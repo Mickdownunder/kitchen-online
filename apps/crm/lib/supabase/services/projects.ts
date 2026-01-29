@@ -1,0 +1,784 @@
+/**
+ * Projects Service
+ *
+ * MIGRATION NOTE:
+ * Die Felder `partial_payments` und `final_invoice` in der projects-Tabelle sind
+ * DEPRECATED und werden durch die neue `invoices`-Tabelle ersetzt.
+ *
+ * Für neue Implementierungen:
+ * - Verwende `createInvoice()`, `getInvoices()`, etc. aus '@/lib/supabase/services/invoices'
+ * - Die Legacy-Felder werden weiterhin gelesen/geschrieben für Abwärtskompatibilität
+ *
+ * Die neuen Tabellen sind:
+ * - `invoices`: Für alle Rechnungen (Anzahlungen + Schlussrechnungen)
+ * - `orders`: Für Auftragsdetails und Status-Tracking
+ *
+ * @see supabase/migrations/20260127160000_create_invoices_table.sql
+ * @see supabase/migrations/20260127160001_create_orders_table.sql
+ */
+
+import { supabase } from '../client'
+import { CustomerProject, InvoiceItem, ProjectDocument } from '@/types'
+import { getCurrentUser } from './auth'
+import { logger } from '@/lib/utils/logger'
+import {
+  calculateItemTotalsFromNet,
+  calculateItemTotalsFromGross,
+  calculateProjectTotals,
+} from '@/lib/utils/priceCalculations'
+import { createFirstPayment } from '@/lib/utils/paymentSchedule'
+
+export async function getProjects(): Promise<CustomerProject[]> {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      console.warn('getProjects: No user authenticated, returning empty array')
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('projects')
+      .select(
+        `
+        *,
+        invoice_items (*)
+      `
+      )
+      // TODO: Re-enable after applying migration: supabase/migrations/20260126113814_add_deleted_at_to_projects.sql
+      // .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('getProjects error:', error)
+      throw error
+    }
+
+    return (data || []).map(mapProjectFromDB)
+  } catch (error: unknown) {
+    // Ignore aborted requests (normal during page navigation)
+    const err = error as { message?: string; name?: string }
+    if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
+      return []
+    }
+    console.error('getProjects failed:', error)
+    // Return empty array instead of throwing to prevent 500 errors
+    return []
+  }
+}
+
+export async function getProject(id: string): Promise<CustomerProject | null> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select(
+      `
+      *,
+      invoice_items (*)
+    `
+    )
+    .eq('id', id)
+    // TODO: Re-enable after applying migration: supabase/migrations/20260126113814_add_deleted_at_to_projects.sql
+    // .is('deleted_at', null)
+    .single()
+
+  if (error) throw error
+  return data ? mapProjectFromDB(data) : null
+}
+
+export async function createProject(
+  project: Omit<CustomerProject, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<CustomerProject> {
+  try {
+    const user = await getCurrentUser()
+    if (!user) throw new Error('Not authenticated')
+
+    const documents = project.documents || []
+    logger.debug('Creating project with data', {
+      component: 'projects',
+      customerName: project.customerName,
+      orderNumber: project.orderNumber,
+      status: project.status,
+      documentsCount: documents.length,
+      documentNames: documents.map((d: ProjectDocument) => d.name),
+    })
+
+    // Automatische Erstellung der ersten Anzahlung, wenn paymentSchedule konfiguriert ist
+    let partialPayments = project.partialPayments || []
+    if (project.paymentSchedule?.autoCreateFirst) {
+      const firstPayment = createFirstPayment(project as CustomerProject)
+      if (firstPayment) {
+        partialPayments = [firstPayment, ...partialPayments]
+        logger.info('Automatisch erste Anzahlung erstellt', {
+          component: 'projects',
+          invoiceNumber: firstPayment.invoiceNumber,
+          amount: firstPayment.amount,
+          description: firstPayment.description,
+        })
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({
+        user_id: user.id,
+        customer_id: project.customerId || null,
+        salesperson_id: project.salespersonId || null,
+        salesperson_name: project.salespersonName || null,
+        customer_name: project.customerName || 'Unbekannt',
+        customer_address: project.address || null,
+        customer_phone: project.phone || null,
+        customer_email: project.email || null,
+        order_number: project.orderNumber || `K-${Date.now()}`,
+        offer_number: project.offerNumber || null,
+        invoice_number: project.invoiceNumber || null,
+        contract_number: project.contractNumber || null,
+        status: project.status || 'Planung',
+        total_amount: project.totalAmount || 0,
+        net_amount: project.netAmount || 0,
+        tax_amount: project.taxAmount || 0,
+        deposit_amount: project.depositAmount || 0,
+        is_deposit_paid: project.isDepositPaid || false,
+        is_final_paid: project.isFinalPaid || false,
+        offer_date: project.offerDate || null,
+        measurement_date: project.measurementDate || null,
+        measurement_time: project.measurementTime || null,
+        is_measured: project.isMeasured || false,
+        order_date: project.orderDate || null,
+        is_ordered: project.isOrdered || false,
+        delivery_date: project.deliveryDate || null,
+        delivery_time: project.deliveryTime || null,
+        installation_date: project.installationDate || null,
+        installation_time: project.installationTime || null,
+        is_installation_assigned: project.isInstallationAssigned || false,
+        completion_date: project.completionDate || null,
+        delivery_type: project.deliveryType || 'delivery',
+        notes: project.notes || '',
+        order_footer_text: project.orderFooterText ?? null,
+        partial_payments: partialPayments,
+        final_invoice: project.finalInvoice || null,
+        complaints: project.complaints || [],
+        documents: documents,
+        payment_schedule: project.paymentSchedule || null,
+        second_payment_created: project.secondPaymentCreated || false,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('createProject error:', JSON.stringify(error, null, 2))
+      const errObj = error as Error & { code?: string; details?: string; hint?: string }
+      console.error('Error details:', {
+        message: errObj?.message,
+        code: errObj?.code,
+        details: errObj?.details,
+        hint: errObj?.hint,
+      })
+      throw error
+    }
+
+    const projectId = data.id
+
+    // Insert invoice items
+    if (project.items && project.items.length > 0) {
+      // KRITISCH: Validiere alle Items vor dem Einfügen
+      for (const item of project.items) {
+        if (item.quantity !== undefined && item.quantity <= 0) {
+          throw new Error(
+            `Ungültige Menge für Artikel "${item.description || 'Unbekannt'}": ${item.quantity}. Menge muss größer als 0 sein.`
+          )
+        }
+        if (item.pricePerUnit !== undefined && item.pricePerUnit < 0) {
+          throw new Error(
+            `Ungültiger Preis für Artikel "${item.description || 'Unbekannt'}": ${item.pricePerUnit}. Preis darf nicht negativ sein.`
+          )
+        }
+      }
+
+      const itemsToInsert = project.items.map(item => {
+        const taxRate = item.taxRate || 20
+        const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1
+        const pricePerUnit = item.pricePerUnit || 0
+
+        // WICHTIG: Nutze exakt die Werte aus dem Frontend-Objekt, rechne NICHT neu,
+        // es sei denn, die Werte fehlen komplett (nicht 0, sondern undefined/null)
+        // Verwende zentrale Utility-Funktion als Fallback
+        // Prüfe ob grossPricePerUnit vorhanden ist (wie im Frontend)
+        const hasGrossPricePerUnit =
+          item.grossPricePerUnit !== undefined && item.grossPricePerUnit !== null
+
+        let netTotal: number
+        let taxAmount: number
+        let grossTotal: number
+        let grossPricePerUnit: number
+
+        if (hasGrossPricePerUnit) {
+          // Brutto-basierte Berechnung (wie im Frontend)
+          const totals = calculateItemTotalsFromGross(quantity, item.grossPricePerUnit!, taxRate)
+          netTotal = item.netTotal ?? totals.netTotal
+          taxAmount = item.taxAmount ?? totals.taxAmount
+          grossTotal = item.grossTotal ?? totals.grossTotal
+          grossPricePerUnit = item.grossPricePerUnit!
+        } else {
+          // Netto-basierte Berechnung (Fallback)
+          const totals = calculateItemTotalsFromNet(quantity, pricePerUnit, taxRate)
+          netTotal = item.netTotal ?? totals.netTotal
+          taxAmount = item.taxAmount ?? totals.taxAmount
+          grossTotal = item.grossTotal ?? totals.grossTotal
+          // Berechne grossPricePerUnit aus grossTotal
+          grossPricePerUnit = quantity > 0 ? grossTotal / quantity : 0
+        }
+
+        return {
+          project_id: projectId,
+          article_id: item.articleId || null,
+          position: item.position || 1,
+          description: item.description || '',
+          model_number: item.modelNumber || null,
+          manufacturer: item.manufacturer || null,
+          specifications: item.specifications || {},
+          quantity: quantity,
+          unit: (() => {
+            const unitMap: Record<string, 'Stk' | 'Pkg' | 'Std' | 'Paush' | 'm' | 'm²' | 'lfm'> = {
+              Stk: 'Stk',
+              stk: 'Stk',
+              STK: 'Stk',
+              Pkg: 'Pkg',
+              pkg: 'Pkg',
+              PKG: 'Pkg',
+              Std: 'Std',
+              std: 'Std',
+              STD: 'Std',
+              Paush: 'Paush',
+              paush: 'Paush',
+              PAUSH: 'Paush',
+              m: 'm',
+              M: 'm',
+              lfm: 'lfm',
+              LFM: 'lfm',
+              'lfm.': 'lfm',
+              'm²': 'm²',
+              m2: 'm²',
+              'M²': 'm²',
+              qm: 'm²',
+              QM: 'm²',
+            }
+            return unitMap[item.unit] || 'Stk'
+          })(),
+          price_per_unit: pricePerUnit,
+          gross_price_per_unit: grossPricePerUnit > 0 ? grossPricePerUnit : null,
+          purchase_price_per_unit:
+            item.purchasePricePerUnit !== undefined &&
+            item.purchasePricePerUnit !== null &&
+            item.purchasePricePerUnit > 0
+              ? item.purchasePricePerUnit
+              : null,
+          tax_rate: String(taxRate),
+          net_total: netTotal,
+          tax_amount: taxAmount,
+          gross_total: grossTotal,
+        }
+      })
+
+      const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert)
+
+      if (itemsError) {
+        console.error('Error inserting items:', JSON.stringify(itemsError, null, 2))
+        // KRITISCH: Rollback - Lösche das erstellte Projekt wenn Items fehlschlagen
+        // Dies verhindert "Ghost Projects" ohne Items in der Datenbank
+        const { error: rollbackError } = await supabase
+          .from('projects')
+          .delete()
+          .eq('id', projectId)
+
+        if (rollbackError) {
+          console.error('Rollback failed:', JSON.stringify(rollbackError, null, 2))
+        } else {
+          logger.debug('Rollback successful: Project deleted after item insertion failure', {
+            component: 'projects',
+          })
+        }
+
+        throw new Error(
+          `Fehler beim Erstellen der Artikel: ${itemsError.message}. Projekt wurde nicht erstellt.`
+        )
+      }
+    }
+
+    return (await getProject(projectId)) as CustomerProject
+  } catch (error: unknown) {
+    console.error('createProject failed:', JSON.stringify(error, null, 2))
+    const err = error as { message?: string; code?: string; details?: string; hint?: string }
+    console.error('Error details:', {
+      message: err?.message,
+      code: err?.code,
+      details: err?.details,
+      hint: err?.hint,
+    })
+    throw error
+  }
+}
+
+export async function updateProject(
+  id: string,
+  project: Partial<CustomerProject>
+): Promise<CustomerProject> {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
+    // Nur Felder aufnehmen, die tatsächlich definiert sind (nicht undefined)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: Record<string, any> = {}
+
+    if (project.customerId !== undefined) updateData.customer_id = project.customerId
+    if (project.salespersonId !== undefined)
+      updateData.salesperson_id = project.salespersonId || null
+    if (project.salespersonName !== undefined)
+      updateData.salesperson_name = project.salespersonName || null
+    if (project.customerName !== undefined) updateData.customer_name = project.customerName
+    if (project.address !== undefined) updateData.customer_address = project.address
+    if (project.phone !== undefined) updateData.customer_phone = project.phone
+    if (project.email !== undefined) updateData.customer_email = project.email
+    if (project.orderNumber !== undefined) updateData.order_number = project.orderNumber
+    if (project.offerNumber !== undefined) updateData.offer_number = project.offerNumber
+    if (project.invoiceNumber !== undefined) updateData.invoice_number = project.invoiceNumber
+    if (project.contractNumber !== undefined) updateData.contract_number = project.contractNumber
+    if (project.status !== undefined) updateData.status = project.status
+    if (project.totalAmount !== undefined) updateData.total_amount = project.totalAmount
+    if (project.netAmount !== undefined) updateData.net_amount = project.netAmount
+    if (project.taxAmount !== undefined) updateData.tax_amount = project.taxAmount
+    if (project.depositAmount !== undefined) updateData.deposit_amount = project.depositAmount
+    if (project.isDepositPaid !== undefined) updateData.is_deposit_paid = project.isDepositPaid
+    if (project.isFinalPaid !== undefined) updateData.is_final_paid = project.isFinalPaid
+    if (project.offerDate !== undefined) updateData.offer_date = project.offerDate
+    if (project.measurementDate !== undefined) updateData.measurement_date = project.measurementDate
+    if (project.measurementTime !== undefined) updateData.measurement_time = project.measurementTime
+    if (project.isMeasured !== undefined) updateData.is_measured = project.isMeasured
+    if (project.orderDate !== undefined) updateData.order_date = project.orderDate
+    if (project.isOrdered !== undefined) updateData.is_ordered = project.isOrdered
+    if (project.deliveryDate !== undefined) updateData.delivery_date = project.deliveryDate
+    if (project.deliveryTime !== undefined) updateData.delivery_time = project.deliveryTime
+    if (project.installationDate !== undefined)
+      updateData.installation_date = project.installationDate
+    if (project.installationTime !== undefined)
+      updateData.installation_time = project.installationTime
+    if (project.isInstallationAssigned !== undefined)
+      updateData.is_installation_assigned = project.isInstallationAssigned
+    if (project.completionDate !== undefined) updateData.completion_date = project.completionDate
+    if (project.deliveryType !== undefined) updateData.delivery_type = project.deliveryType
+    if (project.notes !== undefined) updateData.notes = project.notes
+    if (project.orderFooterText !== undefined)
+      updateData.order_footer_text = project.orderFooterText
+
+    // Add partial_payments, final_invoice, complaints, and documents if provided
+    if (project.partialPayments !== undefined) {
+      updateData.partial_payments = project.partialPayments
+    }
+    if (project.finalInvoice !== undefined) {
+      updateData.final_invoice = project.finalInvoice
+      // WICHTIG: Synchronisiere isFinalPaid automatisch mit finalInvoice.isPaid
+      // Dies stellt sicher, dass das Legacy-Feld immer korrekt ist
+      updateData.is_final_paid = project.finalInvoice.isPaid
+    }
+    if (project.complaints !== undefined) {
+      updateData.complaints = project.complaints
+    }
+    if (project.paymentSchedule !== undefined) {
+      updateData.payment_schedule = project.paymentSchedule
+    }
+    if (project.secondPaymentCreated !== undefined) {
+      updateData.second_payment_created = project.secondPaymentCreated
+    }
+    // WICHTIG: Dokumente immer speichern, auch wenn leer (Array), damit hochgeladene Dokumente nicht verloren gehen
+    if (project.documents !== undefined) {
+      updateData.documents = project.documents
+      logger.debug('Updating documents', {
+        component: 'projects',
+        count: project.documents.length,
+        documentNames: project.documents.map((d: ProjectDocument) => d.name),
+        totalSize: JSON.stringify(project.documents).length,
+      })
+    }
+
+    // Prüfe ob überhaupt Daten zum Update vorhanden sind
+    if (Object.keys(updateData).length === 0) {
+      console.warn('updateProject: No fields to update, returning existing project')
+      return (await getProject(id)) as CustomerProject
+    }
+
+    const { error } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('updateProject error:', JSON.stringify(error, null, 2))
+      const errObj = error as Error & { code?: string; details?: string; hint?: string }
+      console.error('updateProject error details:', {
+        message: errObj?.message,
+        code: errObj?.code,
+        details: errObj?.details,
+        hint: errObj?.hint,
+        updateData: updateData,
+      })
+      throw error
+    }
+
+    // Update invoice items if provided - WICHTIG: Upsert-Logik um Foreign Keys zu erhalten
+    if (project.items !== undefined) {
+      // KRITISCH: Validiere alle Items vor dem Update
+      for (const item of project.items) {
+        if (item.quantity !== undefined && item.quantity <= 0) {
+          throw new Error(
+            `Ungültige Menge für Artikel "${item.description || 'Unbekannt'}": ${item.quantity}. Menge muss größer als 0 sein.`
+          )
+        }
+        if (item.pricePerUnit !== undefined && item.pricePerUnit < 0) {
+          throw new Error(
+            `Ungültiger Preis für Artikel "${item.description || 'Unbekannt'}": ${item.pricePerUnit}. Preis darf nicht negativ sein.`
+          )
+        }
+      }
+
+      // Hole alle bestehenden Items für dieses Projekt
+      const { data: existingItems, error: fetchError } = await supabase
+        .from('invoice_items')
+        .select('id')
+        .eq('project_id', id)
+
+      if (fetchError) {
+        console.error('Error fetching existing items:', fetchError)
+        throw fetchError
+      }
+
+      const existingItemIds = new Set((existingItems || []).map((item: { id: string }) => item.id))
+      const incomingItemIds = new Set<string>()
+
+      // Track successful operations for potential rollback
+      const successfulUpdates: string[] = []
+      const successfulInserts: string[] = []
+
+      // Map unit to valid enum value
+      const unitMap: Record<string, 'Stk' | 'Pkg' | 'Std' | 'Paush' | 'm' | 'm²' | 'lfm'> = {
+        Stk: 'Stk',
+        stk: 'Stk',
+        STK: 'Stk',
+        Pkg: 'Pkg',
+        pkg: 'Pkg',
+        PKG: 'Pkg',
+        Std: 'Std',
+        std: 'Std',
+        STD: 'Std',
+        Paush: 'Paush',
+        paush: 'Paush',
+        PAUSH: 'Paush',
+        m: 'm',
+        M: 'm',
+        lfm: 'lfm',
+        LFM: 'lfm',
+        'lfm.': 'lfm',
+        'm²': 'm²',
+        m2: 'm²',
+        'M²': 'm²',
+        qm: 'm²',
+        QM: 'm²',
+      }
+
+      // Helper function to check if ID is a UUID (from DB)
+      const isUUID = (id: string): boolean => {
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      }
+
+      // Process each item: Update existing or Insert new
+      for (let index = 0; index < project.items.length; index++) {
+        const item = project.items[index]
+        const taxRate = item.taxRate || 20
+        const quantity = item.quantity || 1
+        const pricePerUnit = item.pricePerUnit || 0
+
+        // WICHTIG: Nutze exakt die Werte aus dem Frontend-Objekt, rechne NICHT neu,
+        // es sei denn, die Werte fehlen komplett (nicht 0, sondern undefined/null)
+        // Verwende zentrale Utility-Funktion als Fallback
+        // Prüfe ob grossPricePerUnit vorhanden ist (wie im Frontend)
+        const hasGrossPricePerUnit =
+          item.grossPricePerUnit !== undefined && item.grossPricePerUnit !== null
+
+        const unit = unitMap[item.unit] || 'Stk'
+
+        let netTotal: number
+        let taxAmount: number
+        let grossTotal: number
+        let grossPricePerUnit: number
+
+        if (hasGrossPricePerUnit) {
+          // Brutto-basierte Berechnung (wie im Frontend)
+          const totals = calculateItemTotalsFromGross(quantity, item.grossPricePerUnit!, taxRate)
+          netTotal = item.netTotal ?? totals.netTotal
+          taxAmount = item.taxAmount ?? totals.taxAmount
+          grossTotal = item.grossTotal ?? totals.grossTotal
+          grossPricePerUnit = item.grossPricePerUnit!
+        } else {
+          // Netto-basierte Berechnung (Fallback)
+          const totals = calculateItemTotalsFromNet(quantity, pricePerUnit, taxRate)
+          netTotal = item.netTotal ?? totals.netTotal
+          taxAmount = item.taxAmount ?? totals.taxAmount
+          grossTotal = item.grossTotal ?? totals.grossTotal
+          // Berechne grossPricePerUnit aus grossTotal
+          grossPricePerUnit = quantity > 0 ? grossTotal / quantity : 0
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const itemData: Record<string, any> = {
+          project_id: id,
+          article_id: item.articleId || null,
+          position: item.position || index + 1,
+          description: item.description || '',
+          model_number: item.modelNumber || null,
+          manufacturer: item.manufacturer || null,
+          specifications: item.specifications || {},
+          quantity: quantity,
+          unit: unit,
+          price_per_unit: pricePerUnit,
+          gross_price_per_unit: grossPricePerUnit > 0 ? grossPricePerUnit : null,
+          purchase_price_per_unit:
+            item.purchasePricePerUnit !== undefined &&
+            item.purchasePricePerUnit !== null &&
+            item.purchasePricePerUnit > 0
+              ? item.purchasePricePerUnit
+              : null,
+          tax_rate: String(taxRate),
+          net_total: netTotal,
+          tax_amount: taxAmount,
+          gross_total: grossTotal,
+        }
+
+        // Prüfe ob Item-ID eine UUID ist (aus DB) und ob sie existiert
+        try {
+          if (item.id && isUUID(item.id) && existingItemIds.has(item.id)) {
+            // UPDATE bestehendes Item (behält ID und Foreign Keys)
+            const { error: updateError } = await supabase
+              .from('invoice_items')
+              .update(itemData)
+              .eq('id', item.id)
+
+            if (updateError) {
+              console.error(`Error updating item ${item.id}:`, updateError)
+              throw new Error(
+                `Fehler beim Aktualisieren des Artikels "${item.description || item.id}": ${updateError instanceof Error ? updateError.message : 'Unbekannter Fehler'}`
+              )
+            }
+            successfulUpdates.push(item.id)
+            incomingItemIds.add(item.id)
+          } else {
+            // INSERT neues Item
+            const { data: insertedItem, error: insertError } = await supabase
+              .from('invoice_items')
+              .insert(itemData)
+              .select('id')
+              .single()
+
+            if (insertError) {
+              console.error('Error inserting item:', insertError)
+              throw new Error(
+                `Fehler beim Einfügen des Artikels "${item.description || 'Neu'}": ${insertError instanceof Error ? insertError.message : 'Unbekannter Fehler'}`
+              )
+            }
+            if (insertedItem) {
+              successfulInserts.push((insertedItem as { id: string }).id)
+              incomingItemIds.add((insertedItem as { id: string }).id)
+            }
+          }
+        } catch (itemError: unknown) {
+          // KRITISCH: Rollback bei Fehler - lösche neu eingefügte Items
+          if (successfulInserts.length > 0) {
+            console.warn(`Rolling back ${successfulInserts.length} inserted items due to error`)
+            const { error: rollbackError } = await supabase
+              .from('invoice_items')
+              .delete()
+              .in('id', successfulInserts)
+
+            if (rollbackError) {
+              console.error('Rollback of inserted items failed:', rollbackError)
+            }
+          }
+          throw itemError
+        }
+      }
+
+      // Lösche nur Items, die nicht mehr in der Liste sind
+      const itemsToDelete = Array.from(existingItemIds).filter(id => !incomingItemIds.has(id))
+      if (itemsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('invoice_items')
+          .delete()
+          .in('id', itemsToDelete)
+
+        if (deleteError) {
+          console.error('Error deleting removed items:', deleteError)
+          // Warnung statt Fehler
+          console.warn(
+            'Some items could not be deleted, but foreign keys should be handled by DB constraints'
+          )
+        }
+      }
+    }
+
+    // Fetch the complete project with items
+    return (await getProject(id)) as CustomerProject
+  } catch (error) {
+    console.error('updateProject failed:', error)
+    throw error
+  }
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  // TODO: Re-enable soft delete after applying migration: supabase/migrations/20260126113814_add_deleted_at_to_projects.sql
+  // Soft delete: Set deleted_at timestamp instead of actually deleting
+  // const { error } = await supabase
+  //   .from('projects')
+  //   .update({ deleted_at: new Date().toISOString() })
+  //   .eq('id', id)
+
+  // Temporary: Hard delete until migration is applied
+  const { error } = await supabase.from('projects').delete().eq('id', id)
+
+  if (error) throw error
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapProjectFromDB(dbProject: Record<string, any>): CustomerProject {
+  // WICHTIG: Berechne totalAmount aus exakten grossTotal-Werten der Items,
+  // falls die Items vorhanden sind (korrigiert falsche DB-Werte)
+  // Verwende zentrale Utility-Funktion für konsistente Berechnung
+  const items: InvoiceItem[] = (dbProject.invoice_items || []).map(mapInvoiceItemFromDB)
+  let calculatedTotalAmount = parseFloat(dbProject.total_amount || 0)
+
+  if (items.length > 0) {
+    // Verwende zentrale Utility-Funktion für Projekt-Gesamtwerte
+    const { grossTotal } = calculateProjectTotals(items)
+    calculatedTotalAmount = grossTotal
+  }
+
+  // WICHTIG: Synchronisiere isFinalPaid mit finalInvoice.isPaid, falls finalInvoice existiert
+  // Dies stellt sicher, dass das Legacy-Feld immer korrekt ist, auch wenn die DB inkonsistent ist
+  // Parse finalInvoice sicher - könnte als String oder Objekt kommen
+  let finalInvoice = dbProject.final_invoice || undefined
+  if (finalInvoice && typeof finalInvoice === 'string') {
+    try {
+      finalInvoice = JSON.parse(finalInvoice)
+    } catch (e) {
+      console.warn('Error parsing finalInvoice from string:', e)
+      finalInvoice = undefined
+    }
+  }
+  // Stelle sicher, dass isPaid ein Boolean ist (könnte als String gespeichert sein)
+  if (finalInvoice && typeof finalInvoice.isPaid !== 'boolean') {
+    finalInvoice.isPaid =
+      finalInvoice.isPaid === true || finalInvoice.isPaid === 'true' || finalInvoice.isPaid === 1
+  }
+  const isFinalPaid = finalInvoice
+    ? finalInvoice.isPaid === true || finalInvoice.isPaid === 'true' || finalInvoice.isPaid === 1
+    : dbProject.is_final_paid || false
+
+  return {
+    id: dbProject.id,
+    userId: dbProject.user_id,
+    customerId: dbProject.customer_id,
+    salespersonId: dbProject.salesperson_id,
+    salespersonName: dbProject.salesperson_name,
+    customerName: dbProject.customer_name,
+    address: dbProject.customer_address,
+    phone: dbProject.customer_phone,
+    email: dbProject.customer_email,
+    orderNumber: dbProject.order_number,
+    offerNumber: dbProject.offer_number,
+    invoiceNumber: dbProject.invoice_number,
+    contractNumber: dbProject.contract_number,
+    status: dbProject.status as CustomerProject['status'],
+    items: items,
+    totalAmount: calculatedTotalAmount, // Verwende berechneten Wert statt DB-Wert
+    netAmount: parseFloat(dbProject.net_amount || 0),
+    taxAmount: parseFloat(dbProject.tax_amount || 0),
+    depositAmount: parseFloat(dbProject.deposit_amount || 0),
+    isDepositPaid: dbProject.is_deposit_paid,
+    isFinalPaid: isFinalPaid,
+    partialPayments: dbProject.partial_payments || [],
+    finalInvoice: finalInvoice,
+    paymentSchedule: dbProject.payment_schedule || undefined,
+    secondPaymentCreated: dbProject.second_payment_created || false,
+    offerDate: dbProject.offer_date,
+    measurementDate: dbProject.measurement_date,
+    measurementTime: dbProject.measurement_time,
+    isMeasured: dbProject.is_measured,
+    orderDate: dbProject.order_date,
+    isOrdered: dbProject.is_ordered,
+    deliveryDate: dbProject.delivery_date,
+    deliveryTime: dbProject.delivery_time,
+    installationDate: dbProject.installation_date,
+    installationTime: dbProject.installation_time,
+    isInstallationAssigned: dbProject.is_installation_assigned,
+    completionDate: dbProject.completion_date,
+    documents: (dbProject.documents || []) as ProjectDocument[],
+    complaints: dbProject.complaints || [],
+    notes: dbProject.notes || '',
+    orderFooterText: dbProject.order_footer_text ?? undefined,
+    deliveryStatus: dbProject.delivery_status,
+    allItemsDelivered: dbProject.all_items_delivered || false,
+    readyForAssemblyDate: dbProject.ready_for_assembly_date,
+    deliveryType: (dbProject.delivery_type as 'delivery' | 'pickup') || 'delivery',
+    createdAt: dbProject.created_at,
+    updatedAt: dbProject.updated_at,
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapInvoiceItemFromDB(dbItem: Record<string, any>): InvoiceItem {
+  // Map 'm' back to 'lfm' if description contains "laufmeter"
+  let unit = dbItem.unit as InvoiceItem['unit']
+  if (unit === 'm' && dbItem.description?.toLowerCase().includes('laufmeter')) {
+    unit = 'lfm'
+  }
+
+  const quantity = parseFloat(dbItem.quantity || 0)
+  const grossTotal = parseFloat(dbItem.gross_total || 0)
+
+  // WICHTIG: Verwende zuerst die gespeicherte gross_price_per_unit Spalte (falls vorhanden),
+  // sonst leite sie aus gross_total ab
+  const grossPricePerUnit =
+    dbItem.gross_price_per_unit !== null && dbItem.gross_price_per_unit !== undefined
+      ? parseFloat(dbItem.gross_price_per_unit)
+      : quantity > 0 && Number.isFinite(grossTotal) && grossTotal > 0
+        ? Math.round((grossTotal / quantity) * 100) / 100
+        : undefined
+
+  return {
+    id: dbItem.id,
+    articleId: dbItem.article_id,
+    position: dbItem.position,
+    description: dbItem.description,
+    modelNumber: dbItem.model_number,
+    manufacturer: dbItem.manufacturer,
+    specifications: dbItem.specifications || {},
+    quantity,
+    unit: unit,
+    pricePerUnit: parseFloat(dbItem.price_per_unit || 0),
+    grossPricePerUnit,
+    purchasePricePerUnit: dbItem.purchase_price_per_unit
+      ? parseFloat(dbItem.purchase_price_per_unit)
+      : undefined,
+    taxRate: parseInt(dbItem.tax_rate || '20') as 10 | 13 | 20,
+    netTotal: parseFloat(dbItem.net_total || 0),
+    taxAmount: parseFloat(dbItem.tax_amount || 0),
+    grossTotal,
+    deliveryStatus: dbItem.delivery_status,
+    expectedDeliveryDate: dbItem.expected_delivery_date,
+    actualDeliveryDate: dbItem.actual_delivery_date,
+    quantityOrdered: dbItem.quantity_ordered ? parseFloat(dbItem.quantity_ordered) : undefined,
+    quantityDelivered: dbItem.quantity_delivered
+      ? parseFloat(dbItem.quantity_delivered)
+      : undefined,
+  }
+}

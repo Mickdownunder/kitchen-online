@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    @apply antialiased;
+  }
+}
+
+/* ============================================
+   PRINT STYLES - Professional PDF Output
+   ============================================ */
+@media print {
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 15mm 15mm 20mm 15mm;
+  }
+
+  /* Force color printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide navigation and non-essential elements */
+  aside,
+  nav,
+  .no-print,
+  [class*='md:hidden'],
+  [class*='fixed top-0'],
+  button:not(.print-button) {
+    display: none !important;
+  }
+
+  /* Reset main layout for full-width print */
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Make main content full width */
+  main,
+  .flex-1 {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Remove flex layout that includes sidebar */
+  .flex.h-screen {
+    display: block !important;
+  }
+
+  /* Invoice specific styles */
+  .invoice-container {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .invoice-page {
+    background: white !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  /* Ensure text doesn't break awkwardly */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    page-break-after: avoid;
+  }
+
+  table,
+  figure {
+    page-break-inside: avoid;
+  }
+
+  /* Remove background gradients */
+  [class*='bg-gradient'],
+  [class*='from-slate'],
+  [class*='via-'],
+  [class*='to-slate'] {
+    background: white !important;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply rounded-full bg-slate-100;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300 hover:bg-slate-400;
+  }
+
+  /* Glassmorphism effect */
+  .glass {
+    @apply border border-white/20 bg-white/80 backdrop-blur-xl;
+  }
+
+  /* Smooth animations */
+  .animate-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-amber-600 to-amber-400 bg-clip-text text-transparent;
+  }
+
+  /* Subtle glow effect */
+  .glow {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl;
+  }
+}

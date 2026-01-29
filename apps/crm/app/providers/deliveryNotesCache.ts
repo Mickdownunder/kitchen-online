@@ -1,0 +1,47 @@
+import type React from 'react'
+import type { CustomerDeliveryNote, DeliveryNote } from '@/types'
+import {
+  getCustomerDeliveryNotes as fetchAllCustomerDeliveryNotes,
+  getDeliveryNotes,
+} from '@/lib/supabase/services'
+import { CACHE_DURATION_MS } from './projectsCache'
+
+export async function refreshDeliveryNotesWithCache(opts: {
+  force?: boolean
+  lastRefresh: number
+  setLastRefresh: React.Dispatch<React.SetStateAction<number>>
+  isRefreshingRef: React.MutableRefObject<boolean>
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>
+  setSupplierDeliveryNotes: React.Dispatch<React.SetStateAction<DeliveryNote[]>>
+  setCustomerDeliveryNotes: React.Dispatch<React.SetStateAction<CustomerDeliveryNote[]>>
+}): Promise<void> {
+  const now = Date.now()
+  const force = Boolean(opts.force)
+
+  if (opts.isRefreshingRef.current) return
+  if (!force && opts.lastRefresh > 0 && now - opts.lastRefresh < CACHE_DURATION_MS) return
+
+  try {
+    opts.isRefreshingRef.current = true
+    opts.setIsLoading(true)
+
+    const [supplier, customer] = await Promise.all([
+      getDeliveryNotes(),
+      fetchAllCustomerDeliveryNotes(),
+    ])
+    opts.setSupplierDeliveryNotes(supplier || [])
+    opts.setCustomerDeliveryNotes(customer || [])
+    opts.setLastRefresh(Date.now())
+  } catch (error: unknown) {
+    // Ignore aborted requests (normal during page navigation)
+    const errMessage = error instanceof Error ? error.message : ''
+    const errName = error instanceof Error ? error.name : ''
+    if (errMessage.includes('aborted') || errName === 'AbortError') {
+      return
+    }
+    console.error('Error loading delivery notes:', error)
+  } finally {
+    opts.setIsLoading(false)
+    opts.isRefreshingRef.current = false
+  }
+}

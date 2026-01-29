@@ -1,0 +1,241 @@
+'use client'
+
+import React from 'react'
+import { Pencil, Trash2, Check, X } from 'lucide-react'
+import type { PartialPayment } from '@/types'
+
+interface PaymentRowProps {
+  payment: PartialPayment
+  index: number
+  isEditing: boolean
+  editFormData: Partial<PartialPayment> | null
+  editingPercentInput: string
+  grossTotal: number
+  onEdit: () => void
+  onSave: () => void
+  onCancel: () => void
+  onDelete: () => void
+  onFormChange: (data: Partial<PartialPayment>) => void
+  onPercentChange: (value: string) => void
+  onPercentBlur: () => void
+  onQuickPercent: (percent: number) => void
+  onTogglePaid: (isPaid: boolean) => void
+}
+
+export const PaymentRow: React.FC<PaymentRowProps> = ({
+  payment,
+  index,
+  isEditing,
+  editFormData,
+  editingPercentInput,
+  grossTotal,
+  onEdit,
+  onSave,
+  onCancel,
+  onDelete,
+  onFormChange,
+  onPercentChange,
+  onPercentBlur,
+  onQuickPercent,
+  onTogglePaid,
+}) => {
+  const paymentData = isEditing && editFormData ? editFormData : payment
+
+  if (isEditing) {
+    return (
+      <div className="rounded-xl border-2 border-slate-200 bg-slate-50 p-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-black uppercase tracking-widest text-amber-600">
+              Anzahlung {index + 1}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onSave}
+                className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-emerald-600"
+              >
+                <Check className="h-4 w-4" />
+                Speichern
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex items-center gap-2 rounded-xl bg-slate-300 px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-700 transition-all hover:bg-slate-400"
+              >
+                <X className="h-4 w-4" />
+                Abbrechen
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
+              Beschreibung
+            </label>
+            <input
+              type="text"
+              placeholder="z.B. 40% Anzahlung, 40% vor Lieferung"
+              className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
+              value={paymentData?.description || ''}
+              onChange={e => onFormChange({ ...paymentData, description: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
+                Betrag (€)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
+                value={paymentData?.amount || ''}
+                onChange={e => {
+                  const amount = parseFloat(e.target.value) || 0
+                  onFormChange({ ...paymentData, amount })
+                  if (grossTotal > 0 && amount > 0) {
+                    const percent = (amount / grossTotal) * 100
+                    onPercentChange(percent.toFixed(1))
+                  } else {
+                    onPercentChange('')
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
+                Oder Prozent (%)
+              </label>
+              <div className="mb-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onQuickPercent(30)}
+                  className="flex-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-black uppercase tracking-widest text-amber-700 transition-all hover:bg-amber-200"
+                >
+                  30%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onQuickPercent(40)}
+                  className="flex-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-black uppercase tracking-widest text-amber-700 transition-all hover:bg-amber-200"
+                >
+                  40%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onQuickPercent(50)}
+                  className="flex-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-black uppercase tracking-widest text-amber-700 transition-all hover:bg-amber-200"
+                >
+                  50%
+                </button>
+              </div>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="40"
+                className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
+                value={
+                  editingPercentInput ||
+                  (paymentData?.amount && grossTotal > 0
+                    ? ((paymentData.amount / grossTotal) * 100).toFixed(1)
+                    : '')
+                }
+                onChange={e => onPercentChange(e.target.value)}
+                onBlur={onPercentBlur}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
+                Datum
+              </label>
+              <input
+                type="date"
+                className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
+                value={paymentData?.date || ''}
+                onChange={e => onFormChange({ ...paymentData, date: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {paymentData?.amount && paymentData.amount > 0 && grossTotal > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm font-bold text-amber-800">
+                {((paymentData.amount / grossTotal) * 100).toFixed(1)}% von{' '}
+                {grossTotal.toLocaleString('de-AT')} €
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border-2 border-slate-200 bg-slate-50 p-6">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-base font-black text-slate-900">
+              {payment.description || `Anzahlung ${index + 1}`}
+            </span>
+            {grossTotal > 0 && (
+              <span className="text-xs text-slate-500">
+                ({((payment.amount / grossTotal) * 100).toFixed(1)}%)
+              </span>
+            )}
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-widest ${
+                payment.isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+              }`}
+            >
+              {payment.isPaid ? 'Bezahlt' : 'Offen'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xl font-black text-slate-900">
+              {payment.amount.toLocaleString('de-AT')} €
+            </span>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex items-center gap-2 rounded-xl bg-slate-200 px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-700 transition-all hover:bg-slate-300"
+            >
+              <Pencil className="h-4 w-4" />
+              Bearbeiten
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex items-center gap-2 rounded-xl bg-red-100 px-3 py-2 text-xs font-black uppercase tracking-widest text-red-700 transition-all hover:bg-red-200"
+            >
+              <Trash2 className="h-4 w-4" />
+              Löschen
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-200 pt-2">
+          <div className="flex items-center gap-4 text-sm text-slate-600">
+            <span>Datum: {new Date(payment.date).toLocaleDateString('de-DE')}</span>
+            {payment.isPaid && payment.paidDate && (
+              <span className="font-bold text-emerald-700">
+                Bezahlt am: {new Date(payment.paidDate).toLocaleDateString('de-DE')}
+              </span>
+            )}
+          </div>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-amber-500"
+              checked={payment.isPaid}
+              onChange={e => onTogglePaid(e.target.checked)}
+            />
+            <span className="text-sm font-bold text-slate-700">Als bezahlt markieren</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  )
+}

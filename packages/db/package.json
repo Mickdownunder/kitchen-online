@@ -1,0 +1,13 @@
+{
+  "name": "@kitchen/db",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "migrate": "supabase db push",
+    "generate-types": "supabase gen types typescript --local > src/types.ts",
+    "reset": "supabase db reset"
+  },
+  "devDependencies": {
+    "supabase": "^1.200.0"
+  }
+}
