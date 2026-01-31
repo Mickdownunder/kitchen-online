@@ -66,6 +66,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // ============================================
+  // PORTAL SUBDOMAIN REWRITE
+  // ============================================
+  // When on portal subdomain and path doesn't start with /portal, rewrite to /portal/...
+  if (isPortalSubdomain && !pathname.startsWith('/portal') && !pathname.startsWith('/api') && !pathname.startsWith('/_next')) {
+    // Rewrite /login to /portal/login, / to /portal, etc.
+    const rewriteUrl = request.nextUrl.clone()
+    rewriteUrl.pathname = `/portal${pathname === '/' ? '' : pathname}`
+    console.log(`[Middleware] Portal subdomain rewrite: ${pathname} -> ${rewriteUrl.pathname}`)
+    return NextResponse.rewrite(rewriteUrl)
+  }
+
   // Add pathname header for layout detection
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-pathname', pathname)
@@ -84,19 +96,16 @@ export async function middleware(request: NextRequest) {
   // PORTAL ROUTES (Customer Portal) - Separate cookies
   // ============================================
   // Portal route if: path starts with /portal OR request is from portal subdomain
-  const isPortalRoute = pathname.startsWith('/portal') || isPortalSubdomain
+  const isPortalRoute = pathname.startsWith('/portal')
   
   // Public portal routes (no auth required)
-  // When on portal subdomain, paths are /login instead of /portal/login
-  const publicPortalPaths = ['/login', '/forgot-password', '/reset-password', '/setup-password']
   const publicPortalRoutes = [
     '/portal/login',
     '/portal/forgot-password',
     '/portal/reset-password',
     '/portal/setup-password',
   ]
-  const isPublicPortalRoute = publicPortalRoutes.includes(pathname) || 
-    (isPortalSubdomain && publicPortalPaths.includes(pathname))
+  const isPublicPortalRoute = publicPortalRoutes.includes(pathname)
 
   if (isPortalRoute) {
     let portalUser = null
@@ -113,11 +122,8 @@ export async function middleware(request: NextRequest) {
     if (isPublicPortalRoute) {
       // If customer is already logged in and on login page, redirect to portal dashboard
       const userRole = portalUser?.app_metadata?.role
-      const isOnLoginPage = pathname === '/portal/login' || (isPortalSubdomain && pathname === '/login')
-      if (portalUser && userRole === 'customer' && isOnLoginPage) {
-        // On portal subdomain, redirect to / (which maps to /portal)
-        const redirectPath = isPortalSubdomain ? '/' : '/portal'
-        return NextResponse.redirect(new URL(redirectPath, request.url))
+      if (portalUser && userRole === 'customer' && pathname === '/portal/login') {
+        return NextResponse.redirect(new URL('/portal', request.url))
       }
       return response
     }
@@ -125,10 +131,8 @@ export async function middleware(request: NextRequest) {
     // For all other portal routes, require customer session
     const userRole = portalUser?.app_metadata?.role
     if (!portalUser || userRole !== 'customer') {
-      // On portal subdomain, redirect to /login (which maps to /portal/login)
-      const loginPath = isPortalSubdomain ? '/login' : '/portal/login'
-      console.log(`[Middleware] Portal access denied, redirecting to ${loginPath}`)
-      return NextResponse.redirect(new URL(loginPath, request.url))
+      console.log('[Middleware] Portal access denied, redirecting to /portal/login')
+      return NextResponse.redirect(new URL('/portal/login', request.url))
     }
 
     // Customer is authenticated, allow access
