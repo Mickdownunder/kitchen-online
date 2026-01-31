@@ -6,6 +6,9 @@ import { supabase } from '@/lib/supabase/client'
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 import Link from 'next/link'
+import Image from 'next/image'
+
+const LOGO_URL = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-02%20schwarz.png'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -55,11 +58,18 @@ export default function LoginForm() {
         <div className="rounded-3xl border border-white/10 bg-white p-8 shadow-2xl">
           {/* Logo/Brand */}
           <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/30">
-              <span className="text-2xl font-black text-white">Ki</span>
+            <div className="mx-auto mb-4 flex h-20 items-center justify-center">
+              <Image
+                src={LOGO_URL}
+                alt="KüchenOnline"
+                width={180}
+                height={60}
+                className="h-auto w-auto max-h-16"
+                priority
+              />
             </div>
             <h1 className="mb-2 text-2xl font-black text-slate-900">Willkommen zurück</h1>
-            <p className="text-sm text-slate-500">Melden Sie sich in Ihrem Konto an</p>
+            <p className="text-sm text-slate-500">Melden Sie sich in Ihrem CRM-Konto an</p>
           </div>
 
           {/* Error Message */}
@@ -146,7 +156,7 @@ export default function LoginForm() {
 
         {/* Footer */}
         <div className="mt-6 text-center text-sm text-slate-400">
-          <p>© 2025 Kitchen-Ki. Alle Rechte vorbehalten.</p>
+          <p>© 2025 KüchenOnline GmbH. Alle Rechte vorbehalten.</p>
         </div>
       </div>
     </div>

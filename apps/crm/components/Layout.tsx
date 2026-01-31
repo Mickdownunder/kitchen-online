@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -22,6 +23,9 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { signOut, getCompanySettings } from '@/lib/supabase/services'
+
+// Weißes Logo für dunklen Hintergrund
+const LOGO_URL_WHITE = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-03%20weis.png'
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
@@ -209,12 +213,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       >
         <Link
           href="/dashboard"
-          className="group flex items-center gap-3 border-b border-blue-900/50 p-8 transition-all duration-200 hover:bg-blue-900/50"
+          className="group flex items-center justify-center border-b border-blue-900/50 p-6 transition-all duration-200 hover:bg-blue-900/50"
           aria-label="Zur Startseite"
         >
-          <h1 className="bg-gradient-to-r from-white to-blue-50 bg-clip-text text-xl font-black uppercase tracking-tighter text-transparent">
-            {displayName || 'Firmenname'}
-          </h1>
+          <Image
+            src={LOGO_URL_WHITE}
+            alt={displayName || 'KüchenOnline'}
+            width={160}
+            height={50}
+            className="h-auto w-auto max-h-12"
+            priority
+          />
         </Link>
         <nav className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto p-4" aria-label="Hauptmenü">
           {visibleMenuItems.map(item => (
@@ -267,10 +276,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Mobile Nav - Hidden when printing */}
       <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b border-blue-950 bg-blue-900 p-4 text-white md:hidden print:!hidden">
-        <Link href="/dashboard" className="flex items-center gap-2" aria-label="Zur Startseite">
-          <span className="font-black uppercase tracking-tighter">
-            {displayName || 'Firmenname'}
-          </span>
+        <Link href="/dashboard" className="flex items-center" aria-label="Zur Startseite">
+          <Image
+            src={LOGO_URL_WHITE}
+            alt={displayName || 'KüchenOnline'}
+            width={120}
+            height={40}
+            className="h-auto w-auto max-h-8"
+          />
         </Link>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
