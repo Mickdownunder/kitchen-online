@@ -125,25 +125,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 6. Public URL generieren
-    const { data: urlData } = supabase.storage
-      .from('documents')
-      .getPublicUrl(storagePath)
-
-    // 7. Document in DB speichern
+    // 6. Document in DB speichern
+    const uploadedAt = new Date().toISOString()
     const { data: document, error: dbError } = await supabase
       .from('documents')
       .insert({
         project_id,
         type: 'KUNDEN_DOKUMENT',
-        file_name: file.name,
-        file_url: urlData.publicUrl,
-        storage_path: storagePath,
+        name: file.name,
+        file_path: storagePath,
         uploaded_by: customer_id,
         file_size: file.size,
         mime_type: file.type,
+        uploaded_at: uploadedAt,
       })
-      .select('id, file_name, created_at')
+      .select('id, name, uploaded_at')
       .single()
 
     if (dbError) {
@@ -162,8 +158,8 @@ export async function POST(request: NextRequest) {
       success: true,
       document: {
         id: document.id,
-        name: document.file_name,
-        createdAt: document.created_at,
+        name: document.name,
+        createdAt: document.uploaded_at,
       },
     })
 

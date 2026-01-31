@@ -18,6 +18,7 @@ import {
   Truck,
   BarChart3,
   FileCheck,
+  MessageSquare,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { signOut, getCompanySettings } from '@/lib/supabase/services'
@@ -48,15 +49,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   }, [user])
 
-  // Don't show layout on auth pages (login, signup, forgot-password, reset-password)
+  // Don't show layout on auth pages or portal routes
   const isAuthPage =
     pathname === '/login' ||
     pathname === '/signup' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password'
+  
+  // Portal has its own separate layout
+  const isPortalRoute = pathname?.startsWith('/portal')
 
-  // If on auth page, just show children without layout
-  if (isAuthPage) {
+  // If on auth page or portal, just show children without CRM layout
+  if (isAuthPage || isPortalRoute) {
     return <>{children}</>
   }
 
@@ -116,6 +120,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       label: 'Reklamationen',
       icon: ShieldAlert,
       permission: 'menu_complaints' as const,
+    },
+    {
+      id: '/tickets',
+      label: 'Kundenanfragen',
+      icon: MessageSquare,
+      permission: 'menu_complaints' as const, // Reuse complaints permission for now
     },
     // Finanzen & Berichte
     {

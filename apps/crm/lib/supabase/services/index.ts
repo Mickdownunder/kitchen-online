@@ -10,6 +10,7 @@ export * from './email'
 export * from './invoices'
 export * from './orders'
 export * from './permissions'
+export * from './portalDocuments'
 export * from './projects'
 export * from './supplierInvoices'
 // Note: audit.ts exports are NOT re-exported here because they use server-only imports

@@ -275,6 +275,15 @@ export async function createProject(
           net_total: netTotal,
           tax_amount: taxAmount,
           gross_total: grossTotal,
+          // Warranty / Appliance fields
+          show_in_portal: item.showInPortal || false,
+          serial_number: item.serialNumber || null,
+          installation_date: item.installationDate || null,
+          warranty_until: item.warrantyUntil || null,
+          appliance_category: item.applianceCategory || null,
+          manufacturer_support_url: item.manufacturerSupportUrl || null,
+          manufacturer_support_phone: item.manufacturerSupportPhone || null,
+          manufacturer_support_email: item.manufacturerSupportEmail || null,
         }
       })
 
@@ -553,6 +562,15 @@ export async function updateProject(
           net_total: netTotal,
           tax_amount: taxAmount,
           gross_total: grossTotal,
+          // Warranty / Appliance fields
+          show_in_portal: item.showInPortal || false,
+          serial_number: item.serialNumber || null,
+          installation_date: item.installationDate || null,
+          warranty_until: item.warrantyUntil || null,
+          appliance_category: item.applianceCategory || null,
+          manufacturer_support_url: item.manufacturerSupportUrl || null,
+          manufacturer_support_phone: item.manufacturerSupportPhone || null,
+          manufacturer_support_email: item.manufacturerSupportEmail || null,
         }
 
         // Prüfe ob Item-ID eine UUID ist (aus DB) und ob sie existiert
@@ -780,5 +798,14 @@ function mapInvoiceItemFromDB(dbItem: Record<string, any>): InvoiceItem {
     quantityDelivered: dbItem.quantity_delivered
       ? parseFloat(dbItem.quantity_delivered)
       : undefined,
+    // Warranty / Appliance fields
+    showInPortal: dbItem.show_in_portal || false,
+    serialNumber: dbItem.serial_number || undefined,
+    installationDate: dbItem.installation_date || undefined,
+    warrantyUntil: dbItem.warranty_until || undefined,
+    applianceCategory: dbItem.appliance_category || undefined,
+    manufacturerSupportUrl: dbItem.manufacturer_support_url || undefined,
+    manufacturerSupportPhone: dbItem.manufacturer_support_phone || undefined,
+    manufacturerSupportEmail: dbItem.manufacturer_support_email || undefined,
   }
 }

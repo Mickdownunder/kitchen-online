@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, Trash2, Search, Package, Edit2, Check, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Search, Package, Edit2, Check, GripVertical, Shield } from 'lucide-react'
 import { CustomerProject, InvoiceItem, Article } from '@/types'
+import { ApplianceModal } from './ApplianceModal'
 import { useAuth } from '@/hooks/useAuth'
 import { usePriceInput } from '@/hooks/usePriceInput'
 import { calculateItemTotalsFromGross, roundTo2Decimals } from '@/lib/utils/priceCalculations'
@@ -121,6 +122,7 @@ export function ProjectItemsTab({
   const [priceMode, setPriceMode] = useState<'netto' | 'brutto'>('brutto')
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [priceInputs, setPriceInputs] = useState<Record<string, string>>({})
+  const [applianceModalItem, setApplianceModalItem] = useState<InvoiceItem | null>(null)
 
   const { hasPermission } = useAuth()
   const canViewPurchasePrices = hasPermission('view_purchase_prices')
@@ -749,6 +751,18 @@ export function ProjectItemsTab({
                         )}
                         <button
                           type="button"
+                          onClick={() => setApplianceModalItem(item)}
+                          className={`rounded p-1.5 transition-colors ${
+                            item.showInPortal 
+                              ? 'bg-amber-100 hover:bg-amber-200' 
+                              : 'bg-slate-100 hover:bg-slate-200'
+                          }`}
+                          title="Geräte-Einstellungen"
+                        >
+                          <Shield className={`h-3.5 w-3.5 ${item.showInPortal ? 'text-amber-600' : 'text-slate-400'}`} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => removeItem(item.id)}
                           className="rounded bg-red-100 p-1.5 transition-colors hover:bg-red-200"
                           title="Löschen"
@@ -842,6 +856,20 @@ export function ProjectItemsTab({
             )}
           </div>
         </div>
+      )}
+
+      {/* Appliance Modal */}
+      {applianceModalItem && (
+        <ApplianceModal
+          item={applianceModalItem}
+          isOpen={!!applianceModalItem}
+          onClose={() => setApplianceModalItem(null)}
+          onSave={(updates) => {
+            updateItem(applianceModalItem.id, updates)
+            setApplianceModalItem(null)
+          }}
+          projectId={formData.id}
+        />
       )}
     </div>
   )

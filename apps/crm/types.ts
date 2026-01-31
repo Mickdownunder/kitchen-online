@@ -232,6 +232,16 @@ export interface InvoiceItem {
   actualDeliveryDate?: string
   quantityOrdered?: number
   quantityDelivered?: number
+
+  // Warranty / Appliance (für Kundenportal)
+  showInPortal?: boolean // Im Kundenportal als Gerät anzeigen
+  serialNumber?: string // E-Nummer / Seriennummer
+  installationDate?: string // Installationsdatum
+  warrantyUntil?: string // Garantie bis
+  manufacturerSupportUrl?: string
+  manufacturerSupportPhone?: string
+  manufacturerSupportEmail?: string
+  applianceCategory?: string // z.B. "Backofen", "Geschirrspüler"
 }
 
 export interface ProjectDocument {

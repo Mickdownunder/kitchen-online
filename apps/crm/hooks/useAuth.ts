@@ -83,17 +83,17 @@ export function useAuth() {
 
       // Check if response is OK and content-type is JSON
       if (!response.ok) {
+        // 404 is expected when no pending invite exists - don't log as error
+        if (response.status === 404) {
+          return
+        }
         const contentType = response.headers.get('content-type')
         if (contentType && contentType.includes('application/json')) {
           const errorData = await response.json()
-          console.error('[useAuth] Process invite error:', errorData)
-        } else {
-          // HTML error page - don't try to parse as JSON
-          const text = await response.text()
-          console.error(
-            '[useAuth] Process invite failed with non-JSON response:',
-            text.substring(0, 100)
-          )
+          // Only log if there's actual error content
+          if (errorData && Object.keys(errorData).length > 0) {
+            console.warn('[useAuth] Process invite issue:', errorData)
+          }
         }
         return
       }

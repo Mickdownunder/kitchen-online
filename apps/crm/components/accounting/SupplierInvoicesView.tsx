@@ -81,23 +81,27 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
   const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('bank')
 
+  // Use ref to store onStatsChange to avoid dependency issues
+  const onStatsChangeRef = React.useRef(onStatsChange)
+  onStatsChangeRef.current = onStatsChange
+
   const loadInvoices = useCallback(async () => {
     setLoading(true)
     try {
       const data = await getSupplierInvoices()
       setInvoices(data)
 
-      // Stats für Parent-Komponente
-      if (onStatsChange) {
+      // Stats für Parent-Komponente (use ref to avoid dependency)
+      if (onStatsChangeRef.current) {
         const totalTax = data.reduce((sum, inv) => sum + inv.taxAmount, 0)
-        onStatsChange({ totalTax, count: data.length })
+        onStatsChangeRef.current({ totalTax, count: data.length })
       }
     } catch (error) {
       console.error('Fehler beim Laden der Eingangsrechnungen:', error)
     } finally {
       setLoading(false)
     }
-  }, [onStatsChange])
+  }, [])
 
   useEffect(() => {
     loadInvoices()

@@ -2,10 +2,7 @@
  * Centralized logging utility
  * Provides structured logging with context (user ID, request ID, timestamp)
  * Supports different log levels: DEBUG, INFO, WARN, ERROR
- * Integrated with Sentry for error tracking in production
  */
-
-import * as Sentry from '@sentry/nextjs'
 
 export enum LogLevel {
   DEBUG = 0,
@@ -63,13 +60,6 @@ export class Logger {
     if (level < this.minLevel) return
 
     const formatted = this.formatMessage(level, message, context, error)
-    const entry: LogEntry = {
-      level,
-      message,
-      context,
-      timestamp: new Date().toISOString(),
-      error,
-    }
 
     // Console output
     switch (level) {
@@ -87,40 +77,6 @@ export class Logger {
       case LogLevel.ERROR:
         console.error(formatted)
         break
-    }
-
-    // Send to Sentry in production
-    if (!this.isDevelopment && level >= LogLevel.ERROR) {
-      this.sendToErrorTracking(entry)
-    }
-  }
-
-  private sendToErrorTracking(entry: LogEntry): void {
-    try {
-      if (entry.error) {
-        Sentry.captureException(entry.error, {
-          level: entry.level === LogLevel.ERROR ? 'error' : 'warning',
-          tags: {
-            component: entry.context?.component,
-            action: entry.context?.action,
-          },
-          extra: entry.context,
-          user: entry.context?.userId ? { id: entry.context.userId } : undefined,
-        })
-      } else {
-        Sentry.captureMessage(entry.message, {
-          level: entry.level === LogLevel.ERROR ? 'error' : 'warning',
-          tags: {
-            component: entry.context?.component,
-            action: entry.context?.action,
-          },
-          extra: entry.context,
-          user: entry.context?.userId ? { id: entry.context.userId } : undefined,
-        })
-      }
-    } catch (err) {
-      // Fallback to console if Sentry fails
-      console.error('Failed to send error to Sentry:', err)
     }
   }
 

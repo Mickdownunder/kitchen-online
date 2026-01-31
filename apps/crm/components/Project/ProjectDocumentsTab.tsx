@@ -14,7 +14,11 @@ import {
   getCustomerDeliveryNotes,
   getCompanySettings,
   getInvoices,
+  publishInvoiceToPortal,
+  publishDeliveryNoteToPortal,
+  publishOrderToPortal,
 } from '@/lib/supabase/services'
+import { supabase } from '@/lib/supabase/client'
 import { logger } from '@/lib/utils/logger'
 import {
   FileText,
@@ -29,6 +33,9 @@ import {
   Filter,
   AlertTriangle,
   ClipboardList,
+  Share2,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react'
 import { downloadInvoicePDF, openInvoicePDFInNewTab, InvoiceData } from '../InvoicePDF'
 import { downloadCustomerDeliveryNotePDF } from '../CustomerDeliveryNotePDF'
@@ -79,10 +86,15 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
     useState<CustomerDeliveryNote | null>(null)
   const [showOrderDownloadModal, setShowOrderDownloadModal] = useState(false)
   const [orderDownloadAppendAgb, setOrderDownloadAppendAgb] = useState(false)
+  
+  // Portal publishing state
+  const [publishedDocs, setPublishedDocs] = useState<Set<string>>(new Set())
+  const [publishingDoc, setPublishingDoc] = useState<string | null>(null)
 
   useEffect(() => {
     loadDocuments()
     loadCompanySettings()
+    loadPublishedDocuments()
   }, [project.id])
 
   // Load bank account after company settings are loaded
@@ -124,6 +136,98 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
       )
       // Ignoriere Fehler - Bank Account ist optional
     }
+  }
+
+  // Load which documents are already published to the customer portal
+  const loadPublishedDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('name, type')
+        .eq('project_id', project.id)
+        .in('type', ['RECHNUNGEN', 'LIEFERSCHEINE', 'KAUFVERTRAG'])
+      
+      if (error) throw error
+      
+      // Create a set of published document identifiers
+      const published = new Set<string>()
+      data?.forEach(doc => {
+        // Extract invoice/delivery note number from filename
+        // Format: "Teilrechnung_R-2026-001.pdf" or "Lieferschein_LS-2026-001.pdf"
+        const match = doc.name.match(/_([\w-]+)\.pdf$/)
+        if (match) {
+          published.add(match[1].replace(/-/g, '/'))
+        }
+      })
+      setPublishedDocs(published)
+    } catch (error) {
+      logger.error('Error loading published documents', { component: 'ProjectDocumentsTab' }, error as Error)
+    }
+  }
+
+  // Publish a document to the customer portal
+  const handlePublishToPortal = async (doc: DocumentItem) => {
+    if (!companySettings) {
+      alert('Bitte Firmenstammdaten hinterlegen.')
+      return
+    }
+
+    setPublishingDoc(doc.id)
+    
+    try {
+      if (doc.type === 'invoice') {
+        const result = await publishInvoiceToPortal({
+          invoice: doc.data.invoice || doc.data.payment,
+          project,
+        })
+        if (!result.success) {
+          throw new Error(result.error || 'Fehler beim Veröffentlichen')
+        }
+      } else if (doc.type === 'customer-delivery-note') {
+        const result = await publishDeliveryNoteToPortal({
+          deliveryNote: doc.data.note,
+          project,
+        })
+        if (!result.success) {
+          throw new Error(result.error || 'Fehler beim Veröffentlichen')
+        }
+      } else if (doc.type === 'order') {
+        const result = await publishOrderToPortal({
+          project,
+          appendAgb: !!companySettings.agbText?.trim(),
+        })
+        if (!result.success) {
+          throw new Error(result.error || 'Fehler beim Veröffentlichen')
+        }
+      } else {
+        alert('Dieser Dokumenttyp kann nicht ins Portal veröffentlicht werden.')
+        return
+      }
+
+      // Update published state
+      setPublishedDocs(prev => new Set([...prev, doc.number || doc.id]))
+      
+      // Show success message
+      alert(`"${doc.title}" wurde im Kundenportal veröffentlicht.`)
+    } catch (error) {
+      logger.error('Error publishing to portal', { component: 'ProjectDocumentsTab', doc: doc.id }, error as Error)
+      alert(`Fehler beim Veröffentlichen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)
+    } finally {
+      setPublishingDoc(null)
+    }
+  }
+
+  // Check if a document is published
+  const isPublished = (doc: DocumentItem): boolean => {
+    if (doc.number) {
+      return publishedDocs.has(doc.number)
+    }
+    return publishedDocs.has(doc.id)
+  }
+
+  // Check if a document can be published
+  const canPublish = (doc: DocumentItem): boolean => {
+    return ['invoice', 'customer-delivery-note', 'order'].includes(doc.type)
   }
 
   const loadDocuments = async () => {
@@ -278,14 +382,20 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
     }
   }
 
+  // Auftragsunterlagen: Nur Auftrag, Rechnungen und Kunden-Lieferscheine
+  // KEINE Lieferanten-Lieferscheine, Angebote oder Pläne (die gehören in den Dokumente-Tab)
+  const allowedTypes: DocumentItem['type'][] = ['order', 'invoice', 'customer-delivery-note']
+  
   const filteredDocuments = documents.filter(doc => {
+    // Erst prüfen ob der Dokumenttyp überhaupt erlaubt ist
+    if (!allowedTypes.includes(doc.type)) {
+      return false
+    }
+    
     const matchesFilter =
       filter === 'all' ||
       (filter === 'invoices' && doc.type === 'invoice') ||
       (filter === 'customer-delivery-notes' && doc.type === 'customer-delivery-note') ||
-      (filter === 'supplier-delivery-notes' && doc.type === 'supplier-delivery-note') ||
-      (filter === 'offers' && doc.type === 'offer') ||
-      (filter === 'plans' && doc.type === 'plan') ||
       (filter === 'orders' && doc.type === 'order')
     const matchesSearch =
       doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -603,13 +713,10 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
             onChange={e => setFilter(e.target.value as DocumentType)}
             className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
           >
-            <option value="all">Alle Dokumente</option>
+            <option value="all">Alle Unterlagen</option>
+            <option value="orders">Aufträge</option>
             <option value="invoices">Rechnungen</option>
             <option value="customer-delivery-notes">Kunden-Lieferscheine</option>
-            <option value="supplier-delivery-notes">Lieferanten-Lieferscheine</option>
-            <option value="offers">Angebote</option>
-            <option value="plans">Pläne</option>
-            <option value="orders">Aufträge</option>
           </select>
         </div>
       </div>
@@ -658,6 +765,12 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                           Mit Auftragshinweisen
                         </span>
                       ) : null}
+                      {canPublish(doc) && isPublished(doc) && (
+                        <span className="flex items-center gap-1 rounded bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Im Portal
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -676,6 +789,28 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                   >
                     <Download className="h-5 w-5" />
                   </button>
+                  {canPublish(doc) && (
+                    <button
+                      onClick={() => handlePublishToPortal(doc)}
+                      disabled={publishingDoc === doc.id || isPublished(doc)}
+                      className={`rounded-lg p-2 transition-all ${
+                        isPublished(doc)
+                          ? 'bg-green-100 text-green-600 cursor-default'
+                          : publishingDoc === doc.id
+                          ? 'bg-slate-100 text-slate-400 cursor-wait'
+                          : 'bg-slate-100 text-slate-700 hover:bg-orange-100 hover:text-orange-700 group-hover:bg-orange-100 group-hover:text-orange-700'
+                      }`}
+                      title={isPublished(doc) ? 'Im Kundenportal verfügbar' : 'Im Kundenportal veröffentlichen'}
+                    >
+                      {publishingDoc === doc.id ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : isPublished(doc) ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : (
+                        <Share2 className="h-5 w-5" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

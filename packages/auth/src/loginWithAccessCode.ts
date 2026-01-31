@@ -50,14 +50,9 @@ export async function loginWithAccessCode(
     .from('projects')
     .select(`
       id,
-      name,
+      customer_name,
       status,
-      customer_id,
-      customers (
-        id,
-        name,
-        email
-      )
+      customer_id
     `)
     .eq('access_code', parsed.data.accessCode)
     .single()
@@ -77,14 +72,29 @@ export async function loginWithAccessCode(
     }
   }
 
-  // 4. Customer prüfen
-  const customer = project.customers as { id: string; name: string; email: string } | null
-  if (!customer) {
+  // 4. Customer prüfen - hole Customer separat falls customer_id existiert
+  if (!project.customer_id) {
     return {
       success: false,
       error: 'NO_CUSTOMER_ASSIGNED',
     }
   }
+
+  const { data: customer, error: customerError } = await supabase
+    .from('customers')
+    .select('id, first_name, last_name, email')
+    .eq('id', project.customer_id)
+    .single()
+
+  if (customerError || !customer) {
+    return {
+      success: false,
+      error: 'NO_CUSTOMER_ASSIGNED',
+    }
+  }
+
+  // Customer name aus first_name + last_name zusammensetzen
+  const customerName = `${customer.first_name} ${customer.last_name}`.trim()
 
   // 5. Supabase User erstellen/finden und Session erstellen
   // Wir nutzen eine "magic" Email-Adresse basierend auf dem Projekt
@@ -167,7 +177,7 @@ export async function loginWithAccessCode(
     },
     user: {
       id: customer.id,
-      name: customer.name,
+      name: customerName,
     },
   }
 }

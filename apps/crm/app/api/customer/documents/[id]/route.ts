@@ -81,7 +81,7 @@ export async function DELETE(
     // 3. Dokument laden und Berechtigungen prüfen
     const { data: document, error: fetchError } = await supabase
       .from('documents')
-      .select('id, project_id, type, uploaded_by, storage_path')
+      .select('id, project_id, type, uploaded_by, file_path')
       .eq('id', documentId)
       .single()
 
@@ -115,10 +115,10 @@ export async function DELETE(
     }
 
     // 5. Aus Storage löschen
-    if (document.storage_path) {
+    if (document.file_path) {
       const { error: storageError } = await supabase.storage
         .from('documents')
-        .remove([document.storage_path])
+        .remove([document.file_path])
 
       if (storageError) {
         console.error('Storage delete error:', storageError)

@@ -9,6 +9,7 @@ import { ProjectItemsTab } from './Project/ProjectItemsTab'
 import { ProjectControllingTab } from './Project/ProjectControllingTab'
 import { ProjectDocsTab } from './Project/ProjectDocsTab'
 import { ProjectDocumentsTab } from './Project/ProjectDocumentsTab'
+import { ProjectTicketsTab } from './Project/ProjectTicketsTab'
 import { ProjectModalFooter } from './Project/ProjectModalFooter'
 import { useProjectForm } from './Project/useProjectForm'
 import { useProjectSubmit } from './Project/useProjectSubmit'
@@ -31,7 +32,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
   existingCustomers = [],
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'basics' | 'items' | 'controlling' | 'docs' | 'documents' | 'payments'
+    'basics' | 'items' | 'controlling' | 'docs' | 'documents' | 'payments' | 'tickets'
   >('basics')
   const [previewDoc, setPreviewDoc] = useState<ProjectDocument | null>(null)
 
@@ -211,6 +212,10 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
 
           {activeTab === 'documents' && formData.id && (
             <ProjectDocumentsTab project={formData as CustomerProject} />
+          )}
+
+          {activeTab === 'tickets' && (
+            <ProjectTicketsTab projectId={formData.id} />
           )}
         </div>
 

@@ -307,12 +307,12 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
                   }}
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any, name?: string) => {
+                  formatter={(value: any, name: any) => {
                     const labels: { [key: string]: string } = {
                       paid: 'Eingegangen',
                       outstanding: 'Offen',
                     }
-                    return [`${formatCurrency(value)} €`, labels[name || ''] || name]
+                    return [`${formatCurrency(value)} €`, labels[String(name) || ''] || name]
                   }}
                 />
                 <Legend />

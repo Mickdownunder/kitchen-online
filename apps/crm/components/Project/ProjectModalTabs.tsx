@@ -2,13 +2,13 @@
 
 import React from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, TrendingUp, FileText, CreditCard, Receipt } from 'lucide-react'
+import { Plus, TrendingUp, FileText, CreditCard, Receipt, MessageSquare } from 'lucide-react'
 import { CustomerProject } from '@/types'
 
 interface ProjectModalTabsProps {
-  activeTab: 'basics' | 'items' | 'controlling' | 'docs' | 'documents' | 'payments'
+  activeTab: 'basics' | 'items' | 'controlling' | 'docs' | 'documents' | 'payments' | 'tickets'
   setActiveTab: (
-    tab: 'basics' | 'items' | 'controlling' | 'docs' | 'documents' | 'payments'
+    tab: 'basics' | 'items' | 'controlling' | 'docs' | 'documents' | 'payments' | 'tickets'
   ) => void
   formData: Partial<CustomerProject>
   onClose: () => void
@@ -53,6 +53,12 @@ export function ProjectModalTabs({
         className={`flex items-center gap-2 rounded-xl px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'docs' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900'}`}
       >
         <FileText className="h-3 w-3" /> Dokumente
+      </button>
+      <button
+        onClick={() => setActiveTab('tickets')}
+        className={`flex items-center gap-2 rounded-xl px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'tickets' ? 'bg-green-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900'}`}
+      >
+        <MessageSquare className="h-3 w-3" /> Anfragen
       </button>
       <button
         onClick={() => {

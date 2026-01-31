@@ -103,7 +103,32 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // 5. Ticket erstellen
+    // 5. Get company_id from project
+    const { data: project } = await supabase
+      .from('projects')
+      .select('user_id')
+      .eq('id', project_id)
+      .single()
+
+    let companyId: string | null = null
+    if (project?.user_id) {
+      const { data: companyMember } = await supabase
+        .from('company_members')
+        .select('company_id')
+        .eq('user_id', project.user_id)
+        .eq('is_active', true)
+        .single()
+      companyId = companyMember?.company_id || null
+    }
+
+    if (!companyId) {
+      return NextResponse.json(
+        { success: false, error: 'NO_COMPANY' },
+        { status: 403 }
+      )
+    }
+
+    // 6. Ticket erstellen
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
       .insert({
@@ -112,6 +137,7 @@ export async function POST(request: NextRequest) {
         status: 'OFFEN',
         type: 'KUNDENANFRAGE',
         created_by: customer_id,
+        company_id: companyId,
       })
       .select('id, subject, status, created_at')
       .single()
@@ -124,7 +150,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 6. Erste Nachricht hinzufügen
+    // 7. Erste Nachricht hinzufügen
     const { error: messageError } = await supabase
       .from('ticket_messages')
       .insert({
@@ -132,6 +158,7 @@ export async function POST(request: NextRequest) {
         author_id: customer_id,
         message,
         is_customer: true,
+        author_type: 'customer',
       })
 
     if (messageError) {
