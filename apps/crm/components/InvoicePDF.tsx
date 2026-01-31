@@ -69,10 +69,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-end',
   },
-  invoiceTitle: {
+  titleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: D.accent.invoice,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  titleBadgeText: {
     fontSize: D.fontSize.title,
     fontWeight: 700,
-    color: D.colors.text,
+    color: D.colors.headerText,
     letterSpacing: -0.5,
   },
   invoiceSubtitle: {
@@ -120,11 +127,18 @@ const styles = StyleSheet.create({
   table: {
     marginBottom: 20,
   },
+  tableBox: {
+    borderWidth: 1.5,
+    borderColor: D.colors.borderDark,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: D.colors.headerBg,
     padding: 10,
-    borderRadius: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: D.colors.borderDark,
   },
   tableHeaderCell: {
     fontSize: D.fontSize.micro,
@@ -136,7 +150,7 @@ const styles = StyleSheet.create({
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: D.colors.borderDark,
     padding: 10,
     alignItems: 'flex-start',
   },
@@ -149,9 +163,10 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     color: '#1e293b',
   },
-  colPos: { width: '10%' },
-  colDesc: { width: '70%' },
-  colQty: { width: '20%', textAlign: 'center' },
+  colQty: { width: '18%', textAlign: 'left' },
+  colModel: { width: '18%' },
+  colDesc: { width: '46%' },
+  colManufacturer: { width: '18%' },
   totalsSection: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -272,6 +287,12 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 8,
   },
+  paidNote: {
+    fontSize: D.fontSize.micro,
+    color: D.colors.secondary,
+    marginTop: 4,
+    textAlign: 'right',
+  },
 })
 
 const formatCurrency = (amount: number): string => {
@@ -293,6 +314,8 @@ export interface InvoiceData {
   amount: number
   date: string
   description?: string
+  isPaid?: boolean | string | number
+  paidDate?: string
   project: {
     customerName: string
     address?: string
@@ -339,6 +362,25 @@ const DEFAULT_BANK = {
 const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => {
   const isDeposit = invoice.type === 'deposit'
   const items = isDeposit ? [] : invoice.project.items || []
+  const paidDateValue =
+    invoice.paidDate || (invoice as { paid_date?: string | null }).paid_date || undefined
+  const isPaid =
+    invoice.isPaid === true ||
+    invoice.isPaid === 'true' ||
+    invoice.isPaid === 1 ||
+    (invoice as { is_paid?: boolean | string | number }).is_paid === true ||
+    (invoice as { is_paid?: boolean | string | number }).is_paid === 'true' ||
+    (invoice as { is_paid?: boolean | string | number }).is_paid === 1 ||
+    Boolean(paidDateValue)
+
+  // Debug logging
+  console.log('[InvoicePDF] isPaid check:', {
+    'invoice.isPaid': invoice.isPaid,
+    'invoice.is_paid': (invoice as { is_paid?: boolean | string | number }).is_paid,
+    paidDateValue,
+    isPaidResult: isPaid,
+    invoiceNumber: invoice.invoiceNumber,
+  })
 
   // Anzahlungen summieren (Brutto) - from priorInvoices (new system)
   const totalPartialPayments = invoice.priorInvoices?.reduce((sum, inv) => sum + inv.amount, 0) || 0
@@ -410,9 +452,11 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <View>
-              <Text style={styles.invoiceTitle}>
-                {isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
-              </Text>
+              <View style={styles.titleBadge}>
+                <Text style={styles.titleBadgeText}>
+                  {isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
+                </Text>
+              </View>
               {invoice.description && (
                 <Text style={styles.invoiceSubtitle}>{invoice.description}</Text>
               )}
@@ -447,39 +491,45 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
 
         {/* Items Table – Kunden-PDF: KEINE Preise bei Positionen, nur Gesamtbetrag am Ende */}
         <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderCell, styles.colPos]}>Pos</Text>
-            <Text style={[styles.tableHeaderCell, styles.colDesc]}>Beschreibung</Text>
-            <Text style={[styles.tableHeaderCell, styles.colQty]}>Menge</Text>
-          </View>
-
-          {isDeposit ? (
-            <View style={styles.tableRow}>
-              <Text style={[styles.tableCell, styles.colPos]}>1</Text>
-              <View style={styles.colDesc}>
-                <Text style={styles.tableCellBold}>
-                  {invoice.description || `Anzahlung für Auftrag ${invoice.project.orderNumber}`}
-                </Text>
-                <Text style={styles.tableCell}>Gemäß Vereinbarung</Text>
-              </View>
-              <Text style={[styles.tableCell, styles.colQty]}>1</Text>
+          <View style={styles.tableBox}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderCell, styles.colQty]}>Menge</Text>
+              <Text style={[styles.tableHeaderCell, styles.colModel]}>Modell</Text>
+              <Text style={[styles.tableHeaderCell, styles.colDesc]}>Bezeichnung</Text>
+              <Text style={[styles.tableHeaderCell, styles.colManufacturer]}>Hersteller</Text>
             </View>
-          ) : (
-            items.map((item: InvoiceItem, index: number) => (
-              <View key={item.id || index} style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.colPos]}>{item.position || index + 1}</Text>
+
+            {isDeposit ? (
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.colQty]}>1</Text>
+                <Text style={[styles.tableCell, styles.colModel]}>-</Text>
                 <View style={styles.colDesc}>
-                  <Text style={styles.tableCellBold}>{item.description}</Text>
-                  {item.modelNumber && (
-                    <Text style={styles.tableCell}>Art.-Nr.: {item.modelNumber}</Text>
-                  )}
+                  <Text style={styles.tableCellBold}>
+                    {invoice.description || `Anzahlung für Auftrag ${invoice.project.orderNumber}`}
+                  </Text>
+                  <Text style={styles.tableCell}>Gemäß Vereinbarung</Text>
                 </View>
-                <Text style={[styles.tableCell, styles.colQty]}>
-                  {item.quantity} {item.unit}
-                </Text>
+                <Text style={[styles.tableCell, styles.colManufacturer]}>-</Text>
               </View>
-            ))
-          )}
+            ) : (
+              items.map((item: InvoiceItem, index: number) => (
+                <View key={item.id || index} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, styles.colQty]}>
+                    {item.quantity} {item.unit}
+                  </Text>
+                  <Text style={[styles.tableCell, styles.colModel]}>
+                    {item.modelNumber || '-'}
+                  </Text>
+                  <View style={styles.colDesc}>
+                    <Text style={styles.tableCellBold}>{item.description}</Text>
+                  </View>
+                  <Text style={[styles.tableCell, styles.colManufacturer]}>
+                    {item.manufacturer || '-'}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
         </View>
 
         {/* Totals */}
@@ -570,9 +620,16 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
                     <Text style={styles.totalsValue}>{formatCurrency(restTax)}</Text>
                   </View>
                   <View style={styles.totalsFinal}>
-                    <Text style={styles.totalsFinalLabel}>Zu zahlen (Brutto)</Text>
+                    <Text style={styles.totalsFinalLabel}>
+                      {isPaid ? 'Bereits bezahlt (Brutto)' : 'Zu zahlen (Brutto)'}
+                    </Text>
                     <Text style={styles.totalsFinalValue}>{formatCurrency(restGross)}</Text>
                   </View>
+                {isPaid && paidDateValue && (
+                  <Text style={styles.paidNote}>
+                    Bezahlt am: {new Date(paidDateValue).toLocaleDateString('de-AT')}
+                  </Text>
+                )}
                 </View>
               </>
             ) : (
@@ -588,10 +645,17 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
                 </View>
                 <View style={styles.totalsFinal}>
                   <Text style={styles.totalsFinalLabel}>
-                    {isDeposit ? 'Rechnungsbetrag' : 'Gesamtbetrag'} (Brutto)
+                    {isPaid
+                      ? 'Bereits bezahlt (Brutto)'
+                      : `${isDeposit ? 'Rechnungsbetrag' : 'Gesamtbetrag'} (Brutto)`}
                   </Text>
                   <Text style={styles.totalsFinalValue}>{formatCurrency(invoice.amount)}</Text>
                 </View>
+                {isPaid && paidDateValue && (
+                  <Text style={styles.paidNote}>
+                    Bezahlt am: {new Date(paidDateValue).toLocaleDateString('de-AT')}
+                  </Text>
+                )}
               </>
             )}
           </View>

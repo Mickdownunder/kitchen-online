@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CustomerProject,
@@ -91,20 +91,7 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
   const [publishedDocs, setPublishedDocs] = useState<Set<string>>(new Set())
   const [publishingDoc, setPublishingDoc] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadDocuments()
-    loadCompanySettings()
-    loadPublishedDocuments()
-  }, [project.id])
-
-  // Load bank account after company settings are loaded
-  useEffect(() => {
-    if (companySettings?.id) {
-      loadBankAccount()
-    }
-  }, [companySettings?.id])
-
-  const loadCompanySettings = async () => {
+  const loadCompanySettings = useCallback(async () => {
     try {
       const settings = await getCompanySettings()
       setCompanySettings(settings)
@@ -115,9 +102,9 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         error as Error
       )
     }
-  }
+  }, [])
 
-  const loadBankAccount = async () => {
+  const loadBankAccount = useCallback(async () => {
     try {
       if (!companySettings?.id) {
         // Warte auf Company Settings
@@ -136,10 +123,10 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
       )
       // Ignoriere Fehler - Bank Account ist optional
     }
-  }
+  }, [companySettings?.id])
 
   // Load which documents are already published to the customer portal
-  const loadPublishedDocuments = async () => {
+  const loadPublishedDocuments = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('documents')
@@ -161,9 +148,13 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
       })
       setPublishedDocs(published)
     } catch (error) {
-      logger.error('Error loading published documents', { component: 'ProjectDocumentsTab' }, error as Error)
+      logger.error(
+        'Error loading published documents',
+        { component: 'ProjectDocumentsTab' },
+        error as Error
+      )
     }
-  }
+  }, [project.id])
 
   // Publish a document to the customer portal
   const handlePublishToPortal = async (doc: DocumentItem) => {
@@ -230,7 +221,7 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
     return ['invoice', 'customer-delivery-note', 'order'].includes(doc.type)
   }
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     try {
       setLoading(true)
       const allDocs: DocumentItem[] = []
@@ -380,7 +371,20 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [project])
+
+  useEffect(() => {
+    loadDocuments()
+    loadCompanySettings()
+    loadPublishedDocuments()
+  }, [loadDocuments, loadCompanySettings, loadPublishedDocuments])
+
+  // Load bank account after company settings are loaded
+  useEffect(() => {
+    if (companySettings?.id) {
+      loadBankAccount()
+    }
+  }, [companySettings?.id, loadBankAccount])
 
   // Auftragsunterlagen: Nur Auftrag, Rechnungen und Kunden-Lieferscheine
   // KEINE Lieferanten-Lieferscheine, Angebote oder Pläne (die gehören in den Dokumente-Tab)
@@ -416,7 +420,8 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         return
       }
       if (doc.type === 'invoice') {
-        // Load prior partial invoices for final invoice PDFs
+        // Always fetch latest invoice data to ensure isPaid status is current
+        let currentInvoice: Invoice | null = null
         let priorInvoices: {
           id: string
           invoiceNumber: string
@@ -424,13 +429,19 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
           date: string
           description?: string
         }[] = []
-        if (doc.data.type === 'final') {
-          try {
-            const allInvoices = await getInvoices(project.id)
+
+        try {
+          const allInvoices = await getInvoices(project.id)
+          
+          // Find the current invoice with fresh data (works for both partial and final)
+          currentInvoice = allInvoices.find(inv => inv.id === doc.id) || null
+          
+          // Get prior partial invoices for final invoice PDFs
+          if (currentInvoice && currentInvoice.type === 'final') {
             priorInvoices = allInvoices
               .filter(
                 inv =>
-                  inv.type === 'partial' && inv.invoiceNumber !== doc.data.invoice.invoiceNumber
+                  inv.type === 'partial' && inv.invoiceNumber !== currentInvoice!.invoiceNumber
               )
               .map(inv => ({
                 id: inv.id,
@@ -439,23 +450,35 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                 date: inv.invoiceDate,
                 description: inv.description,
               }))
-          } catch (error) {
-            logger.debug('Could not load prior invoices for PDF', {
-              component: 'ProjectDocumentsTab',
-              error,
-            })
           }
+        } catch (error) {
+          logger.debug('Could not load invoices for PDF', {
+            component: 'ProjectDocumentsTab',
+            error,
+          })
         }
 
+        // Fallback to cached data if fresh fetch failed
+        if (!currentInvoice) {
+          currentInvoice = doc.data.invoice
+        }
+
+        // Debug logging before creating invoice data for download
+        console.log('[ProjectDocumentsTab] handleDownload - Creating PDF data:', {
+          docDataType: doc.data.type,
+          currentInvoiceIsPaid: currentInvoice?.isPaid,
+          currentInvoicePaidDate: currentInvoice?.paidDate,
+          invoiceNumber: currentInvoice?.invoiceNumber,
+        })
+
         const invoiceData: InvoiceData = {
-          type: doc.data.type === 'partial' ? 'deposit' : 'final',
-          invoiceNumber:
-            doc.data.type === 'partial'
-              ? doc.data.payment.invoiceNumber
-              : doc.data.invoice.invoiceNumber,
-          amount: doc.data.type === 'partial' ? doc.data.payment.amount : doc.data.invoice.amount,
-          date: doc.data.type === 'partial' ? doc.data.payment.date : doc.data.invoice.date,
-          description: doc.data.type === 'partial' ? doc.data.payment.description : undefined,
+          type: currentInvoice.type === 'partial' ? 'deposit' : 'final',
+          invoiceNumber: currentInvoice.invoiceNumber,
+          amount: currentInvoice.amount,
+          date: currentInvoice.invoiceDate,
+          description: currentInvoice.description,
+          isPaid: currentInvoice.isPaid,
+          paidDate: currentInvoice.paidDate,
           project: {
             customerName: project.customerName,
             address: project.address,
@@ -517,7 +540,8 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         return
       }
       try {
-        // Load prior partial invoices for final invoice PDFs
+        // Always fetch latest invoice data to ensure isPaid status is current
+        let currentInvoice: Invoice | null = null
         let priorInvoices: {
           id: string
           invoiceNumber: string
@@ -525,13 +549,19 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
           date: string
           description?: string
         }[] = []
-        if (doc.data.type === 'final') {
-          try {
-            const allInvoices = await getInvoices(project.id)
+
+        try {
+          const allInvoices = await getInvoices(project.id)
+          
+          // Find the current invoice with fresh data (works for both partial and final)
+          currentInvoice = allInvoices.find(inv => inv.id === doc.id) || null
+          
+          // Get prior partial invoices for final invoice PDFs
+          if (currentInvoice && currentInvoice.type === 'final') {
             priorInvoices = allInvoices
               .filter(
                 inv =>
-                  inv.type === 'partial' && inv.invoiceNumber !== doc.data.invoice.invoiceNumber
+                  inv.type === 'partial' && inv.invoiceNumber !== currentInvoice!.invoiceNumber
               )
               .map(inv => ({
                 id: inv.id,
@@ -540,23 +570,27 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                 date: inv.invoiceDate,
                 description: inv.description,
               }))
-          } catch (error) {
-            logger.debug('Could not load prior invoices for PDF', {
-              component: 'ProjectDocumentsTab',
-              error,
-            })
           }
+        } catch (error) {
+          logger.debug('Could not load invoices for PDF', {
+            component: 'ProjectDocumentsTab',
+            error,
+          })
+        }
+
+        // Fallback to cached data if fresh fetch failed
+        if (!currentInvoice) {
+          currentInvoice = doc.data.invoice
         }
 
         const invoiceData: InvoiceData = {
-          type: doc.data.type === 'partial' ? 'deposit' : 'final',
-          invoiceNumber:
-            doc.data.type === 'partial'
-              ? doc.data.payment.invoiceNumber
-              : doc.data.invoice.invoiceNumber,
-          amount: doc.data.type === 'partial' ? doc.data.payment.amount : doc.data.invoice.amount,
-          date: doc.data.type === 'partial' ? doc.data.payment.date : doc.data.invoice.date,
-          description: doc.data.type === 'partial' ? doc.data.payment.description : undefined,
+          type: currentInvoice.type === 'partial' ? 'deposit' : 'final',
+          invoiceNumber: currentInvoice.invoiceNumber,
+          amount: currentInvoice.amount,
+          date: currentInvoice.invoiceDate,
+          description: currentInvoice.description,
+          isPaid: currentInvoice.isPaid,
+          paidDate: currentInvoice.paidDate,
           project: {
             customerName: project.customerName,
             address: project.address,

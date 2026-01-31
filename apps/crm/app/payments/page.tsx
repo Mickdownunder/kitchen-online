@@ -72,6 +72,13 @@ function PaymentsPageContent() {
       }
     : { grossTotal: 0, netTotal: 0, taxTotal: 0 }
 
+  const resetForm = useCallback(() => {
+    setEditingPaymentId(null)
+    setNewPaymentForm(null)
+    setPercentInput('')
+    setEditingPercentInput('')
+  }, [])
+
   // Auto-select project if projectId is in URL
   useEffect(() => {
     if (projectIdParam && projects.length > 0) {
@@ -81,14 +88,7 @@ function PaymentsPageContent() {
         resetForm()
       }
     }
-  }, [projectIdParam, projects, selectedProject?.id])
-
-  const resetForm = useCallback(() => {
-    setEditingPaymentId(null)
-    setNewPaymentForm(null)
-    setPercentInput('')
-    setEditingPercentInput('')
-  }, [])
+  }, [projectIdParam, projects, selectedProject?.id, resetForm])
 
   const handleSelectProject = useCallback(
     (project: CustomerProject) => {
@@ -279,6 +279,23 @@ function PaymentsPageContent() {
       }
     } catch (error) {
       console.error('Error toggling final invoice status:', error)
+    }
+  }
+
+  const handleDeleteFinalInvoice = async () => {
+    if (!finalInvoice || !selectedProject) return
+
+    const confirmMessage = finalInvoice.isPaid
+      ? 'Die Schlussrechnung ist als bezahlt markiert. Trotzdem löschen?'
+      : 'Möchten Sie die Schlussrechnung wirklich löschen?'
+    if (!confirm(confirmMessage)) return
+
+    try {
+      await deleteInvoice(finalInvoice.id)
+      await loadProjectInvoices(selectedProject.id)
+    } catch (error) {
+      console.error('Error deleting final invoice:', error)
+      alert('Fehler beim Löschen der Schlussrechnung')
     }
   }
 
@@ -477,7 +494,7 @@ function PaymentsPageContent() {
                         <CreditCard className="mx-auto mb-3 h-12 w-12 text-slate-400" />
                         <p className="text-sm">Noch keine Anzahlungen hinzugefügt</p>
                         <p className="mt-1 text-xs">
-                          Klicken Sie auf "Anzahlung hinzufügen" um eine hinzuzufügen
+                          Klicken Sie auf &quot;Anzahlung hinzufügen&quot; um eine hinzuzufügen
                         </p>
                       </div>
                     )}
@@ -499,6 +516,7 @@ function PaymentsPageContent() {
                       finalInvoice={
                         finalInvoice
                           ? {
+                              id: finalInvoice.id,
                               invoiceNumber: finalInvoice.invoiceNumber,
                               amount: finalInvoice.amount,
                               date: finalInvoice.invoiceDate,
@@ -509,6 +527,7 @@ function PaymentsPageContent() {
                       }
                       onGenerateFinalInvoice={() => handleGenerateFinalInvoice(selectedProject.id)}
                       onToggleFinalInvoicePaid={handleToggleFinalInvoicePaid}
+                      onDeleteFinalInvoice={handleDeleteFinalInvoice}
                     />
                   )}
                 </div>

@@ -17,6 +17,8 @@ import {
   DollarSign,
   Percent,
   Package,
+  UserPlus,
+  Briefcase,
 } from 'lucide-react'
 import {
   CustomerProject,
@@ -37,6 +39,7 @@ import { useGroupedProjects } from '@/hooks/useGroupedProjects'
 import { ProjectRow } from '@/components/projects/ProjectRow'
 import { useToast } from '@/components/providers/ToastProvider'
 import { useApp } from '@/app/providers'
+import { LeadRow, LeadModal } from '@/components/leads'
 
 interface ProjectListProps {
   projects: CustomerProject[]
@@ -57,6 +60,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 }) => {
   const { success, error, warning } = useToast()
   const { refreshDeliveryNotes } = useApp()
+  const [activeTab, setActiveTab] = useState<'leads' | 'orders'>('orders')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'measurement' | 'order' | 'installation'>(
     initialFilter
@@ -86,6 +90,10 @@ const ProjectList: React.FC<ProjectListProps> = ({
     useState<CustomerProject | null>(null)
   const [visibleRows, setVisibleRows] = useState(200)
   const [complaintsByProject, setComplaintsByProject] = useState<Map<string, number>>(new Map())
+  
+  // Lead-specific state
+  const [selectedLead, setSelectedLead] = useState<CustomerProject | null>(null)
+  const [showLeadModal, setShowLeadModal] = useState(false)
 
   useEffect(() => {
     loadCustomers()
@@ -145,8 +153,23 @@ const ProjectList: React.FC<ProjectListProps> = ({
     }
   }
 
+  // Filter by tab first (Leads vs Orders)
+  // Compare as string to handle both enum and raw DB values
+  const tabFilteredProjects = projects.filter(p => {
+    const isLead = p.status === ProjectStatus.LEAD || p.status === 'Lead'
+    if (activeTab === 'leads') {
+      return isLead
+    } else {
+      return !isLead
+    }
+  })
+
+  // Count leads for badge
+  const leadsCount = projects.filter(p => p.status === ProjectStatus.LEAD || p.status === 'Lead').length
+  const ordersCount = projects.filter(p => p.status !== ProjectStatus.LEAD && p.status !== 'Lead').length
+
   const { filteredProjects, availableYears } = useProjectFilters({
-    projects,
+    projects: tabFilteredProjects,
     searchTerm,
     filterType,
     selectedYear,
@@ -411,14 +434,43 @@ const ProjectList: React.FC<ProjectListProps> = ({
     })
   }
 
+  // Lead-specific handlers
+  const handleOpenLead = (lead: CustomerProject) => {
+    setSelectedLead(lead)
+    setShowLeadModal(true)
+  }
+
+  const handleConvertLeadToOrder = (lead: CustomerProject) => {
+    // Change status from Lead to Planung
+    onUpdateProject({ ...lead, status: ProjectStatus.PLANNING })
+    setShowLeadModal(false)
+    setSelectedLead(null)
+    success('Lead wurde zum Auftrag umgewandelt!')
+    // Switch to orders tab to show the new order
+    setActiveTab('orders')
+  }
+
+  const handleDeleteLead = (lead: CustomerProject) => {
+    onDeleteProject(lead.id)
+    setShowLeadModal(false)
+    setSelectedLead(null)
+    success('Lead wurde gelöscht')
+  }
+
+  const handleUpdateLeadNotes = (lead: CustomerProject, notes: string) => {
+    onUpdateProject({ ...lead, notes })
+  }
+
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
+      case ProjectStatus.LEAD:
+        return 'bg-amber-100 text-amber-700 border-amber-200'
       case ProjectStatus.COMPLETED:
         return 'bg-green-100 text-green-700 border-green-200'
       case ProjectStatus.COMPLAINT:
         return 'bg-red-100 text-red-700 border-red-200'
       case ProjectStatus.INSTALLATION:
-        return 'bg-amber-100 text-amber-700 border-amber-200'
+        return 'bg-orange-100 text-orange-700 border-orange-200'
       case ProjectStatus.ORDERED:
         return 'bg-purple-100 text-purple-700 border-purple-200'
       case ProjectStatus.MEASURING:
@@ -464,8 +516,54 @@ const ProjectList: React.FC<ProjectListProps> = ({
         </div>
       </div>
 
+      {/* Tabs: Leads vs Aufträge */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            setActiveTab('leads')
+            // Reset filters for leads - show all leads regardless of date
+            setSelectedYear('all')
+            setSelectedMonth('all')
+            setFilterType('all')
+          }}
+          className={`flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${
+            activeTab === 'leads'
+              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/30'
+              : 'bg-white text-slate-600 shadow-md hover:bg-slate-50'
+          }`}
+        >
+          <UserPlus className="h-5 w-5" />
+          Leads
+          {leadsCount > 0 && (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-black ${
+              activeTab === 'leads' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
+            }`}>
+              {leadsCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all ${
+            activeTab === 'orders'
+              ? 'bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-lg'
+              : 'bg-white text-slate-600 shadow-md hover:bg-slate-50'
+          }`}
+        >
+          <Briefcase className="h-5 w-5" />
+          Aufträge
+          {ordersCount > 0 && (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-black ${
+              activeTab === 'orders' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+            }`}>
+              {ordersCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Stats Cards - Only for filtered projects */}
-      {filteredProjects.length > 0 && (
+      {filteredProjects.length > 0 && activeTab === 'orders' && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-lg">
             <div className="mb-2 flex items-center gap-3">
@@ -564,30 +662,32 @@ const ProjectList: React.FC<ProjectListProps> = ({
           </div>
         </div>
 
-        {/* Year Filter */}
-        <div className="glass flex items-center gap-2 rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
-          <Calendar className="h-4 w-4 text-slate-400" />
-          <select
-            value={selectedYear}
-            onChange={e => {
-              setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))
-              if (e.target.value !== 'all') {
-                setSelectedMonth('all')
-              }
-            }}
-            className="cursor-pointer border-none bg-transparent px-3 py-2 text-sm font-bold text-slate-900 outline-none"
-          >
-            <option value="all">Alle Jahre</option>
-            {availableYears.map(year => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Year Filter - only for Orders tab */}
+        {activeTab === 'orders' && (
+          <div className="glass flex items-center gap-2 rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
+            <Calendar className="h-4 w-4 text-slate-400" />
+            <select
+              value={selectedYear}
+              onChange={e => {
+                setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))
+                if (e.target.value !== 'all') {
+                  setSelectedMonth('all')
+                }
+              }}
+              className="cursor-pointer border-none bg-transparent px-3 py-2 text-sm font-bold text-slate-900 outline-none"
+            >
+              <option value="all">Alle Jahre</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-        {/* Month Filter (only if year selected) */}
-        {selectedYear !== 'all' && (
+        {/* Month Filter - only for Orders tab and if year selected */}
+        {activeTab === 'orders' && selectedYear !== 'all' && (
           <div className="glass flex items-center gap-2 rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
             <select
               value={selectedMonth}
@@ -606,36 +706,107 @@ const ProjectList: React.FC<ProjectListProps> = ({
           </div>
         )}
 
-        {/* Status Filter */}
-        <div className="glass scrollbar-hide flex items-center gap-2 overflow-x-auto rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
-          <button
-            onClick={() => setFilterType('all')}
-            className={`whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'all' ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
-          >
-            Alle
-          </button>
-          <button
-            onClick={() => setFilterType('measurement')}
-            className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'measurement' ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
-          >
-            <Ruler className="h-3.5 w-3.5" /> Zu Ausmessen
-          </button>
-          <button
-            onClick={() => setFilterType('order')}
-            className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'order' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
-          >
-            <ShoppingCart className="h-3.5 w-3.5" /> Zu Bestellen
-          </button>
-          <button
-            onClick={() => setFilterType('installation')}
-            className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'installation' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
-          >
-            <Truck className="h-3.5 w-3.5" /> Zu Terminieren
-          </button>
-        </div>
+        {/* Status Filter - only for Orders tab */}
+        {activeTab === 'orders' && (
+          <div className="glass scrollbar-hide flex items-center gap-2 overflow-x-auto rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'all' ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
+            >
+              Alle
+            </button>
+            <button
+              onClick={() => setFilterType('measurement')}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'measurement' ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
+            >
+              <Ruler className="h-3.5 w-3.5" /> Zu Ausmessen
+            </button>
+            <button
+              onClick={() => setFilterType('order')}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'order' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
+            >
+              <ShoppingCart className="h-3.5 w-3.5" /> Zu Bestellen
+            </button>
+            <button
+              onClick={() => setFilterType('installation')}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${filterType === 'installation' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
+            >
+              <Truck className="h-3.5 w-3.5" /> Zu Terminieren
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Projects Table */}
+      {/* Leads Table - only shown when activeTab is 'leads' */}
+      {activeTab === 'leads' && (
+        <div className="glass overflow-hidden rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/30 shadow-xl">
+          {filteredProjects.length > 0 ? (
+            <table className="w-full">
+              <thead className="border-b border-slate-100 bg-slate-50/50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                    Interessent
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                    Kontakt
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                    Termin
+                  </th>
+                  <th className="px-6 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                    Aktionen
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredProjects.map(lead => (
+                  <LeadRow
+                    key={lead.id}
+                    lead={lead}
+                    onOpen={() => handleOpenLead(lead)}
+                    onConvertToOrder={(e) => {
+                      e.stopPropagation()
+                      handleConvertLeadToOrder(lead)
+                    }}
+                    onDelete={(e) => {
+                      e.stopPropagation()
+                      handleDeleteLead(lead)
+                    }}
+                  />
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="mb-4 rounded-full bg-amber-100 p-6">
+                <UserPlus className="h-12 w-12 text-amber-500" />
+              </div>
+              <h3 className="mb-2 text-xl font-bold text-slate-900">Keine Leads vorhanden</h3>
+              <p className="max-w-md text-slate-500">
+                Leads werden automatisch erstellt, wenn Kunden über Cal.com einen Termin buchen.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Lead Modal */}
+      {selectedLead && (
+        <LeadModal
+          lead={selectedLead}
+          isOpen={showLeadModal}
+          onClose={() => {
+            setShowLeadModal(false)
+            setSelectedLead(null)
+          }}
+          onConvertToOrder={() => handleConvertLeadToOrder(selectedLead)}
+          onDelete={() => handleDeleteLead(selectedLead)}
+          onUpdateNotes={(notes) => handleUpdateLeadNotes(selectedLead, notes)}
+        />
+      )}
+
+      {/* Projects Table - only shown when activeTab is 'orders' */}
+      {activeTab === 'orders' && (
       <div className="glass overflow-hidden rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/30 shadow-xl">
         {groupedProjects.length > 0 ? (
           <div className="divide-y divide-slate-100">
@@ -841,8 +1012,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
           </div>
         )}
       </div>
+      )}
 
-      {filteredProjects.length > visibleRows && (
+      {activeTab === 'orders' && filteredProjects.length > visibleRows && (
         <div className="flex items-center justify-center">
           <button
             onClick={() => setVisibleRows(v => v + 400)}

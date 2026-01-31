@@ -2,8 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { KeyRound, Loader2, AlertCircle, ChefHat, Mail, Lock, ArrowRight } from 'lucide-react'
+import Image from 'next/image'
+import { KeyRound, Loader2, AlertCircle, Mail, Lock, ArrowRight } from 'lucide-react'
 import { portalSupabase } from '@/lib/supabase/portal-client'
+
+const LOGO_URL = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-02%20schwarz.png'
 
 type LoginMode = 'code' | 'email'
 
@@ -106,10 +109,17 @@ export default function PortalLoginPage() {
       <div className="relative w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 shadow-xl shadow-emerald-500/30">
-            <ChefHat className="h-10 w-10 text-white" />
+          <div className="mx-auto mb-6">
+            <Image
+              src={LOGO_URL}
+              alt="KüchenOnline"
+              width={200}
+              height={60}
+              className="h-14 w-auto mx-auto"
+              unoptimized
+            />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">Kundenportal</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Kundenportal</h1>
           <p className="mt-2 text-slate-500">
             {mode === 'code' 
               ? 'Melden Sie sich mit Ihrem Projektcode an'

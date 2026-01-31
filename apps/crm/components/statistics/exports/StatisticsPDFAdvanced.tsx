@@ -252,10 +252,8 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
   receivedMoney,
   outstanding,
   projectStats,
-  monthlyProjectData = [],
   topCustomers = [],
   invoiceStats,
-  monthlyInvoiceData = [],
   chartImages,
 }) => {
   const formatCurrency = (value: number) => {
@@ -387,7 +385,11 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Monatliche Umsatz-Entwicklung</Text>
               <View style={styles.chartContainer}>
-                <Image src={chartImages.monthlyRevenue} style={styles.chartImage} />
+                <Image
+                  src={chartImages.monthlyRevenue}
+                  style={styles.chartImage}
+                  alt="Monatsumsatz"
+                />
               </View>
             </View>
           )}
@@ -482,7 +484,11 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Umsatz nach Rechnungsart</Text>
               <View style={styles.chartContainer}>
-                <Image src={chartImages.invoiceTypes} style={styles.chartImage} />
+                <Image
+                  src={chartImages.invoiceTypes}
+                  style={styles.chartImage}
+                  alt="Rechnungsarten"
+                />
               </View>
             </View>
           )}
@@ -491,7 +497,11 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Zahlungsstatus</Text>
               <View style={styles.chartContainer}>
-                <Image src={chartImages.paymentStatus} style={styles.chartImage} />
+                <Image
+                  src={chartImages.paymentStatus}
+                  style={styles.chartImage}
+                  alt="Zahlungsstatus"
+                />
               </View>
             </View>
           )}

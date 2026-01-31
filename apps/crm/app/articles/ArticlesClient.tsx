@@ -64,9 +64,7 @@ export default function ArticlesClient() {
   return (
     <ArticleCatalog
       articles={articles}
-      onSelectArticle={article => {
-        // Article selected
-      }}
+      onSelectArticle={() => {}}
       onSaveArticle={handleSaveArticle}
       onDeleteArticle={handleDeleteArticle}
     />

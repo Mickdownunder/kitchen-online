@@ -84,6 +84,9 @@ export function getRateLimiter(route: string): RateLimiter {
   if (route.includes('/api/users/invite') || route.includes('/api/users/process-invite')) {
     return authRateLimiter
   }
+  if (route.includes('/api/customer/auth')) {
+    return authRateLimiter
+  }
   if (route.includes('/api/chat') || route.includes('/api/extract-project')) {
     return aiRateLimiter
   }

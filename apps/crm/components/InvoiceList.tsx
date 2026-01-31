@@ -89,6 +89,19 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime())
   }, [dbInvoices, projects])
 
+  // Update selectedInvoice when invoices are reloaded (e.g., after status change)
+  useEffect(() => {
+    if (selectedInvoice) {
+      const updatedInvoice = invoices.find(inv => inv.id === selectedInvoice.id)
+      if (updatedInvoice && (
+        updatedInvoice.isPaid !== selectedInvoice.isPaid ||
+        updatedInvoice.paidDate !== selectedInvoice.paidDate
+      )) {
+        setSelectedInvoice(updatedInvoice)
+      }
+    }
+  }, [invoices, selectedInvoice])
+
   const handleMarkAsPaid = async (invoice: ListInvoice) => {
     setSaving(true)
     try {

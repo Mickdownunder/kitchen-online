@@ -251,7 +251,6 @@ const ComplaintKanbanBoard: React.FC<ComplaintKanbanBoardProps> = ({
   onComplaintClick,
   onStatusChange,
 }) => {
-  const [_activeId, _setActiveId] = useState<string | null>(null) // Reserved for drag state
   const [draggedComplaint, setDraggedComplaint] = useState<Complaint | null>(null)
 
   const sensors = useSensors(
@@ -270,7 +269,6 @@ const ComplaintKanbanBoard: React.FC<ComplaintKanbanBoardProps> = ({
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
-    _setActiveId(active.id as string)
     const complaint = complaints.find(c => c.id === active.id)
     if (complaint) {
       setDraggedComplaint(complaint)
@@ -279,7 +277,6 @@ const ComplaintKanbanBoard: React.FC<ComplaintKanbanBoardProps> = ({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    _setActiveId(null)
     setDraggedComplaint(null)
 
     if (!over) return

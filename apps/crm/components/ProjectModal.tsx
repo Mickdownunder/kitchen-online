@@ -28,7 +28,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
   onClose,
   onSave,
   onDelete,
-  existingProjects = [],
   existingCustomers = [],
 }) => {
   const [activeTab, setActiveTab] = useState<

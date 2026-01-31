@@ -19,7 +19,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: D.spacing.sectionGap,
     paddingBottom: D.spacing.headerPaddingBottom,
-    borderBottomWidth: 2,
+    borderBottomWidth: 3,
     borderBottomColor: D.accent.order,
   },
   logo: {
@@ -67,18 +67,24 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
+  },
+  titleBadge: {
+    backgroundColor: D.accent.order,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
   },
   orderTitle: {
     fontSize: D.fontSize.title,
     fontWeight: 700,
-    color: D.colors.text,
+    color: '#ffffff',
     letterSpacing: -0.5,
   },
   orderSubtitle: {
     fontSize: D.fontSize.small,
     color: D.colors.secondary,
-    marginTop: 3,
+    marginTop: 8,
   },
   orderNumber: {
     textAlign: 'right',
@@ -98,6 +104,30 @@ const styles = StyleSheet.create({
   titleRight: {
     textAlign: 'right',
   },
+  // Meta info card (Datum, Auftragsnummer, etc.)
+  metaCard: {
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 25,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  metaColumn: {
+    flex: 1,
+  },
+  metaLabel: {
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  metaValue: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: D.colors.text,
+  },
   montageRow: {
     marginTop: 8,
   },
@@ -113,12 +143,19 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     color: '#1e293b',
   },
-  table: { marginBottom: 20 },
+  // Table with border
+  tableBox: {
+    borderWidth: 1.5,
+    borderColor: D.colors.borderDark,
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  table: { },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: D.colors.headerBg,
     padding: 10,
-    borderRadius: 4,
   },
   tableHeaderCell: {
     fontSize: D.fontSize.micro,
@@ -130,16 +167,23 @@ const styles = StyleSheet.create({
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: D.colors.borderDark,
     padding: 10,
     alignItems: 'flex-start',
   },
+  tableRowAlt: {
+    backgroundColor: '#f8fafc',
+  },
+  tableRowLast: {
+    borderBottomWidth: 0,
+  },
   tableCell: { fontSize: D.fontSize.small, color: D.colors.secondary },
   tableCellBold: { fontSize: D.fontSize.small, fontWeight: 600, color: D.colors.text },
-  colPos: { width: '10%' },
-  colDesc: { width: '60%' },
-  colQty: { width: '15%', textAlign: 'center' },
-  colUnit: { width: '15%', textAlign: 'center' },
+  // Gleiche Spalten wie in Rechnung: Menge | Modell | Bezeichnung | Hersteller
+  colQty: { width: '18%', textAlign: 'left' },
+  colModel: { width: '18%' },
+  colDesc: { width: '46%' },
+  colManufacturer: { width: '18%' },
   totalsSection: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -246,6 +290,7 @@ export const OrderPDFDocument: React.FC<OrderPDFProps> = ({
   showUnitPrices = false,
   appendAgb = false,
 }) => {
+  void showUnitPrices
   const orderDate =
     project.offerDate || project.orderDate || project.updatedAt || new Date().toISOString()
   const items: InvoiceItem[] = project.items ?? []
@@ -285,57 +330,84 @@ export const OrderPDFDocument: React.FC<OrderPDFProps> = ({
           ) : null}
         </View>
 
-        {/* Title: Auftrag – links Titel, rechts Datum + Auftragsnummer + ggf. Montagetermin */}
+        {/* Title: Auftrag mit Badge */}
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <View>
-              <Text style={styles.orderTitle}>AUFTRAG</Text>
+              <View style={styles.titleBadge}>
+                <Text style={styles.orderTitle}>AUFTRAG</Text>
+              </View>
+              <Text style={styles.orderSubtitle}>Auftragsbestätigung</Text>
             </View>
             <View style={styles.titleRight}>
-              <Text style={styles.orderNumberLabel}>Datum</Text>
-              <Text style={styles.orderNumberValue}>
-                {new Date(orderDate).toLocaleDateString('de-AT')}
-              </Text>
-              <View style={styles.montageRow}>
-                <Text style={styles.orderNumberLabel}>Auftragsnummer</Text>
-                <Text style={styles.orderNumberValue}>{project.orderNumber}</Text>
-              </View>
-              {project.installationDate ? (
-                <View style={styles.montageRow}>
-                  <Text style={styles.montageLabel}>Montagetermin</Text>
-                  <Text style={styles.montageValue}>
-                    {new Date(project.installationDate).toLocaleDateString('de-AT')}
-                    {project.installationTime ? `, ${project.installationTime}` : ''}
-                  </Text>
-                </View>
-              ) : null}
+              <Text style={styles.orderNumberLabel}>Auftragsnummer</Text>
+              <Text style={styles.orderNumberValue}>{project.orderNumber}</Text>
             </View>
           </View>
         </View>
 
-        {/* Items Table – Kunden-PDF: KEINE Preise bei Positionen, nur Gesamtbetrag am Ende */}
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderCell, styles.colPos]}>Pos</Text>
-            <Text style={[styles.tableHeaderCell, styles.colDesc]}>Beschreibung</Text>
-            <Text style={[styles.tableHeaderCell, styles.colQty]}>Menge</Text>
-            <Text style={[styles.tableHeaderCell, styles.colUnit]}>Einheit</Text>
+        {/* Meta Info Card */}
+        <View style={styles.metaCard}>
+          <View style={styles.metaColumn}>
+            <Text style={styles.metaLabel}>Auftragsdatum</Text>
+            <Text style={styles.metaValue}>
+              {new Date(orderDate).toLocaleDateString('de-AT')}
+            </Text>
           </View>
-          {items.map((item, index) => {
-            return (
-              <View key={item.id || index} style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.colPos]}>{item.position ?? index + 1}</Text>
-                <View style={styles.colDesc}>
-                  <Text style={styles.tableCellBold}>{item.description}</Text>
-                  {item.modelNumber ? (
-                    <Text style={styles.tableCell}>Art.-Nr.: {item.modelNumber}</Text>
-                  ) : null}
+          {project.installationDate ? (
+            <View style={styles.metaColumn}>
+              <Text style={styles.metaLabel}>Montagetermin</Text>
+              <Text style={styles.metaValue}>
+                {new Date(project.installationDate).toLocaleDateString('de-AT')}
+                {project.installationTime ? `, ${project.installationTime}` : ''}
+              </Text>
+            </View>
+          ) : null}
+          {project.customerId ? (
+            <View style={styles.metaColumn}>
+              <Text style={styles.metaLabel}>Kundennummer</Text>
+              <Text style={styles.metaValue}>{project.customerId}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Items Table mit Rahmen - gleiche Spalten wie Rechnung */}
+        <View style={styles.tableBox}>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderCell, styles.colQty]}>Menge</Text>
+              <Text style={[styles.tableHeaderCell, styles.colModel]}>Modell</Text>
+              <Text style={[styles.tableHeaderCell, styles.colDesc]}>Bezeichnung</Text>
+              <Text style={[styles.tableHeaderCell, styles.colManufacturer]}>Hersteller</Text>
+            </View>
+            {items.map((item, index) => {
+              const isLast = index === items.length - 1
+              const isAlt = index % 2 === 1
+              return (
+                <View
+                  key={item.id || index}
+                  style={[
+                    styles.tableRow,
+                    isAlt && styles.tableRowAlt,
+                    isLast && styles.tableRowLast,
+                  ]}
+                >
+                  <Text style={[styles.tableCell, styles.colQty]}>
+                    {item.quantity} {item.unit}
+                  </Text>
+                  <Text style={[styles.tableCell, styles.colModel]}>
+                    {item.modelNumber || '-'}
+                  </Text>
+                  <View style={styles.colDesc}>
+                    <Text style={styles.tableCellBold}>{item.description}</Text>
+                  </View>
+                  <Text style={[styles.tableCell, styles.colManufacturer]}>
+                    {item.manufacturer || '-'}
+                  </Text>
                 </View>
-                <Text style={[styles.tableCell, styles.colQty]}>{item.quantity}</Text>
-                <Text style={[styles.tableCell, styles.colUnit]}>{item.unit}</Text>
-              </View>
-            )
-          })}
+              )
+            })}
+          </View>
         </View>
 
         {/* Totals – immer anzeigen (Netto, MwSt., Gesamtbetrag) */}

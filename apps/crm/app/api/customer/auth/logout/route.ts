@@ -5,17 +5,16 @@ import { createClient } from '@supabase/supabase-js'
  * POST /api/customer/auth/logout
  * 
  * Invalidiert die aktuelle Customer Session.
+ * Funktioniert auch ohne Auth-Header (Client hat bereits signOut gemacht).
  */
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authorization Header prüfen
+    // 1. Authorization Header prüfen (optional)
     const authHeader = request.headers.get('Authorization')
     
+    // Wenn kein Token, ist der User bereits ausgeloggt - das ist OK
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: true })
     }
 
     const token = authHeader.substring(7)

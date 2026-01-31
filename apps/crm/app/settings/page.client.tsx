@@ -47,7 +47,6 @@ export default function SettingsPageClient() {
     employees,
     editingEmployee,
     setEditingEmployee,
-    reload: _reload,
     saveCompany,
     saveBank,
     removeBank,
@@ -61,7 +60,7 @@ export default function SettingsPageClient() {
     if (activeTab === 'users' && companySettings.id) {
       userMgmt.loadMembersAndPermissions()
     }
-  }, [activeTab, companySettings.id])
+  }, [activeTab, companySettings.id, userMgmt])
   const canManageUsers = userMgmt.canManageUsers
 
   const roleLabels: Record<RoleKey, string> = {

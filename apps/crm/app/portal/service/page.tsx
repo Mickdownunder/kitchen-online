@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { portalSupabase } from '@/lib/supabase/portal-client'
 import { useCustomerApi } from '../hooks/useCustomerApi'
+import { useProject } from '../context/ProjectContext'
 import Link from 'next/link'
 import { 
   MessageSquare, 
@@ -252,22 +253,23 @@ function CreateTicketForm({
 
 export default function PortalServicePage() {
   const { accessToken, isReady } = useCustomerApi()
+  const { selectedProject, isLoading: projectLoading } = useProject()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [customerId, setCustomerId] = useState<string | null>(null)
 
-  const loadTickets = useCallback(async (showSpinner = true) => {
+  const loadTickets = useCallback(async (projectId: string, showSpinner = true) => {
     if (showSpinner) {
       setIsLoading(true)
     }
     setError(null)
 
     try {
-      // Fetch tickets - RLS will automatically filter
+      // Fetch tickets for the selected project
       const { data, error: fetchError } = await portalSupabase
         .from('tickets')
         .select('id, subject, status, type, created_at, updated_at')
+        .eq('project_id', projectId)
         .order('created_at', { ascending: false })
 
       if (fetchError) {
@@ -286,40 +288,30 @@ export default function PortalServicePage() {
   }, [])
 
   useEffect(() => {
-    if (isReady && accessToken) {
-      loadTickets(true)
+    if (isReady && accessToken && selectedProject?.id && !projectLoading) {
+      loadTickets(selectedProject.id, true)
     } else if (isReady && !accessToken) {
       setIsLoading(false)
       setError('NOT_AUTHENTICATED')
     }
-  }, [isReady, accessToken, loadTickets])
+  }, [isReady, accessToken, selectedProject?.id, projectLoading, loadTickets])
 
   useEffect(() => {
-    if (!isReady || !accessToken) return
+    if (!selectedProject?.id) return
 
-    const fetchCustomerId = async () => {
-      const { data: { user } } = await portalSupabase.auth.getUser()
-      setCustomerId(user?.app_metadata?.customer_id ?? null)
-    }
-
-    fetchCustomerId()
-  }, [isReady, accessToken])
-
-  useEffect(() => {
-    if (!customerId) return
-
-    // Subscribe to ticket changes - RLS will filter by customer
+    // Subscribe to ticket changes for this project
     const channel = portalSupabase
-      .channel(`portal-tickets-${customerId}`)
+      .channel(`portal-tickets-${selectedProject.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'tickets',
+          filter: `project_id=eq.${selectedProject.id}`,
         },
         () => {
-          loadTickets(false)
+          loadTickets(selectedProject.id, false)
         }
       )
       .subscribe()
@@ -327,7 +319,7 @@ export default function PortalServicePage() {
     return () => {
       portalSupabase.removeChannel(channel)
     }
-  }, [customerId, loadTickets])
+  }, [selectedProject?.id, loadTickets])
 
   useEffect(() => {
     const interval = window.setInterval(() => {

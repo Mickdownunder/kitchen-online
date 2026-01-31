@@ -24,6 +24,8 @@ export interface InvoiceInput {
   description?: string
   type?: 'deposit' | 'final' | 'partial'
   dueDate?: string
+  isPaid?: boolean
+  paidDate?: string
 }
 
 export interface PDFGenerationOptions {
@@ -47,7 +49,7 @@ export interface GeneratedPDF {
  * Generiert ein PDF basierend auf Typ und Optionen
  */
 export async function generatePDF(options: PDFGenerationOptions): Promise<GeneratedPDF> {
-  const { type, project, invoice, deliveryNoteId, dateRange: _dateRange } = options
+  const { type, project, invoice, deliveryNoteId } = options
 
   // Lade Company Settings und Bank Account einmal für alle PDFs
   const companySettings = await getCompanySettings()
@@ -150,6 +152,8 @@ async function generateInvoicePDF(
     amount: invoice.amount,
     date: invoice.date,
     description: invoice.description,
+    isPaid: invoice.isPaid,
+    paidDate: invoice.paidDate,
     project: {
       customerName: project.customerName,
       address: project.address,

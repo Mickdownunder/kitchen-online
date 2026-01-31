@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { 
   ArrowLeft, 
@@ -131,7 +131,6 @@ function MessageBubble({ message }: { message: Message }) {
 
 export default function TicketDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const ticketId = params.id as string
   const { success, error: showError } = useToast()
 
@@ -298,8 +297,6 @@ export default function TicketDetailPage() {
   }
 
   const status = statusConfig[ticket.status] || statusConfig['OFFEN']
-  const StatusIcon = status.icon
-
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6">
       {/* Main Content */}

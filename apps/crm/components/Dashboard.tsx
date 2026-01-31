@@ -86,16 +86,6 @@ const Dashboard: React.FC<DashboardProps> = ({ projects }) => {
     },
   ]
 
-  // Status distribution data - reserved for future pie chart visualization
-  const _statusData = Object.values(ProjectStatus)
-    .map(status => ({
-      name: status,
-      value: projects.filter(p => p.status === status).length,
-    }))
-    .filter(d => d.value > 0)
-
-  const _COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#6366f1', '#8b5cf6', '#ec4899']
-
   // Calculate monthly revenue from real project data - ALLE 12 MONATE
   const monthlyRevenueData = React.useMemo(() => {
     const monthNames = [

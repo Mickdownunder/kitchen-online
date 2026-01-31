@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useEffect, Suspense } from 'react'
+import React, { useState, useMemo, useEffect, Suspense, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, AlertTriangle, Search } from 'lucide-react'
 import { useApp } from '../providers'
@@ -17,7 +17,6 @@ function ComplaintsPageContent() {
   const { projects } = useApp()
   const { success, error: showError } = useToast()
   const searchParams = useSearchParams()
-  const _statusParam = searchParams.get('status') // Reserved for future filtering
   const projectIdParam = searchParams.get('projectId')
 
   const [complaints, setComplaints] = useState<Complaint[]>([])
@@ -30,22 +29,7 @@ function ComplaintsPageContent() {
   >('all')
   const [supplierFilter, setSupplierFilter] = useState<string>('all')
 
-  // Lade Reklamationen - neu laden wenn projectIdParam sich ändert
-  useEffect(() => {
-    loadComplaints()
-  }, [projectIdParam])
-
-  // Deep-Link: Öffne Reklamation wenn projectId übergeben wird
-  useEffect(() => {
-    if (projectIdParam && complaints.length > 0) {
-      const projectComplaints = complaints.filter(c => c.projectId === projectIdParam)
-      if (projectComplaints.length > 0) {
-        setSelectedComplaint(projectComplaints[0])
-      }
-    }
-  }, [projectIdParam, complaints])
-
-  const loadComplaints = async () => {
+  const loadComplaints = useCallback(async () => {
     try {
       setLoading(true)
       // Wenn projectIdParam vorhanden ist, zeige ALLE (auch resolved) für Projekt-Context
@@ -59,7 +43,22 @@ function ComplaintsPageContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectIdParam, showError])
+
+  // Lade Reklamationen - neu laden wenn projectIdParam sich ändert
+  useEffect(() => {
+    loadComplaints()
+  }, [loadComplaints])
+
+  // Deep-Link: Öffne Reklamation wenn projectId übergeben wird
+  useEffect(() => {
+    if (projectIdParam && complaints.length > 0) {
+      const projectComplaints = complaints.filter(c => c.projectId === projectIdParam)
+      if (projectComplaints.length > 0) {
+        setSelectedComplaint(projectComplaints[0])
+      }
+    }
+  }, [projectIdParam, complaints])
 
   // Gefilterte Reklamationen
   const filteredComplaints = useMemo(() => {

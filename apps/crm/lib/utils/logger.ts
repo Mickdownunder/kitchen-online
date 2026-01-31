@@ -20,14 +20,6 @@ interface LogContext {
   [key: string]: any // Logger metadata can have any additional properties
 }
 
-interface LogEntry {
-  level: LogLevel
-  message: string
-  context?: LogContext
-  timestamp: string
-  error?: Error
-}
-
 export class Logger {
   private minLevel: LogLevel
   private isDevelopment: boolean

@@ -69,110 +69,149 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-end',
   },
-  deliveryNoteTitle: {
-    fontSize: 22,
+  titleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: D.accent.delivery,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  titleBadgeText: {
+    fontSize: D.fontSize.title,
     fontWeight: 700,
-    color: '#1e293b',
+    color: D.colors.headerText,
     letterSpacing: -0.5,
   },
   deliveryNoteSubtitle: {
-    fontSize: 9,
-    color: '#64748b',
+    fontSize: D.fontSize.small,
+    color: D.colors.secondary,
     marginTop: 3,
   },
   deliveryNoteNumber: {
     textAlign: 'right',
   },
   deliveryNoteNumberLabel: {
-    fontSize: 7,
-    color: '#94a3b8',
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   deliveryNoteNumberValue: {
     fontSize: 12,
     fontWeight: 700,
-    color: '#1e293b',
+    color: D.colors.text,
     marginTop: 2,
   },
   metaSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 25,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 4,
   },
   metaItem: {
     flex: 1,
   },
   metaLabel: {
-    fontSize: 7,
-    color: '#94a3b8',
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   metaValue: {
-    fontSize: 10,
-    color: '#1e293b',
+    fontSize: D.fontSize.body,
+    color: D.colors.text,
     fontWeight: 600,
   },
   itemsTable: {
     marginBottom: 30,
   },
+  tableBox: {
+    borderWidth: 1.5,
+    borderColor: D.colors.borderDark,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    backgroundColor: D.colors.headerBg,
+    padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: D.colors.borderDark,
   },
   tableHeaderText: {
-    fontSize: 8,
+    fontSize: D.fontSize.micro,
     fontWeight: 700,
-    color: '#64748b',
+    color: D.colors.headerText,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: D.colors.borderDark,
+    padding: 10,
+    alignItems: 'flex-start',
+  },
+  tableRowAlt: {
+    backgroundColor: '#f8fafc',
   },
   tableCell: {
-    fontSize: 9,
-    color: '#1e293b',
+    fontSize: D.fontSize.small,
+    color: D.colors.secondary,
   },
   colPosition: { width: '8%' },
-  colDescription: { width: '52%' },
-  colQuantity: { width: '15%', textAlign: 'right' },
-  colUnit: { width: '10%', textAlign: 'center' },
+  colDescription: { width: '56%' },
+  colQuantity: { width: '18%', textAlign: 'center' },
+  colUnit: { width: '18%', textAlign: 'center' },
   signatureSection: {
-    marginTop: 50,
+    marginTop: 40,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: D.colors.border,
   },
   signatureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 30,
+    marginTop: 24,
+  },
+  signatureColumn: {
+    width: '45%',
   },
   signatureBox: {
-    width: '45%',
-    paddingTop: 60,
+    width: '100%',
+    paddingTop: 50,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: D.colors.text,
   },
   signatureLabel: {
-    fontSize: 8,
-    color: '#64748b',
+    fontSize: D.fontSize.caption,
+    color: D.colors.secondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  receiptSection: {
+    marginBottom: 142,
+  },
+  receiptLabel: {
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
+    marginBottom: 4,
+  },
+  receiptLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: D.colors.borderDark,
+    height: 12,
+  },
+  receiptHint: {
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  receiptPlaceholder: {
+    opacity: 0,
   },
   signatureImage: {
     width: '100%',
@@ -180,12 +219,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   footer: {
-    marginTop: 40,
-    paddingTop: 20,
+    marginTop: 30,
+    paddingTop: 15,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    fontSize: 7,
-    color: '#94a3b8',
+    borderTopColor: D.colors.border,
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
     textAlign: 'center',
   },
 })
@@ -252,9 +291,11 @@ const CustomerDeliveryNotePDFDocument: React.FC<CustomerDeliveryNotePDFProps> = 
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <View>
-              <Text style={styles.deliveryNoteTitle}>LIEFERSCHEIN</Text>
+              <View style={styles.titleBadge}>
+                <Text style={styles.titleBadgeText}>LIEFERSCHEIN</Text>
+              </View>
               <Text style={styles.deliveryNoteSubtitle}>
-                Lieferdatum: {new Date(deliveryNote.deliveryDate).toLocaleDateString('de-DE')}
+                Lieferdatum: {new Date(deliveryNote.deliveryDate).toLocaleDateString('de-AT')}
               </Text>
             </View>
             <View style={styles.deliveryNoteNumber}>
@@ -273,7 +314,7 @@ const CustomerDeliveryNotePDFDocument: React.FC<CustomerDeliveryNotePDFProps> = 
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>Lieferdatum</Text>
             <Text style={styles.metaValue}>
-              {new Date(deliveryNote.deliveryDate).toLocaleDateString('de-DE')}
+              {new Date(deliveryNote.deliveryDate).toLocaleDateString('de-AT')}
             </Text>
           </View>
         </View>
@@ -281,45 +322,60 @@ const CustomerDeliveryNotePDFDocument: React.FC<CustomerDeliveryNotePDFProps> = 
         {/* Items Table */}
         {deliveryNote.items && deliveryNote.items.length > 0 && (
           <View style={styles.itemsTable}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderText, styles.colPosition]}>Pos.</Text>
-              <Text style={[styles.tableHeaderText, styles.colDescription]}>Beschreibung</Text>
-              <Text style={[styles.tableHeaderText, styles.colQuantity]}>Menge</Text>
-              <Text style={[styles.tableHeaderText, styles.colUnit]}>Einheit</Text>
-            </View>
-            {deliveryNote.items.map((item, idx) => (
-              <View key={idx} style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.colPosition]}>{item.position}</Text>
-                <Text style={[styles.tableCell, styles.colDescription]}>{item.description}</Text>
-                <Text style={[styles.tableCell, styles.colQuantity]}>{item.quantity}</Text>
-                <Text style={[styles.tableCell, styles.colUnit]}>{item.unit}</Text>
+            <View style={styles.tableBox}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, styles.colPosition]}>Pos.</Text>
+                <Text style={[styles.tableHeaderText, styles.colDescription]}>Beschreibung</Text>
+                <Text style={[styles.tableHeaderText, styles.colQuantity]}>Menge</Text>
+                <Text style={[styles.tableHeaderText, styles.colUnit]}>Einheit</Text>
               </View>
-            ))}
+              {deliveryNote.items.map((item, idx) => (
+                <View key={idx} style={[styles.tableRow, idx % 2 === 1 ? styles.tableRowAlt : null]}>
+                  <Text style={[styles.tableCell, styles.colPosition]}>{item.position}</Text>
+                  <Text style={[styles.tableCell, styles.colDescription]}>{item.description}</Text>
+                  <Text style={[styles.tableCell, styles.colQuantity]}>{item.quantity}</Text>
+                  <Text style={[styles.tableCell, styles.colUnit]}>{item.unit}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
         {/* Signature Section */}
-        <View style={styles.signatureSection}>
+        <View style={styles.signatureSection} wrap={false}>
           <View style={styles.signatureRow}>
-            <View style={styles.signatureBox}>
-              {deliveryNote.customerSignature ? (
-                <>
-                  <Image src={deliveryNote.customerSignature} style={styles.signatureImage} />
-                  <Text style={styles.signatureLabel}>
-                    {deliveryNote.signedBy || project.customerName}
-                  </Text>
-                  {deliveryNote.customerSignatureDate && (
+            <View style={styles.signatureColumn}>
+              <View style={styles.receiptSection}>
+                <Text style={styles.receiptLabel}>Ware erhalten am</Text>
+                <View style={styles.receiptLine} />
+                <Text style={styles.receiptHint}>Ort, Datum</Text>
+              </View>
+              <View style={styles.signatureBox}>
+                {deliveryNote.customerSignature ? (
+                  <>
+                    <Image
+                      src={deliveryNote.customerSignature}
+                      style={styles.signatureImage}
+                      alt="Kundenunterschrift"
+                    />
                     <Text style={styles.signatureLabel}>
-                      {new Date(deliveryNote.customerSignatureDate).toLocaleDateString('de-DE')}
+                      {deliveryNote.signedBy || project.customerName}
                     </Text>
-                  )}
-                </>
-              ) : (
-                <Text style={styles.signatureLabel}>Unterschrift Kunde</Text>
-              )}
+                  </>
+                ) : (
+                  <Text style={styles.signatureLabel}>Unterschrift Kunde</Text>
+                )}
+              </View>
             </View>
-            <View style={styles.signatureBox}>
-              <Text style={styles.signatureLabel}>Unterschrift Lieferant</Text>
+            <View style={styles.signatureColumn}>
+              <View style={[styles.receiptSection, styles.receiptPlaceholder]}>
+                <Text style={styles.receiptLabel}>Ware erhalten am</Text>
+                <View style={styles.receiptLine} />
+                <Text style={styles.receiptHint}>Ort, Datum</Text>
+              </View>
+              <View style={styles.signatureBox}>
+                <Text style={styles.signatureLabel}>Unterschrift Lieferant</Text>
+              </View>
             </View>
           </View>
         </View>

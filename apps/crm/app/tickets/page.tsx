@@ -1,4 +1,3 @@
-import { requirePermission } from '@/lib/auth/requirePermission'
 import TicketsClient from './TicketsClient'
 
 export default async function TicketsPage() {

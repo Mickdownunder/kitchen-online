@@ -54,7 +54,6 @@ interface ProjectBasicsTabProps {
 export function ProjectBasicsTab({
   formData,
   setFormData,
-  customers,
   employees,
   selectedCustomerId,
   setSelectedCustomerId,
@@ -217,7 +216,7 @@ export function ProjectBasicsTab({
                     name="deliveryType"
                     value="delivery"
                     checked={(formData.deliveryType || 'delivery') === 'delivery'}
-                    onChange={e =>
+                    onChange={() =>
                       setFormData(prev => ({ ...prev, deliveryType: 'delivery' as const }))
                     }
                     className="h-4 w-4 cursor-pointer accent-amber-500"
@@ -230,7 +229,7 @@ export function ProjectBasicsTab({
                     name="deliveryType"
                     value="pickup"
                     checked={formData.deliveryType === 'pickup'}
-                    onChange={e =>
+                    onChange={() =>
                       setFormData(prev => ({ ...prev, deliveryType: 'pickup' as const }))
                     }
                     className="h-4 w-4 cursor-pointer accent-amber-500"
@@ -625,7 +624,7 @@ export function ProjectBasicsTab({
                     ))
                   ) : (
                     <div className="px-4 py-3 text-center text-sm text-slate-500">
-                      Keine Mitarbeiter vorhanden. Bitte unter "Firmenstammdaten" anlegen.
+                      Keine Mitarbeiter vorhanden. Bitte unter &quot;Firmenstammdaten&quot; anlegen.
                     </div>
                   )}
                 </div>

@@ -21,10 +21,7 @@ export function ProjectModalFooter({
   onDelete,
   onSave,
 }: ProjectModalFooterProps) {
-  const totalPartial = formData.partialPayments?.reduce((sum, p) => sum + p.amount, 0) || 0
-  const remaining = calculations.grossTotal - totalPartial
-  const _hasPartialPayments = formData.partialPayments && formData.partialPayments.length > 0
-  const _hasRemaining = remaining > 0
+  void calculations
 
   return (
     <div className="border-t border-slate-100 bg-slate-50/50 px-10 py-6">

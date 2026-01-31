@@ -8,13 +8,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Euro,
   FileText,
   Download,
   Receipt,
   CircleDollarSign
 } from 'lucide-react'
 import { useCustomerApi } from '../hooks/useCustomerApi'
+import { useProject } from '../context/ProjectContext'
 
 interface Invoice {
   id: string
@@ -189,49 +189,41 @@ function InvoiceCard({
 
 export default function PortalZahlungenPage() {
   const { accessToken, isReady } = useCustomerApi()
+  const { selectedProject, isLoading: projectLoading } = useProject()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [projectInfo, setProjectInfo] = useState<ProjectPaymentInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (projectId: string) => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Get current user to get customer_id
-      const { data: { user } } = await portalSupabase.auth.getUser()
-      const customerId = user?.app_metadata?.customer_id
-
-      if (!customerId) {
-        throw new Error('No customer found')
-      }
-
-      // Fetch ALL invoices for this customer (RLS will filter by customer_id)
+      // Fetch invoices for the selected project
       const { data: invoicesData, error: invoicesError } = await portalSupabase
         .from('invoices')
-        .select('id, invoice_number, type, amount, invoice_date, due_date, is_paid, paid_date, description, project_id')
+        .select('id, invoice_number, type, amount, invoice_date, due_date, is_paid, paid_date, description')
+        .eq('project_id', projectId)
         .order('invoice_date', { ascending: false })
 
       if (invoicesError) throw invoicesError
 
-      // Fetch ALL projects payment info (RLS will filter)
-      const { data: projectsData, error: projectsError } = await portalSupabase
+      // Fetch project payment info for the selected project
+      const { data: projectData, error: projectError } = await portalSupabase
         .from('projects')
         .select('id, total_amount, deposit_amount, is_deposit_paid, is_final_paid')
-        .order('created_at', { ascending: false })
+        .eq('id', projectId)
+        .single()
 
-      if (projectsError) throw projectsError
-
-      // Aggregate totals across all projects
-      const totalAmount = projectsData?.reduce((sum, p) => sum + (p.total_amount || 0), 0) || 0
+      if (projectError) throw projectError
 
       setInvoices(invoicesData || [])
       setProjectInfo({
-        totalAmount,
-        depositAmount: projectsData?.[0]?.deposit_amount || 0,
-        isDepositPaid: projectsData?.[0]?.is_deposit_paid || false,
-        isFinalPaid: projectsData?.[0]?.is_final_paid || false,
+        totalAmount: projectData?.total_amount || 0,
+        depositAmount: projectData?.deposit_amount || 0,
+        isDepositPaid: projectData?.is_deposit_paid || false,
+        isFinalPaid: projectData?.is_final_paid || false,
       })
     } catch (err) {
       console.error('Error loading payment data:', err)
@@ -242,13 +234,13 @@ export default function PortalZahlungenPage() {
   }, [])
 
   useEffect(() => {
-    if (isReady && accessToken) {
-      loadData()
+    if (isReady && accessToken && selectedProject?.id && !projectLoading) {
+      loadData(selectedProject.id)
     } else if (isReady && !accessToken) {
       setIsLoading(false)
       setError('NOT_AUTHENTICATED')
     }
-  }, [isReady, accessToken, loadData])
+  }, [isReady, accessToken, selectedProject?.id, projectLoading, loadData])
 
   // Calculate totals
   const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.amount, 0)
@@ -400,7 +392,8 @@ export default function PortalZahlungenPage() {
       {/* Info Box */}
       <div className="rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100 p-4 ring-1 ring-slate-200/50">
         <p className="text-sm text-slate-600">
-          <strong className="text-slate-700">Hinweis:</strong> PDF-Rechnungen finden Sie auch im Bereich "Dokumente". Bei Fragen zu Zahlungen kontaktieren Sie uns gerne.
+          <strong className="text-slate-700">Hinweis:</strong> PDF-Rechnungen finden Sie auch im
+          Bereich &quot;Dokumente&quot;. Bei Fragen zu Zahlungen kontaktieren Sie uns gerne.
         </p>
       </div>
     </div>

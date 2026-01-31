@@ -158,7 +158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       customerDeliveryNotes,
       setProjects,
     })
-  }, [projects.length, isLoading, customerDeliveryNotes.length])
+  }, [projects, isLoading, customerDeliveryNotes, setProjects])
 
   // Check payment schedule in background (non-blocking, runs after initial load)
   useEffect(() => {
@@ -168,7 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       projects,
       setProjects,
     })
-  }, [projects.length, isLoading])
+  }, [projects, isLoading, setProjects])
 
   const handleFunctionCall = async (
     name: string,

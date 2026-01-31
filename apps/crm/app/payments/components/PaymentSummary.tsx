@@ -8,6 +8,7 @@ interface PaymentSummaryProps {
   partialPayments: PartialPayment[]
   grossTotal: number
   finalInvoice?: {
+    id: string
     invoiceNumber: string
     amount: number
     date: string
@@ -16,6 +17,7 @@ interface PaymentSummaryProps {
   }
   onGenerateFinalInvoice: () => void
   onToggleFinalInvoicePaid: (isPaid: boolean) => void
+  onDeleteFinalInvoice: () => void
 }
 
 export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
@@ -24,6 +26,7 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
   finalInvoice,
   onGenerateFinalInvoice,
   onToggleFinalInvoicePaid,
+  onDeleteFinalInvoice,
 }) => {
   const totalPartial = partialPayments.reduce((sum, p) => sum + p.amount, 0)
   const remaining = grossTotal - totalPartial
@@ -85,6 +88,15 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
           </div>
           <div className="mt-2 text-xs text-slate-600">
             Datum: {new Date(finalInvoice.date).toLocaleDateString('de-DE')}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onDeleteFinalInvoice}
+              className="rounded-xl bg-red-100 px-4 py-2 text-xs font-black uppercase tracking-widest text-red-700 transition-all hover:bg-red-200"
+            >
+              Schlussrechnung löschen
+            </button>
           </div>
         </div>
       ) : (

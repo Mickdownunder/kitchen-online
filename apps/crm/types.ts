@@ -21,6 +21,7 @@ export interface UserProfile {
 }
 
 export enum ProjectStatus {
+  LEAD = 'Lead',
   PLANNING = 'Planung',
   MEASURING = 'Aufmaß',
   ORDERED = 'Bestellt',
@@ -616,6 +617,8 @@ export interface CustomerProject {
   documents: ProjectDocument[]
   complaints: Complaint[]
   notes: string
+  /** Portal-Zugangscode für Kunden */
+  accessCode?: string
   /** Hinweise für Auftrag (PDF): erscheint unter den Positionen, oberhalb der Unterschrift (z. B. Zahlungsmodalitäten, Reklamationen, Unterschrift Kunde, Schlusstext). */
   orderFooterText?: string
 

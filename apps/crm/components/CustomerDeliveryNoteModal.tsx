@@ -222,9 +222,9 @@ export default function CustomerDeliveryNoteModal({
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
               <p className="text-sm text-blue-900">
                 <strong>💡 Hinweis:</strong> Lieferscheine können bereits im Voraus erfasst werden
-                (z.B. für die Disposition). Der Status wird automatisch auf "geliefert" gesetzt,
-                sobald das Lieferdatum erreicht ist. Die Unterschrift wird von einer Fremdfirma
-                erfasst.
+                (z.B. für die Disposition). Der Status wird automatisch auf
+                &quot;geliefert&quot; gesetzt, sobald das Lieferdatum erreicht ist. Die
+                Unterschrift wird von einer Fremdfirma erfasst.
               </p>
             </div>
 
@@ -242,7 +242,7 @@ export default function CustomerDeliveryNoteModal({
                       {new Date(existingDeliveryNote.deliveryDate) <= new Date() &&
                         existingDeliveryNote.status === 'draft' && (
                           <span className="ml-2 font-bold text-amber-600">
-                            (Status wird automatisch auf 'geliefert' gesetzt)
+                            (Status wird automatisch auf &apos;geliefert&apos; gesetzt)
                           </span>
                         )}
                     </p>

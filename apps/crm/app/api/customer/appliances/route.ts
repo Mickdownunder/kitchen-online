@@ -45,6 +45,7 @@ async function getCustomerSession(request: NextRequest) {
  * GET /api/customer/appliances
  * 
  * Lists all items marked as "show_in_portal" for the customer's project
+ * Optional: ?projectId=xxx to filter by specific project
  * Reads from invoice_items table
  */
 export async function GET(request: NextRequest) {
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { customer_id } = session
+    const requestedProjectId = request.nextUrl.searchParams.get('projectId')
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,23 +73,44 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    // 1. Get all project IDs for this customer
-    const { data: projects, error: projectsError } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('customer_id', customer_id)
-      .is('deleted_at', null)
+    // 1. Get project IDs for this customer
+    let projectIds: string[] = []
+    
+    if (requestedProjectId) {
+      // Verify the requested project belongs to this customer
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('id', requestedProjectId)
+        .eq('customer_id', customer_id)
+        .is('deleted_at', null)
+        .single()
 
-    if (projectsError || !projects || projects.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: { appliances: [], groupedByCategory: {}, totalCount: 0 },
-      })
+      if (projectError || !project) {
+        return NextResponse.json({
+          success: true,
+          data: { appliances: [], groupedByCategory: {}, totalCount: 0 },
+        })
+      }
+      projectIds = [project.id]
+    } else {
+      // Get all projects for this customer
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('customer_id', customer_id)
+        .is('deleted_at', null)
+
+      if (projectsError || !projects || projects.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: { appliances: [], groupedByCategory: {}, totalCount: 0 },
+        })
+      }
+      projectIds = projects.map(p => p.id)
     }
 
-    const projectIds = projects.map(p => p.id)
-
-    // 2. Fetch invoice items that are marked as show_in_portal for all projects
+    // 2. Fetch invoice items that are marked as show_in_portal
     const { data: items, error } = await supabase
       .from('invoice_items')
       .select(`

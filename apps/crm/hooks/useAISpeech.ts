@@ -113,8 +113,8 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
     }
 
     // Check TTS support and load preference
-    if ('speechSynthesis' in window) {
-      const savedTTS = localStorage.getItem('ai_tts_enabled')
+    if ('speechSynthesis' in window && typeof window.localStorage?.getItem === 'function') {
+      const savedTTS = window.localStorage.getItem('ai_tts_enabled')
       if (savedTTS === 'true') {
         setIsTTSEnabled(true)
       }
@@ -226,7 +226,9 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
   const toggleTTS = useCallback(() => {
     const newState = !isTTSEnabled
     setIsTTSEnabled(newState)
-    localStorage.setItem('ai_tts_enabled', newState.toString())
+    if (typeof window.localStorage?.setItem === 'function') {
+      window.localStorage.setItem('ai_tts_enabled', newState.toString())
+    }
 
     if (!newState) {
       stopSpeaking()

@@ -62,9 +62,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // Add pathname header for layout detection
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', pathname)
+
   const response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   })
 
@@ -72,7 +76,15 @@ export async function middleware(request: NextRequest) {
   // PORTAL ROUTES (Customer Portal) - Separate cookies
   // ============================================
   const isPortalRoute = pathname.startsWith('/portal')
-  const isPortalLoginRoute = pathname === '/portal/login'
+  
+  // Public portal routes (no auth required)
+  const publicPortalRoutes = [
+    '/portal/login',
+    '/portal/forgot-password',
+    '/portal/reset-password',
+    '/portal/setup-password',
+  ]
+  const isPublicPortalRoute = publicPortalRoutes.includes(pathname)
 
   if (isPortalRoute) {
     let portalUser = null
@@ -85,11 +97,11 @@ export async function middleware(request: NextRequest) {
       console.error('[Middleware] Portal auth error:', error)
     }
 
-    // Portal login page is always accessible
-    if (isPortalLoginRoute) {
-      // If customer is already logged in, redirect to portal dashboard
+    // Public portal pages are always accessible
+    if (isPublicPortalRoute) {
+      // If customer is already logged in and on login page, redirect to portal dashboard
       const userRole = portalUser?.app_metadata?.role
-      if (portalUser && userRole === 'customer') {
+      if (portalUser && userRole === 'customer' && pathname === '/portal/login') {
         return NextResponse.redirect(new URL('/portal', request.url))
       }
       return response

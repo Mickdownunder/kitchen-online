@@ -3,9 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Fragment } from 'react'
-import { Dialog, Transition } from '@headlessui/react'
-import { X, Home, FileText, HelpCircle, Package, ChefHat, Calendar, CreditCard } from 'lucide-react'
+import { Dialog, Transition, Listbox } from '@headlessui/react'
+import { X, Home, FileText, HelpCircle, Package, Calendar, CreditCard, ChevronDown, Check, Briefcase } from 'lucide-react'
+import Image from 'next/image'
 import LogoutButton from './LogoutButton'
+import { useProject } from '../context/ProjectContext'
+
+const LOGO_URL = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-02%20schwarz.png'
 
 const navigation = [
   { name: 'Übersicht', href: '/portal', icon: Home },
@@ -23,6 +27,7 @@ interface PortalSidebarProps {
 
 export default function PortalSidebar({ sidebarOpen, setSidebarOpen }: PortalSidebarProps) {
   const pathname = usePathname() || ''
+  const { projects, selectedProject, selectProject, hasMultipleProjects, isLoading } = useProject()
 
   const isActive = (href: string) => {
     if (href === '/portal') {
@@ -34,15 +39,85 @@ export default function PortalSidebar({ sidebarOpen, setSidebarOpen }: PortalSid
   const sidebarContent = (
     <div className="flex h-full flex-col bg-white border-r border-slate-200/80">
       {/* Logo / Header */}
-      <div className="flex flex-shrink-0 items-center gap-3 px-6 py-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25">
-          <ChefHat className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold text-slate-900">KüchenOnline</h1>
-          <p className="text-xs text-slate-500">Kundenportal</p>
-        </div>
+      <div className="flex flex-shrink-0 items-center px-6 py-6">
+        <Image
+          src={LOGO_URL}
+          alt="KüchenOnline"
+          width={180}
+          height={50}
+          className="h-10 w-auto"
+          unoptimized
+        />
       </div>
+
+      {/* Projekt-Switcher - nur anzeigen wenn mehrere Projekte */}
+      {!isLoading && selectedProject && (
+        <div className="px-4 pb-4">
+          {hasMultipleProjects ? (
+            <Listbox value={selectedProject.id} onChange={selectProject}>
+              <div className="relative">
+                <Listbox.Button className="relative w-full rounded-xl bg-slate-100 py-3 pl-4 pr-10 text-left text-sm font-medium text-slate-900 transition-colors hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                  <span className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-slate-500" />
+                    <span className="truncate">
+                      {selectedProject.orderNumber || 'Auftrag'}: {selectedProject.name}
+                    </span>
+                  </span>
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <ChevronDown className="h-4 w-4 text-slate-500" />
+                  </span>
+                </Listbox.Button>
+                <Transition
+                  as={Fragment}
+                  leave="transition ease-in duration-100"
+                  leaveFrom="opacity-100"
+                  leaveTo="opacity-0"
+                >
+                  <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none">
+                    {projects.map((project) => (
+                      <Listbox.Option
+                        key={project.id}
+                        value={project.id}
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-3 pl-10 pr-4 ${
+                            active ? 'bg-emerald-50 text-emerald-900' : 'text-slate-900'
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span className={`block truncate ${selected ? 'font-semibold' : 'font-normal'}`}>
+                              {project.orderNumber || 'Auftrag'}: {project.name}
+                            </span>
+                            <span className="block truncate text-xs text-slate-500">
+                              Status: {project.status}
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-emerald-600">
+                                <Check className="h-4 w-4" />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Listbox.Option>
+                    ))}
+                  </Listbox.Options>
+                </Transition>
+              </div>
+            </Listbox>
+          ) : (
+            // Nur ein Projekt - einfache Anzeige ohne Dropdown
+            <div className="rounded-xl bg-slate-100 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                <Briefcase className="h-4 w-4 text-slate-500" />
+                <span className="truncate">
+                  {selectedProject.orderNumber || 'Auftrag'}: {selectedProject.name}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4">

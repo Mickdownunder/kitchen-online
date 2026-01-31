@@ -1,20 +1,22 @@
 # @kitchen/db
 
 Database package containing:
-- SQL Migrations
-- RLS Policies
-- Database Types (generated)
+- Supabase CLI migrations
+- Baseline schema dump (reference)
 
 ## Structure
 
 ```
 db/
-├── migrations/          # SQL migration files
-├── policies/           # RLS policy definitions
-├── rpcs/               # Remote Procedure Calls
-└── src/
-    └── types.ts        # Generated TypeScript types
+├── supabase/
+│   └── migrations/      # CLI-managed migrations (authoritative)
+├── migrations/          # Baseline schema dump (reference only)
+└── package.json
 ```
+
+Notes:
+- `supabase/migrations` is the only path used by `supabase db push`.
+- `migrations/001_initial_schema.sql` is a snapshot for documentation/rebuilds.
 
 ## Commands
 

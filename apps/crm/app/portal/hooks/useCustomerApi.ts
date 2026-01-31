@@ -95,28 +95,30 @@ export function useCustomerApi() {
   }
 }
 
-export function useProjectData() {
+/**
+ * Hook to load project dashboard data
+ * @param projectId - Optional project ID. If provided, loads data for that specific project.
+ */
+export function useProjectData(projectId?: string | null) {
   const { accessToken, isReady, fetchWithAuth } = useCustomerApi()
   const [data, setData] = useState<ProjectData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
-  const loadProject = useCallback(async (projectId?: string) => {
+  const loadProject = useCallback(async (pid?: string | null) => {
     if (!accessToken) return
 
     setIsLoading(true)
     setError(null)
 
-    const url = projectId 
-      ? `/api/customer/project?projectId=${projectId}`
+    const url = pid 
+      ? `/api/customer/project?projectId=${pid}`
       : '/api/customer/project'
 
     const result = await fetchWithAuth<ProjectData>(url)
 
     if (result.success && result.data) {
       setData(result.data)
-      setSelectedProjectId(result.data.project.id)
     } else {
       setError(result.error || 'Fehler beim Laden der Daten')
     }
@@ -124,31 +126,21 @@ export function useProjectData() {
     setIsLoading(false)
   }, [accessToken, fetchWithAuth])
 
-  // Initial load
+  // Load when projectId changes or on initial mount
   useEffect(() => {
     if (isReady && accessToken) {
-      loadProject()
+      loadProject(projectId)
     } else if (isReady && !accessToken) {
       setIsLoading(false)
       setError('NOT_AUTHENTICATED')
     }
-  }, [isReady, accessToken, loadProject])
-
-  // Select a different project
-  const selectProject = useCallback((projectId: string) => {
-    if (projectId !== selectedProjectId) {
-      loadProject(projectId)
-    }
-  }, [selectedProjectId, loadProject])
+  }, [isReady, accessToken, projectId, loadProject])
 
   return { 
     data, 
     isLoading, 
     error, 
-    refresh: () => loadProject(selectedProjectId || undefined),
-    selectedProjectId,
-    selectProject,
-    hasMultipleProjects: (data?.allProjects?.length || 0) > 1,
+    refresh: () => loadProject(projectId),
   }
 }
 

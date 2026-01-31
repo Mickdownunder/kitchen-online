@@ -114,15 +114,6 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
     return Object.entries(statusCounts).map(([name, value]) => ({ name, value }))
   }, [filteredSupplier])
 
-  // Status distribution for customer notes - reserved for future chart
-  const _customerStatusDistribution = useMemo(() => {
-    const statusCounts: { [key: string]: number } = {}
-    filteredCustomer.forEach(n => {
-      statusCounts[n.status] = (statusCounts[n.status] || 0) + 1
-    })
-    return Object.entries(statusCounts).map(([name, value]) => ({ name, value }))
-  }, [filteredCustomer])
-
   // Top suppliers (by count)
   const topSuppliers = useMemo(() => {
     const supplierCounts: { [key: string]: number } = {}

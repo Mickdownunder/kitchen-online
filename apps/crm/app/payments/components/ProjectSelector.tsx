@@ -29,7 +29,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
             <div className="py-8 text-center text-slate-400">
               <p className="mb-2">Keine Aufträge gefunden</p>
               <p className="mb-4 text-xs">
-                Erstellen Sie zuerst einen Auftrag im Bereich "Aufträge"
+                Erstellen Sie zuerst einen Auftrag im Bereich &quot;Aufträge&quot;
               </p>
               <button
                 onClick={() => (window.location.href = '/projects')}

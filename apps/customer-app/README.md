@@ -1,52 +1,41 @@
 # @kitchen/customer-app
 
-React Native (Expo) App für Kunden.
+Customer Mobile App (Expo).  
+Status: **Scaffold only** — source code not yet migrated into this repo.
 
-## Features
-
-- Login mit Projektcode
-- Dashboard mit Projektstatus
-- Dokumente ansehen
-- Tickets erstellen und verfolgen
-- Termine einsehen
+Aktueller Kunden‑UI‑Pfad: `apps/crm/app/portal` (Web‑Portal).
 
 ## Setup
 
 ```bash
-# Dependencies installieren
+# Dependencies installieren (im Repo-Root)
 pnpm install
 
-# iOS Simulator starten
-pnpm ios
+# App starten
+pnpm --filter @kitchen/customer-app start
 
-# Android Emulator starten
-pnpm android
+# iOS Simulator
+pnpm --filter @kitchen/customer-app ios
 
-# Web (für Entwicklung)
-pnpm web
+# Android Emulator
+pnpm --filter @kitchen/customer-app android
+
+# Web (Entwicklung)
+pnpm --filter @kitchen/customer-app web
 ```
 
-## Struktur
+## Struktur (aktuell)
 
 ```
 customer-app/
-├── app/              # Expo Router (file-based routing)
-│   ├── (auth)/       # Auth screens (login)
-│   ├── (tabs)/       # Main tab navigation
-│   │   ├── index.tsx # Dashboard
-│   │   ├── documents.tsx
-│   │   ├── tickets.tsx
-│   │   └── appointments.tsx
-│   └── _layout.tsx
-├── components/       # Shared components
-├── hooks/            # Custom hooks
-└── lib/              # Utilities
+├── package.json
+└── README.md
 ```
 
-## Tech Stack
+## Tech Stack (geplant)
 
 - Expo SDK 52
-- Expo Router (file-based routing)
+- Expo Router
 - Supabase (Auth + Database)
-- @kitchen/shared-types (Zod schemas)
-- @kitchen/auth (Session management)
+- @kitchen/shared-types (Zod)
+- @kitchen/auth (Session)

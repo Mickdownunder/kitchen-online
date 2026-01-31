@@ -24,6 +24,8 @@ interface PublishRequest {
     amount: number
     date: string
     description?: string
+    isPaid?: boolean
+    paidDate?: string
   }
   // For delivery notes
   deliveryNote?: {
@@ -170,6 +172,8 @@ export async function POST(request: NextRequest) {
         amount: invoice.amount,
         date: invoice.date,
         description: invoice.description,
+        isPaid: invoice.isPaid ?? false,
+        paidDate: invoice.paidDate,
         project: {
           customerName: project.customerName,
           address: project.address,
@@ -185,8 +189,10 @@ export async function POST(request: NextRequest) {
         bankAccount: bankAccount,
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfElement = React.createElement(InvoicePDFDocumentServer, { invoice: invoiceData }) as any
+      const pdfElement = React.createElement(
+        InvoicePDFDocumentServer,
+        { invoice: invoiceData }
+      ) as React.ReactElement
       pdfBuffer = await renderToBuffer(pdfElement)
       
       const invoiceTypeLabel = invoice.type === 'partial' ? 'Teilrechnung' : 'Schlussrechnung'
@@ -205,17 +211,19 @@ export async function POST(request: NextRequest) {
         customerId: project.customerId,
       } as CustomerProject
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const deliveryNoteElement = React.createElement(CustomerDeliveryNotePDFDocumentServer, {
-        deliveryNote: {
-          deliveryNoteNumber: body.deliveryNote.deliveryNoteNumber,
-          deliveryDate: body.deliveryNote.deliveryDate,
-          deliveryAddress: body.deliveryNote.deliveryAddress,
-          items: body.deliveryNote.items,
-        },
-        project: deliveryNoteProject,
-        company: companySettings,
-      }) as any
+      const deliveryNoteElement = React.createElement(
+        CustomerDeliveryNotePDFDocumentServer,
+        {
+          deliveryNote: {
+            deliveryNoteNumber: body.deliveryNote.deliveryNoteNumber,
+            deliveryDate: body.deliveryNote.deliveryDate,
+            deliveryAddress: body.deliveryNote.deliveryAddress,
+            items: body.deliveryNote.items,
+          },
+          project: deliveryNoteProject,
+          company: companySettings,
+        }
+      ) as React.ReactElement
 
       pdfBuffer = await renderToBuffer(deliveryNoteElement)
       
@@ -249,12 +257,11 @@ export async function POST(request: NextRequest) {
           sum + (item.netTotal || 0) * (1 + ((item.taxRate || 20) / 100)), 0),
       } as CustomerProject
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const orderElement = React.createElement(OrderPDFDocumentServer, {
         project: orderProject,
         company: companySettings,
         appendAgb: body.appendAgb ?? true,
-      }) as any
+      }) as React.ReactElement
       
       pdfBuffer = await renderToBuffer(orderElement)
       

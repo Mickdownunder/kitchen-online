@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useCustomerApi } from '../hooks/useCustomerApi'
+import { useProject } from '../context/ProjectContext'
 import Link from 'next/link'
 import { 
   Refrigerator, 
@@ -244,37 +245,44 @@ function ApplianceCard({ appliance }: { appliance: Appliance }) {
 
 export default function AppliancesPage() {
   const { accessToken, isReady, fetchWithAuth } = useCustomerApi()
+  const { selectedProject, isLoading: projectLoading } = useProject()
   const [appliances, setAppliances] = useState<Appliance[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const loadAppliances = useCallback(async (projectId: string) => {
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetchWithAuth<{ appliances: Appliance[] }>(
+        `/api/customer/appliances?projectId=${projectId}`
+      )
+      
+      if (response.success && response.data) {
+        setAppliances(response.data.appliances)
+      } else {
+        setError(response.error || 'Fehler beim Laden')
+      }
+    } catch (err) {
+      console.error('Error loading appliances:', err)
+      setError('Fehler beim Laden der Geräte')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [fetchWithAuth])
+
   useEffect(() => {
-    if (!isReady) return
+    if (!isReady || projectLoading) return
     if (!accessToken) {
       setIsLoading(false)
       setError('NOT_AUTHENTICATED')
       return
     }
+    if (!selectedProject?.id) return
 
-    const loadAppliances = async () => {
-      try {
-        const response = await fetchWithAuth<{ appliances: Appliance[] }>('/api/customer/appliances')
-        
-        if (response.success && response.data) {
-          setAppliances(response.data.appliances)
-        } else {
-          setError(response.error || 'Fehler beim Laden')
-        }
-      } catch (err) {
-        console.error('Error loading appliances:', err)
-        setError('Fehler beim Laden der Geräte')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadAppliances()
-  }, [isReady, accessToken, fetchWithAuth])
+    loadAppliances(selectedProject.id)
+  }, [isReady, accessToken, selectedProject?.id, projectLoading, loadAppliances])
 
   if (isLoading) {
     return (
@@ -338,8 +346,9 @@ export default function AppliancesPage() {
       {/* Info Box */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 p-5 ring-1 ring-blue-200/50">
         <p className="text-sm text-blue-800">
-          <strong className="text-blue-900">Tipp:</strong> Bei Problemen mit einem Gerät können Sie direkt den Hersteller-Kundendienst 
-          kontaktieren oder über "Problem melden" ein Ticket an uns senden.
+          <strong className="text-blue-900">Tipp:</strong> Bei Problemen mit einem Gerät können
+          Sie direkt den Hersteller-Kundendienst kontaktieren oder über
+          &quot;Problem melden&quot; ein Ticket an uns senden.
         </p>
       </div>
     </div>

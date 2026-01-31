@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { rateLimit } from '@/lib/middleware/rateLimit'
 
 const SetPasswordSchema = z.object({
   password: z
@@ -21,6 +22,23 @@ const SetPasswordSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const limitCheck = await rateLimit(request)
+    if (!limitCheck || !limitCheck.allowed) {
+      const resetTime = limitCheck?.resetTime || Date.now() + 60000
+      return NextResponse.json(
+        { success: false, error: 'RATE_LIMITED', resetTime },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': resetTime.toString(),
+          },
+        }
+      )
+    }
+
     // 1. Authorization Header prüfen
     const authHeader = request.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
@@ -75,14 +93,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 6. Passwort setzen und password_set Flag auf true
+    // 6. Kundendaten laden für Metadaten
+    const customerId = user.app_metadata?.customer_id
+    let customerName = user.user_metadata?.customer_name || ''
+    let customerEmail = user.user_metadata?.customer_email || ''
+
+    if (customerId && (!customerName || !customerEmail)) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('first_name, last_name, email')
+        .eq('id', customerId)
+        .single()
+
+      if (customer) {
+        customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
+        customerEmail = customer.email || ''
+      }
+    }
+
+    const finalMetadata = {
+      ...user.user_metadata,
+      password_set: true,
+      password_set_at: new Date().toISOString(),
+      customer_name: customerName,
+      customer_email: customerEmail,
+      full_name: customerName, // For Supabase display name column
+      name: customerName, // Alternative field some UIs use
+    }
+
+    // 7. Passwort setzen und Metadaten aktualisieren
     const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
       password: password,
-      user_metadata: {
-        ...user.user_metadata,
-        password_set: true,
-        password_set_at: new Date().toISOString(),
-      },
+      user_metadata: finalMetadata,
     })
 
     if (updateError) {

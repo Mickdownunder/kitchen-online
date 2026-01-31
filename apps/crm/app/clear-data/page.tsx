@@ -10,8 +10,10 @@ export default function ClearDataPage() {
 
   const clearAllData = () => {
     // Clear localStorage
-    localStorage.removeItem('kp_projects')
-    localStorage.removeItem('kp_appointments')
+    if (typeof window.localStorage?.removeItem === 'function') {
+      window.localStorage.removeItem('kp_projects')
+      window.localStorage.removeItem('kp_appointments')
+    }
 
     setCleared(true)
 

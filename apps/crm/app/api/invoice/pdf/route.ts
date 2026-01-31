@@ -87,6 +87,8 @@ export async function POST(request: NextRequest) {
       amount: invoice.amount,
       date: invoice.date,
       description: invoice.description,
+      isPaid: invoice.isPaid ?? false,
+      paidDate: invoice.paidDate,
       project: {
         customerName: project.customerName,
         address: project.address,

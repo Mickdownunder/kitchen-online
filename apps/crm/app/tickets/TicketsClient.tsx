@@ -1,12 +1,11 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, Suspense, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { 
   MessageSquare, 
   Search, 
-  Filter,
   Clock,
   CheckCircle,
   Circle,
@@ -141,9 +140,8 @@ function TicketRow({ ticket }: { ticket: Ticket }) {
 }
 
 function TicketsContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const { success, error: showError } = useToast()
+  const { error: showError } = useToast()
 
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [stats, setStats] = useState<TicketStats>({ total: 0, open: 0, inProgress: 0, closed: 0 })

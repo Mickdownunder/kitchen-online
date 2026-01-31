@@ -1,39 +1,30 @@
 # @kitchen/crm
 
-Das CRM (Customer Relationship Management) für KüchenOnline.
+Das CRM (Employee‑UI) und das Customer Portal (Web) für KüchenOnline.
 
 ## Setup
 
-Der Code wird aus dem bestehenden `Kitchen-Ki-APP` Projekt kopiert.
+1. `pnpm install` im Root
+2. `apps/crm/.env.local` anlegen
+3. `pnpm dev` starten
 
-### Dateien kopieren
+### Benötigte Env Vars
 
 ```bash
-# Vom Kitchen-Ki-APP Ordner alle relevanten Dateien kopieren:
-cp -r /Users/michaellabitzke/Kitchen-Ki-APP/app ./app
-cp -r /Users/michaellabitzke/Kitchen-Ki-APP/components ./components
-cp -r /Users/michaellabitzke/Kitchen-Ki-APP/hooks ./hooks
-cp -r /Users/michaellabitzke/Kitchen-Ki-APP/lib ./lib
-cp -r /Users/michaellabitzke/Kitchen-Ki-APP/public ./public
-cp /Users/michaellabitzke/Kitchen-Ki-APP/middleware.ts ./
-cp /Users/michaellabitzke/Kitchen-Ki-APP/next.config.js ./
-cp /Users/michaellabitzke/Kitchen-Ki-APP/tailwind.config.js ./
-cp /Users/michaellabitzke/Kitchen-Ki-APP/postcss.config.js ./
-cp /Users/michaellabitzke/Kitchen-Ki-APP/tsconfig.json ./
-cp /Users/michaellabitzke/Kitchen-Ki-APP/types.ts ./
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+GEMINI_API_KEY=... # optional (AI features)
 ```
-
-### Nach dem Kopieren
-
-1. `pnpm install` im Root ausführen
-2. `.env.local` erstellen mit Supabase Keys
-3. `pnpm dev` starten
 
 ## Struktur
 
 ```
 crm/
-├── app/              # Next.js App Router
+├── app/              # Next.js App Router (CRM + Portal)
+│   ├── api/          # Server routes
+│   ├── portal/       # Customer portal pages
+│   └── tickets/      # CRM tickets UI
 ├── components/       # React Components
 ├── hooks/            # Custom Hooks
 ├── lib/              # Utilities, Services
@@ -43,13 +34,51 @@ crm/
 
 ## Customer API Routes
 
-Die Customer API Routes werden hier hinzugefügt unter:
+Die Customer API Routes liegen unter:
 ```
 app/api/customer/
 ├── auth/
 │   ├── login/route.ts
-│   └── logout/route.ts
+│   ├── logout/route.ts
+│   └── set-password/route.ts
 ├── documents/route.ts
+├── documents/[id]/route.ts
+├── documents/[id]/download/route.ts
 ├── tickets/route.ts
+├── tickets/[id]/messages/route.ts
+├── tickets/[id]/messages/[messageId]/download/route.ts
+├── appliances/route.ts
 └── project/route.ts
+```
+
+Hinweis:
+- Downloads laufen über Signed URLs (private Storage).
+- Customer‑Sessions sind customer_id‑basiert (multi‑project ready).
+
+## Smoke Tests (Playwright)
+
+Playwright ist für kurze Smoke‑Tests eingerichtet.
+
+Voraussetzung: App läuft lokal (Standard `http://localhost:3000`).
+
+```bash
+pnpm --filter @kitchen/crm test:e2e
+```
+
+Optional (UI‑Runner):
+```bash
+pnpm --filter @kitchen/crm test:e2e:ui
+```
+
+Benötigte Env‑Vars für Login‑Tests:
+```bash
+PW_BASE_URL=http://localhost:3000
+PW_CRM_EMAIL=...
+PW_CRM_PASSWORD=...
+
+# Portal: entweder Projektcode oder E‑Mail Login
+PW_PORTAL_ACCESS_CODE=...
+# oder
+PW_PORTAL_EMAIL=...
+PW_PORTAL_PASSWORD=...
 ```

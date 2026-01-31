@@ -70,7 +70,6 @@ export async function POST(request: NextRequest) {
       projectId,
       invoiceId, // Optional: spezifische Anzahlung (Index oder ID)
       deliveryNoteId, // Optional: spezifischer Lieferschein
-      dateRange: _dateRange, // Optional: für Statistics (currently unused)
     } = body
 
     if (!to || !subject || !pdfType) {

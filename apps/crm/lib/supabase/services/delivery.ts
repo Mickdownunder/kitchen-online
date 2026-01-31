@@ -235,11 +235,7 @@ export async function createGoodsReceipt(
 
     // Update invoice items delivery status
     for (const item of goodsReceipt.items) {
-      await updateInvoiceItemDeliveryStatus(
-        item.projectItemId,
-        item.quantityReceived,
-        item.quantityExpected
-      )
+      await updateInvoiceItemDeliveryStatus(item.projectItemId, item.quantityReceived)
     }
   }
 
@@ -254,8 +250,7 @@ export async function createGoodsReceipt(
 // Helper: Update invoice item delivery status
 async function updateInvoiceItemDeliveryStatus(
   itemId: string,
-  quantityReceived: number,
-  quantityExpected: number
+  quantityReceived: number
 ): Promise<void> {
   const { data: item } = await supabase
     .from('invoice_items')

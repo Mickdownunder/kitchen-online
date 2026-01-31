@@ -5,7 +5,6 @@ import { portalSupabase } from '@/lib/supabase/portal-client'
 import { 
   Calendar,
   Clock,
-  MapPin,
   Loader2, 
   AlertCircle,
   CalendarCheck,
@@ -15,6 +14,7 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { useCustomerApi } from '../hooks/useCustomerApi'
+import { useProject } from '../context/ProjectContext'
 
 interface Appointment {
   id: string
@@ -36,10 +36,15 @@ interface ProjectDates {
 
 // Appointment type config
 const typeConfig: Record<string, { label: string; icon: typeof Calendar; color: string; bgColor: string }> = {
+  'Consultation': { label: 'Planungstermin', icon: Calendar, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  'FirstMeeting': { label: 'Erstgespräch', icon: Calendar, color: 'text-amber-600', bgColor: 'bg-amber-50' },
   'Planung': { label: 'Planungstermin', icon: Calendar, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-  'Aufmaß': { label: 'Aufmaßtermin', icon: Ruler, color: 'text-amber-600', bgColor: 'bg-amber-50' },
+  'Aufmaß': { label: 'Aufmaßtermin', icon: Ruler, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
+  'Measurement': { label: 'Aufmaßtermin', icon: Ruler, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
   'Lieferung': { label: 'Lieferung', icon: Truck, color: 'text-purple-600', bgColor: 'bg-purple-50' },
+  'Delivery': { label: 'Lieferung', icon: Truck, color: 'text-purple-600', bgColor: 'bg-purple-50' },
   'Montage': { label: 'Montage', icon: Wrench, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
+  'Installation': { label: 'Montage', icon: Wrench, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
 }
 
 function formatDate(dateString: string | null): string {
@@ -219,42 +224,34 @@ function AppointmentCard({
 
 export default function PortalTerminePage() {
   const { accessToken, isReady } = useCustomerApi()
+  const { selectedProject, isLoading: projectLoading } = useProject()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [projectDates, setProjectDates] = useState<ProjectDates | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (projectId: string) => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Get current user to get customer_id
-      const { data: { user } } = await portalSupabase.auth.getUser()
-      const customerId = user?.app_metadata?.customer_id
-
-      if (!customerId) {
-        throw new Error('No customer found')
-      }
-
-      // Fetch ALL appointments for this customer (RLS will filter by customer_id)
+      // Fetch appointments for the selected project
       const { data: appointmentsData, error: appointmentsError } = await portalSupabase
         .from('planning_appointments')
-        .select('id, type, date, time, notes, project_id')
+        .select('id, type, date, time, notes')
+        .eq('project_id', projectId)
         .order('date', { ascending: true })
 
       if (appointmentsError) throw appointmentsError
 
-      // Fetch ALL projects for this customer (RLS will filter)
-      const { data: projectsData, error: projectsError } = await portalSupabase
+      // Fetch project dates for the selected project
+      const { data: projectData, error: projectError } = await portalSupabase
         .from('projects')
         .select('id, measurement_date, measurement_time, delivery_date, delivery_time, installation_date, installation_time, status')
-        .order('created_at', { ascending: false })
+        .eq('id', projectId)
+        .single()
       
-      if (projectsError) throw projectsError
-      
-      // Use first project for dates (or could aggregate all)
-      const projectData = projectsData?.[0]
+      if (projectError) throw projectError
 
       setAppointments(appointmentsData || [])
       setProjectDates({
@@ -275,13 +272,13 @@ export default function PortalTerminePage() {
   }, [])
 
   useEffect(() => {
-    if (isReady && accessToken) {
-      loadData()
+    if (isReady && accessToken && selectedProject?.id && !projectLoading) {
+      loadData(selectedProject.id)
     } else if (isReady && !accessToken) {
       setIsLoading(false)
       setError('NOT_AUTHENTICATED')
     }
-  }, [isReady, accessToken, loadData])
+  }, [isReady, accessToken, selectedProject?.id, projectLoading, loadData])
 
   // Combine appointments with project dates
   const allAppointments: Array<{ type: string; date: string; time: string | null; notes?: string | null; source: 'appointment' | 'project' }> = []
@@ -298,10 +295,15 @@ export default function PortalTerminePage() {
   })
 
   // Add project dates if they exist and aren't already in appointments
+  // Note: For Lead projects, measurement_date is used to store the planning appointment date,
+  // so we don't add it as a separate Aufmaß entry if status is Lead
   if (projectDates) {
     const hasAppointmentType = (type: string) => appointments.some(a => a.type === type)
+    const isLeadProject = projectDates.status === 'Lead' || projectDates.status === 'LEAD'
 
-    if (projectDates.measurementDate && !hasAppointmentType('Aufmaß')) {
+    // Only show measurementDate as Aufmaß if NOT a lead project
+    // For leads, the measurement_date field stores the planning appointment date
+    if (projectDates.measurementDate && !hasAppointmentType('Aufmaß') && !isLeadProject) {
       allAppointments.push({
         type: 'Aufmaß',
         date: projectDates.measurementDate,

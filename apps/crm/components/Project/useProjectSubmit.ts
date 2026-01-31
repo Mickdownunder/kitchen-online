@@ -90,6 +90,8 @@ export function useProjectSubmit({
         installationDate: formData.installationDate,
         installationTime: formData.installationTime,
         invoiceNumber: formData.invoiceNumber,
+        salespersonId: formData.salespersonId,
+        salespersonName: formData.salespersonName,
         createdAt: formData.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }

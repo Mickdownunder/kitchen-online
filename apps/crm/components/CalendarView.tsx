@@ -39,7 +39,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   onDeleteAppointment,
 }) => {
   const { user } = useAuth()
-  const [_selectedDay, _setSelectedDay] = useState<number | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')

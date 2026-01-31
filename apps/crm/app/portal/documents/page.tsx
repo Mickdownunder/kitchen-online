@@ -16,6 +16,7 @@ import {
   CloudUpload
 } from 'lucide-react'
 import { useCustomerApi } from '../hooks/useCustomerApi'
+import { useProject } from '../context/ProjectContext'
 
 interface Document {
   id: string
@@ -143,6 +144,7 @@ function DocumentCard({
 
 export default function PortalDocumentsPage() {
   const { accessToken, isReady } = useCustomerApi()
+  const { selectedProject, isLoading: projectLoading } = useProject()
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -157,7 +159,7 @@ export default function PortalDocumentsPage() {
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const loadDocuments = useCallback(async () => {
+  const loadDocuments = useCallback(async (projectId: string) => {
     setIsLoading(true)
     setError(null)
 
@@ -168,10 +170,11 @@ export default function PortalDocumentsPage() {
         setCustomerId(user.app_metadata.customer_id)
       }
 
-      // Fetch documents - RLS will automatically filter
+      // Fetch documents for the selected project
       const { data, error: fetchError } = await portalSupabase
         .from('documents')
         .select('id, name, type, file_path, file_size, mime_type, uploaded_at, uploaded_by')
+        .eq('project_id', projectId)
         .order('uploaded_at', { ascending: false })
 
       if (fetchError) {
@@ -188,13 +191,13 @@ export default function PortalDocumentsPage() {
   }, [])
 
   useEffect(() => {
-    if (isReady && accessToken) {
-      loadDocuments()
+    if (isReady && accessToken && selectedProject?.id && !projectLoading) {
+      loadDocuments(selectedProject.id)
     } else if (isReady && !accessToken) {
       setIsLoading(false)
       setError('NOT_AUTHENTICATED')
     }
-  }, [isReady, accessToken, loadDocuments])
+  }, [isReady, accessToken, selectedProject?.id, projectLoading, loadDocuments])
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -417,8 +420,9 @@ export default function PortalDocumentsPage() {
       {/* Upload Info */}
       <div className="rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100 p-4 ring-1 ring-slate-200/50">
         <p className="text-sm text-slate-600">
-          <strong className="text-slate-700">Tipp:</strong> Sie können eigene Dokumente (PDF, JPG, PNG, HEIC) bis max. 10 MB hochladen.
-          Diese erscheinen in der Kategorie "Meine Dokumente".
+          <strong className="text-slate-700">Tipp:</strong> Sie können eigene Dokumente (PDF,
+          JPG, PNG, HEIC) bis max. 10 MB hochladen. Diese erscheinen in der Kategorie
+          &quot;Meine Dokumente&quot;.
         </p>
       </div>
 

@@ -35,7 +35,6 @@ const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({
 }) => {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'overview' | 'email' | 'documents'>('overview')
-  const [_abDocumentFile, _setAbDocumentFile] = useState<File | null>(null) // Reserved for AB document uploads
 
   // Betroffene Items aus Projekt
   const affectedItems = useMemo(() => {

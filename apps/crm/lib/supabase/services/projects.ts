@@ -742,6 +742,7 @@ function mapProjectFromDB(dbProject: Record<string, any>): CustomerProject {
     documents: (dbProject.documents || []) as ProjectDocument[],
     complaints: dbProject.complaints || [],
     notes: dbProject.notes || '',
+    accessCode: dbProject.access_code || undefined,
     orderFooterText: dbProject.order_footer_text ?? undefined,
     deliveryStatus: dbProject.delivery_status,
     allItemsDelivered: dbProject.all_items_delivered || false,

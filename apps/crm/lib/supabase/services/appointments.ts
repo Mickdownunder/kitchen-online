@@ -60,7 +60,6 @@ export async function getAppointments(): Promise<PlanningAppointment[]> {
     if (error) {
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
       const errorCode = errObj.code
-      const _errorMessage = error.message || String(error)
       const errorDetails = errObj.details
       const errorHint = errObj.hint
 
@@ -158,8 +157,6 @@ export async function createAppointment(
     if (error) {
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
       const errorCode = errObj.code
-      const _errorMessage = error.message
-
       // ONLY check for specific PostgreSQL error code 42P01 (relation does not exist)
       if (errorCode === '42P01') {
         const errorMsg =

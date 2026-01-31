@@ -217,7 +217,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </h1>
         </Link>
         <nav className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto p-4" aria-label="Hauptmenü">
-          {visibleMenuItems.map((item, index) => (
+          {visibleMenuItems.map(item => (
             <Link
               key={item.id}
               href={item.id}

@@ -31,7 +31,7 @@ const APPLIANCE_CATEGORIES = [
   'Sonstiges',
 ]
 
-export function ApplianceModal({ item, isOpen, onClose, onSave, projectId }: ApplianceModalProps) {
+export function ApplianceModal({ item, isOpen, onClose, onSave }: ApplianceModalProps) {
   // Calculate warranty years from warrantyUntil and installationDate
   const getWarrantyYears = (): string => {
     if (!item.warrantyUntil || !item.installationDate) return ''

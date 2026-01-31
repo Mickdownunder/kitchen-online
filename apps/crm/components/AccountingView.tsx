@@ -87,7 +87,6 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
 
   // Neue State für Rechnungen aus der Datenbank
   const [dbInvoices, setDbInvoices] = useState<Invoice[]>([])
-  const [_loadingInvoices, setLoadingInvoices] = useState(true)
 
   // Eingangsrechnungen (Vorsteuer)
   const [supplierInvoices, setSupplierInvoices] = useState<SupplierInvoice[]>([])
@@ -97,14 +96,11 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
 
   // Lade alle Rechnungen aus der neuen invoices-Tabelle
   const loadInvoices = useCallback(async () => {
-    setLoadingInvoices(true)
     try {
       const invoices = await getInvoicesWithProject()
       setDbInvoices(invoices)
     } catch (error) {
       console.error('Fehler beim Laden der Rechnungen:', error)
-    } finally {
-      setLoadingInvoices(false)
     }
   }, [])
 
@@ -452,7 +448,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
     years.add(new Date().getFullYear())
 
     return Array.from(years).sort((a, b) => b - a)
-  }, [projects])
+  }, [dbInvoices, projects])
 
   const { label: periodLabel } = getDateRange()
 

@@ -24,7 +24,6 @@ const PDFChartRenderer: React.FC<PDFChartRendererProps> = ({
   className = '',
 }) => {
   const chartRef = useRef<HTMLDivElement>(null)
-  const [_imageData, setImageData] = useState<string | null>(null) // Used internally
   const [isRendering, setIsRendering] = useState(false)
 
   useEffect(() => {
@@ -43,7 +42,6 @@ const PDFChartRenderer: React.FC<PDFChartRendererProps> = ({
           backgroundColor: '#ffffff',
         })
 
-        setImageData(image)
         if (onImageReady) {
           onImageReady(image)
         }

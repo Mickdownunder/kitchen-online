@@ -110,7 +110,6 @@ export function ProjectItemsTab({
   addItem,
   updateItem,
   removeItem,
-  articles,
   articleSearchTerm,
   setArticleSearchTerm,
   showArticleDropdown,
@@ -320,18 +319,6 @@ export function ProjectItemsTab({
     setDraggedIndex(null)
   }
 
-  const _moveItem = (fromIndex: number, toIndex: number) => {
-    const items = [...(formData.items || [])]
-    const [moved] = items.splice(fromIndex, 1)
-    items.splice(toIndex, 0, moved)
-
-    const updatedItems = items.map((item, idx) => ({
-      ...item,
-      position: idx + 1,
-    }))
-
-    setFormData({ ...formData, items: updatedItems })
-  }
 
   return (
     <div className="animate-in fade-in slide-in-from-right-4 space-y-6">
@@ -503,7 +490,9 @@ export function ProjectItemsTab({
                   >
                     <Package className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                     <p className="text-sm font-bold">Noch keine Positionen</p>
-                    <p className="mt-1 text-xs">Klicken Sie auf "Neue Zeile" oder "Artikelstamm"</p>
+                    <p className="mt-1 text-xs">
+                      Klicken Sie auf &quot;Neue Zeile&quot; oder &quot;Artikelstamm&quot;
+                    </p>
                   </td>
                 </tr>
               )}

@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react'
 import { ArrowLeft, Download, FileText, Loader2 } from 'lucide-react'
-import { CompanySettings, BankAccount, InvoiceItem } from '@/types'
+import { CompanySettings, BankAccount, InvoiceItem, CustomerProject } from '@/types'
 import { ListInvoice } from '@/hooks/useInvoiceFilters'
 import { downloadInvoicePDF, InvoiceData } from './InvoicePDF'
-import { getCompanySettings, getBankAccounts, getInvoices } from '@/lib/supabase/services'
+import { getCompanySettings, getBankAccounts, getInvoices, getProject, getInvoice } from '@/lib/supabase/services'
 
 interface InvoiceViewProps {
   invoice: ListInvoice
@@ -17,28 +17,73 @@ const formatCurrency = (amount: number): string => {
   return `${amount.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }
 
-const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice, onBack }) => {
+const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack }) => {
   const [isGenerating, setIsGenerating] = useState(false)
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null)
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null)
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [partialInvoices, setPartialInvoices] = useState<ListInvoice[]>([])
+  
+  // Lokaler State für die aktuelle Rechnung - wird beim Mount mit frischen Daten geladen
+  const [currentInvoice, setCurrentInvoice] = useState(invoiceProp)
+  const invoice = currentInvoice
 
-  const project = invoice.project
+  const [projectData, setProjectData] = useState<CustomerProject | null>(invoiceProp.project || null)
+  const project = projectData
   const isDeposit = invoice.type === 'partial'
-  const items = isDeposit ? [] : project.items || []
+  const items = isDeposit ? [] : project?.items || []
+
+  // Lade frische Rechnungsdaten beim Mount
+  useEffect(() => {
+    const loadFreshInvoice = async () => {
+      try {
+        const freshInvoice = await getInvoice(invoiceProp.id)
+        if (freshInvoice) {
+          // Merge mit ListInvoice Feldern
+          setCurrentInvoice({
+            ...invoiceProp,
+            ...freshInvoice,
+            date: freshInvoice.invoiceDate,
+            status: freshInvoice.isPaid ? 'paid' : 'sent',
+          } as ListInvoice)
+        }
+      } catch (error) {
+        console.error('Error loading fresh invoice:', error)
+      }
+    }
+    loadFreshInvoice()
+  }, [invoiceProp.id, invoiceProp])
+
+  // Lade Projekt inkl. Positionen (für Schlussrechnung)
+  useEffect(() => {
+    const loadProjectWithItems = async () => {
+      const projectId = project?.id || invoice.projectId
+      if (!projectId || isDeposit) return
+      if (project?.items && project.items.length > 0) return
+
+      try {
+        const fullProject = await getProject(projectId)
+        if (fullProject) {
+          setProjectData(fullProject)
+        }
+      } catch (error) {
+        console.error('Error loading project details:', error)
+      }
+    }
+    loadProjectWithItems()
+  }, [invoice.projectId, isDeposit, project?.id, project?.items])
 
   // Lade alle Anzahlungen für dieses Projekt (für Schlussrechnung)
   useEffect(() => {
     const loadPartials = async () => {
-      if (!isDeposit && project?.id) {
-        const allInvoices = await getInvoices(project.id)
+      if (!isDeposit && (project?.id || invoice.projectId)) {
+        const allInvoices = await getInvoices(project?.id || invoice.projectId)
         const partials = allInvoices.filter(inv => inv.type === 'partial')
         setPartialInvoices(partials as unknown as ListInvoice[])
       }
     }
     loadPartials()
-  }, [project?.id, isDeposit])
+  }, [project?.id, invoice.projectId, isDeposit])
 
   // Anzahlungen summieren (Brutto) - aus der neuen invoices Tabelle
   const totalPartialPayments = partialInvoices.reduce((sum, p) => sum + p.amount, 0)
@@ -105,6 +150,10 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice, onBack }) => {
   const handleDownloadPDF = async () => {
     setIsGenerating(true)
     try {
+      // Always fetch the latest invoice data to ensure isPaid status is current
+      const freshInvoice = await getInvoice(invoice.id)
+      const currentInvoice = freshInvoice || invoice
+
       // Konvertiere partialInvoices zu PartialPayment-Format für PDF-Kompatibilität
       const partialPaymentsForPDF = partialInvoices.map(inv => ({
         id: inv.id,
@@ -116,12 +165,22 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice, onBack }) => {
         description: inv.description,
       }))
 
+      // Debug logging before creating invoice data
+      console.log('[InvoiceView] Creating PDF data:', {
+        'currentInvoice.isPaid': currentInvoice.isPaid,
+        'currentInvoice.paidDate': currentInvoice.paidDate,
+        invoiceNumber: currentInvoice.invoiceNumber,
+        invoiceType: currentInvoice.type,
+      })
+
       const invoiceData: InvoiceData = {
-        type: invoice.type === 'partial' ? 'deposit' : invoice.type,
-        invoiceNumber: invoice.invoiceNumber,
-        amount: invoice.amount,
-        date: invoice.invoiceDate || invoice.date,
-        description: invoice.description,
+        type: currentInvoice.type === 'partial' ? 'deposit' : currentInvoice.type,
+        invoiceNumber: currentInvoice.invoiceNumber,
+        amount: currentInvoice.amount,
+        date: currentInvoice.invoiceDate || invoice.date,
+        description: currentInvoice.description,
+        isPaid: currentInvoice.isPaid,
+        paidDate: currentInvoice.paidDate,
         project: {
           customerName: project?.customerName || '',
           address: project?.address,
@@ -253,50 +312,54 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice, onBack }) => {
           </div>
 
           {/* Items Table – Kunden-Ansicht: KEINE Preise bei Positionen, nur Gesamtbetrag am Ende */}
-          <table className="mb-8 w-full">
-            <thead>
-              <tr className="bg-slate-900 text-white">
-                <th className="w-12 rounded-tl-lg px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                  Pos
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                  Beschreibung
-                </th>
-                <th className="w-20 rounded-tr-lg px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                  Menge
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isDeposit ? (
-                <tr className="border-b border-slate-100">
-                  <td className="px-4 py-4 text-slate-400">1</td>
-                  <td className="px-4 py-4">
-                    <p className="font-medium text-slate-900">
-                      {invoice.description || `Anzahlung für Auftrag ${project.orderNumber}`}
-                    </p>
-                    <p className="text-sm text-slate-500">Gemäß Vereinbarung</p>
-                  </td>
-                  <td className="px-4 py-4 text-center text-slate-600">1</td>
+          <div className="mb-8 overflow-hidden rounded-lg border-2 border-slate-400">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-900 text-white">
+                  <th className="w-24 px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    Menge
+                  </th>
+                  <th className="w-28 px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    Modell
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    Bezeichnung
+                  </th>
+                  <th className="w-28 px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    Hersteller
+                  </th>
                 </tr>
-              ) : (
-                items.map((item: InvoiceItem, index: number) => (
-                  <tr key={item.id || index} className="border-b border-slate-100">
-                    <td className="px-4 py-4 text-slate-400">{item.position || index + 1}</td>
+              </thead>
+              <tbody>
+                {isDeposit ? (
+                <tr className="border-b border-slate-300">
+                    <td className="px-4 py-4 text-slate-600">1</td>
+                    <td className="px-4 py-4 text-slate-400">-</td>
                     <td className="px-4 py-4">
-                      <p className="font-medium text-slate-900">{item.description}</p>
-                      {item.modelNumber && (
-                        <p className="text-sm text-slate-500">Art.-Nr.: {item.modelNumber}</p>
-                      )}
+                      <p className="font-medium text-slate-900">
+                        {invoice.description || `Anzahlung für Auftrag ${project.orderNumber}`}
+                      </p>
+                      <p className="text-sm text-slate-500">Gemäß Vereinbarung</p>
                     </td>
-                    <td className="px-4 py-4 text-center text-slate-600">
-                      {item.quantity} {item.unit}
-                    </td>
+                    <td className="px-4 py-4 text-slate-400">-</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  items.map((item: InvoiceItem, index: number) => (
+                  <tr key={item.id || index} className="border-b border-slate-300">
+                      <td className="px-4 py-4 text-slate-600">
+                        {item.quantity} {item.unit}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">{item.modelNumber || '-'}</td>
+                      <td className="px-4 py-4">
+                        <p className="font-medium text-slate-900">{item.description}</p>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600">{item.manufacturer || '-'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {/* Totals */}
           <div className="mb-8 flex justify-end">
@@ -381,12 +444,17 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice, onBack }) => {
                       </div>
                       <div className="mt-3 flex justify-between border-t-2 border-slate-900 pt-3">
                         <span className="text-lg font-black text-slate-900">
-                          Zu zahlen (Brutto)
+                          {invoice.isPaid ? 'Bereits bezahlt (Brutto)' : 'Zu zahlen (Brutto)'}
                         </span>
-                        <span className="text-xl font-black text-amber-600">
+                        <span className={`text-xl font-black ${invoice.isPaid ? 'text-green-600' : 'text-amber-600'}`}>
                           {formatCurrency(restGross)}
                         </span>
                       </div>
+                      {invoice.isPaid && invoice.paidDate && (
+                        <p className="mt-2 text-right text-sm text-slate-500">
+                          Bezahlt am: {new Date(invoice.paidDate).toLocaleDateString('de-AT')}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </>
@@ -402,12 +470,19 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice, onBack }) => {
                   </div>
                   <div className="mt-3 flex justify-between border-t-2 border-slate-900 pt-3">
                     <span className="text-lg font-black text-slate-900">
-                      {isDeposit ? 'Rechnungsbetrag' : 'Gesamtbetrag'} (Brutto)
+                      {invoice.isPaid
+                        ? 'Bereits bezahlt (Brutto)'
+                        : `${isDeposit ? 'Rechnungsbetrag' : 'Gesamtbetrag'} (Brutto)`}
                     </span>
-                    <span className="text-xl font-black text-amber-600">
+                    <span className={`text-xl font-black ${invoice.isPaid ? 'text-green-600' : 'text-amber-600'}`}>
                       {formatCurrency(invoice.amount)}
                     </span>
                   </div>
+                  {invoice.isPaid && invoice.paidDate && (
+                    <p className="mt-2 text-right text-sm text-slate-500">
+                      Bezahlt am: {new Date(invoice.paidDate).toLocaleDateString('de-AT')}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

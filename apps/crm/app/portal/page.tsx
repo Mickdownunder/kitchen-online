@@ -1,6 +1,7 @@
 'use client'
 
 import { useProjectData } from './hooks/useCustomerApi'
+import { useProject } from './context/ProjectContext'
 import { 
   FileText, 
   MessageSquare, 
@@ -21,7 +22,7 @@ import {
 import Link from 'next/link'
 
 // Project status steps - matches CRM workflow
-// Customer gets portal access at "Planung" stage
+// Customer gets portal access at "Planung" stage (Lead maps to Planung for portal view)
 const statusSteps = [
   { id: 'Planung', label: 'Planung', icon: '🎨' },
   { id: 'Aufmaß', label: 'Aufmaß', icon: '📐' },
@@ -33,7 +34,10 @@ const statusSteps = [
 
 function getStatusIndex(status: string): number {
   // Normalize status to match our steps (handle different CRM formats)
+  // Lead status maps to Planung for portal view
   const statusMap: Record<string, string> = {
+    'LEAD': 'Planung',
+    'Lead': 'Planung',
     'PLANUNG': 'Planung',
     'Planung': 'Planung',
     'AUFMASS': 'Aufmaß',
@@ -171,7 +175,7 @@ function StatusTimelineDesktop({ currentStatus }: { currentStatus: string }) {
   )
 }
 
-// Glassmorphism Quick Action Card
+// Glassmorphism Quick Action Card - Mobile optimized
 function QuickActionCard({ 
   icon: Icon, 
   label, 
@@ -192,24 +196,19 @@ function QuickActionCard({
   return (
     <Link
       href={href}
-      className="group relative overflow-hidden rounded-2xl bg-white/70 backdrop-blur-sm p-5 md:p-6 shadow-sm ring-1 ring-white/50 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 hover:bg-white"
+      className="group relative overflow-hidden rounded-xl md:rounded-2xl bg-white/70 backdrop-blur-sm p-3.5 md:p-5 shadow-sm ring-1 ring-white/50 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 hover:bg-white"
     >
       {/* Gradient blob */}
       <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl transition-all duration-500 group-hover:opacity-40 group-hover:scale-150 ${gradient}`} />
       
-      <div className="relative flex items-start justify-between">
-        <div className="flex-1">
-          <div className={`mb-3 inline-flex rounded-xl p-2.5 ${iconBg}`}>
-            <Icon className="h-5 w-5 md:h-6 md:w-6" />
-          </div>
-          <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className="mt-0.5 text-2xl md:text-3xl font-bold text-slate-900">
-            {value !== undefined ? value : description}
-          </p>
+      <div className="relative">
+        <div className={`mb-2 md:mb-3 inline-flex rounded-lg md:rounded-xl p-2 md:p-2.5 ${iconBg}`}>
+          <Icon className="h-4 w-4 md:h-5 md:w-5" />
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 transition-all duration-300 group-hover:bg-emerald-100 group-hover:scale-110">
-          <ArrowRight className="h-4 w-4 text-slate-400 transition-all group-hover:translate-x-0.5 group-hover:text-emerald-600" />
-        </div>
+        <p className="text-xs md:text-sm font-medium text-slate-500">{label}</p>
+        <p className="mt-0.5 text-xl md:text-2xl font-bold text-slate-900">
+          {value !== undefined ? value : description}
+        </p>
       </div>
     </Link>
   )
@@ -230,8 +229,27 @@ function formatDate(dateString: string): string {
   }
 }
 
+// Termin-Typen ins Deutsche übersetzen
+function getAppointmentLabel(type: string): string {
+  const typeLabels: Record<string, string> = {
+    'Planung': 'Planungstermin',
+    'Consultation': 'Planungstermin',
+    'FirstMeeting': 'Erstgespräch',
+    'Aufmaß': 'Aufmaßtermin',
+    'Measurement': 'Aufmaßtermin',
+    'Lieferung': 'Liefertermin',
+    'Delivery': 'Liefertermin',
+    'Montage': 'Montagetermin',
+    'Installation': 'Montagetermin',
+  }
+  return typeLabels[type] || type
+}
+
 export default function PortalDashboardPage() {
-  const { data, isLoading, error } = useProjectData()
+  const { selectedProject, isLoading: projectLoading } = useProject()
+  const { data, isLoading: dataLoading, error } = useProjectData(selectedProject?.id)
+  
+  const isLoading = projectLoading || dataLoading
 
   if (isLoading) {
     return (
@@ -280,9 +298,9 @@ export default function PortalDashboardPage() {
   const greeting = getGreeting()
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="space-y-4 md:space-y-6">
       {/* Welcome Section - Emerald themed */}
-      <div className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-6 md:p-8 text-white shadow-2xl shadow-emerald-500/20">
+      <div className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-5 md:p-8 text-white shadow-2xl shadow-emerald-500/20">
         {/* Decorative elements */}
         <div className="absolute -right-10 -top-10 h-40 w-40 md:h-64 md:w-64 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute -left-10 -bottom-10 h-32 w-32 md:h-48 md:w-48 rounded-full bg-teal-400/20 blur-2xl" />
@@ -298,31 +316,64 @@ export default function PortalDashboardPage() {
             <Sparkles className="h-4 w-4" />
             <p className="text-sm font-medium">{greeting}</p>
           </div>
-          <h1 className="mt-2 text-2xl md:text-4xl font-bold tracking-tight">
+          <h1 className="mt-1 text-xl md:text-4xl font-bold tracking-tight">
             {data.customer.name}
           </h1>
-          <p className="mt-3 text-emerald-100 max-w-lg text-sm md:text-base leading-relaxed">
-            Willkommen in Ihrem persönlichen Kundenportal. Hier haben Sie alles im Blick.
+          <p className="mt-2 text-emerald-100 max-w-lg text-sm md:text-base leading-relaxed">
+            Willkommen in Ihrem persönlichen Kundenportal.
           </p>
-          
-          {/* Quick stats on welcome */}
-          <div className="mt-6 flex flex-wrap gap-4 md:gap-6">
-            <div className="flex items-center gap-2 rounded-full bg-white/20 backdrop-blur-sm px-4 py-2">
-              <FileText className="h-4 w-4" />
-              <span className="text-sm font-medium">{data.stats.documentsCount} Dokumente</span>
-            </div>
-            {data.stats.openTicketsCount > 0 && (
-              <div className="flex items-center gap-2 rounded-full bg-white/20 backdrop-blur-sm px-4 py-2">
-                <MessageSquare className="h-4 w-4" />
-                <span className="text-sm font-medium">{data.stats.openTicketsCount} offene Anfragen</span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* Quick Actions - Responsive grid */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-5">
+      {/* Nächster Termin - ganz oben nach der Begrüßung */}
+      {data.nextAppointment && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-500 to-indigo-500 p-5 md:p-6 text-white shadow-xl shadow-purple-500/20">
+          {/* Decorative elements */}
+          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+          <div className="absolute -left-4 -bottom-4 h-24 w-24 rounded-full bg-indigo-400/20 blur-xl" />
+          
+          {/* Badge */}
+          <div className="absolute right-3 top-3 md:right-4 md:top-4">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-1 md:px-3 md:py-1.5 text-xs font-semibold text-white">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              </span>
+              Nächster Termin
+            </span>
+          </div>
+
+          <div className="relative flex items-start gap-3 md:gap-4">
+            <div className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm flex-shrink-0">
+              <Calendar className="h-6 w-6 md:h-7 md:w-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs md:text-sm font-medium text-purple-100">Ihr nächster Termin</p>
+              <h3 className="mt-0.5 text-lg md:text-xl font-bold text-white truncate">
+                {getAppointmentLabel(data.nextAppointment.title)}
+              </h3>
+              
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 text-purple-100">
+                  <Clock className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-sm md:text-base font-semibold text-white">{formatDate(data.nextAppointment.startTime)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <Link 
+            href="/portal/termine"
+            className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-white/20 backdrop-blur-sm px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-white/30 w-full"
+          >
+            Alle Termine anzeigen
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
+
+      {/* Quick Actions - Mobile optimized grid */}
+      <div className="grid grid-cols-2 gap-2.5 md:gap-4 lg:grid-cols-5">
         <QuickActionCard
           icon={Calendar}
           label="Termine"
@@ -369,21 +420,21 @@ export default function PortalDashboardPage() {
       </div>
 
       {/* Project Status Card */}
-      <div className="rounded-2xl bg-white/80 backdrop-blur-sm p-5 md:p-6 shadow-sm ring-1 ring-slate-200/50">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Ihr Projektstatus</h2>
-            <p className="text-sm text-slate-500 mt-0.5">
+      <div className="rounded-xl md:rounded-2xl bg-white/80 backdrop-blur-sm p-4 md:p-6 shadow-sm ring-1 ring-slate-200/50">
+        <div className="flex items-start justify-between gap-3 mb-5 md:mb-6">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base md:text-lg font-bold text-slate-900">Ihr Projektstatus</h2>
+            <p className="text-xs md:text-sm text-slate-500 mt-0.5 truncate">
               {data.project.orderNumber && `Auftrag ${data.project.orderNumber}`}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
+          <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
+            <span className="relative flex h-2 w-2 md:h-3 md:w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 md:h-3 md:w-3 bg-emerald-500"></span>
             </span>
-            <span className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25">
-              {data.project.status}
+            <span className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1 md:px-4 md:py-1.5 text-xs md:text-sm font-semibold text-white shadow-md shadow-emerald-500/25">
+              {data.project.status === 'Lead' ? 'Planung' : data.project.status}
             </span>
           </div>
         </div>
@@ -399,94 +450,66 @@ export default function PortalDashboardPage() {
         </div>
       </div>
 
-      {/* Two Column Layout - Better tablet support */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-2">
-        {/* Next Appointment */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur-sm p-5 md:p-6 shadow-sm ring-1 ring-slate-200/50 transition-all hover:shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-100 to-purple-50">
-              <Calendar className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <h2 className="font-bold text-slate-900">Nächster Termin</h2>
-              <p className="text-xs text-slate-500">Ihre geplanten Termine</p>
-            </div>
+      {/* Ansprechpartner - Vollbreite auf Mobile */}
+      <div className="rounded-2xl bg-white/80 backdrop-blur-sm p-4 md:p-6 shadow-sm ring-1 ring-slate-200/50 transition-all hover:shadow-md">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex h-10 w-10 md:h-11 md:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50">
+            <User className="h-5 w-5 text-emerald-600" />
           </div>
-          {data.nextAppointment ? (
-            <div className="mt-5 rounded-xl bg-purple-50 p-4">
-              <p className="text-lg font-bold text-slate-900">{data.nextAppointment.title}</p>
-              <p className="mt-2 text-sm text-purple-700 flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                {formatDate(data.nextAppointment.startTime)}
-              </p>
-            </div>
-          ) : (
-            <div className="mt-5 rounded-xl bg-slate-50 p-6 text-center">
-              <Calendar className="h-8 w-8 text-slate-300 mx-auto" />
-              <p className="mt-2 text-slate-500 text-sm">Aktuell keine Termine geplant</p>
-            </div>
-          )}
+          <div>
+            <h2 className="font-bold text-slate-900">Ihr Ansprechpartner</h2>
+            <p className="text-xs text-slate-500">Direkter Kontakt</p>
+          </div>
         </div>
-
-        {/* Salesperson Contact */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur-sm p-5 md:p-6 shadow-sm ring-1 ring-slate-200/50 transition-all hover:shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50">
-              <User className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <h2 className="font-bold text-slate-900">Ihr Ansprechpartner</h2>
-              <p className="text-xs text-slate-500">Direkter Kontakt</p>
-            </div>
-          </div>
-          {data.salesperson ? (
-            <div className="mt-5 space-y-3">
-              <p className="text-lg font-bold text-slate-900">{data.salesperson.name}</p>
+        {data.salesperson ? (
+          <div className="space-y-2 md:space-y-3">
+            <p className="text-base md:text-lg font-bold text-slate-900">{data.salesperson.name}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <a 
                 href={`mailto:${data.salesperson.email}`} 
                 className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-slate-600 transition-all hover:bg-emerald-50 hover:text-emerald-700"
               >
-                <Mail className="h-4 w-4" />
-                <span className="text-sm font-medium">{data.salesperson.email}</span>
+                <Mail className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm font-medium truncate">{data.salesperson.email}</span>
               </a>
               {data.salesperson.phone && (
                 <a 
                   href={`tel:${data.salesperson.phone}`} 
                   className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-slate-600 transition-all hover:bg-emerald-50 hover:text-emerald-700"
                 >
-                  <Phone className="h-4 w-4" />
+                  <Phone className="h-4 w-4 flex-shrink-0" />
                   <span className="text-sm font-medium">{data.salesperson.phone}</span>
                 </a>
               )}
             </div>
-          ) : (
-            <div className="mt-5 rounded-xl bg-slate-50 p-6 text-center">
-              <User className="h-8 w-8 text-slate-300 mx-auto" />
-              <p className="mt-2 text-slate-500 text-sm">Kein Ansprechpartner zugewiesen</p>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="rounded-xl bg-slate-50 p-4 md:p-6 text-center">
+            <User className="h-8 w-8 text-slate-300 mx-auto" />
+            <p className="mt-2 text-slate-500 text-sm">Kein Ansprechpartner zugewiesen</p>
+          </div>
+        )}
       </div>
 
       {/* CTA Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 p-6 md:p-8">
+      <div className="relative overflow-hidden rounded-xl md:rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 p-5 md:p-8">
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
         <div className="absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-teal-500/10 blur-2xl" />
         
-        <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="relative">
           <div className="text-white">
-            <h2 className="text-xl md:text-2xl font-bold">Haben Sie Fragen?</h2>
-            <p className="mt-2 text-slate-300 text-sm md:text-base max-w-md">
-              Unser Team steht Ihnen jederzeit zur Verfügung. Stellen Sie einfach eine Anfrage.
+            <h2 className="text-lg md:text-2xl font-bold">Haben Sie Fragen?</h2>
+            <p className="mt-1 md:mt-2 text-slate-300 text-sm md:text-base max-w-md">
+              Unser Team steht Ihnen jederzeit zur Verfügung.
             </p>
           </div>
           <Link
             href="/portal/service"
-            className="group inline-flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-0.5"
+            className="mt-4 w-full md:w-auto group inline-flex items-center justify-center gap-2 md:gap-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 md:px-6 md:py-4 font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-0.5"
           >
-            <MessageSquare className="h-5 w-5" />
+            <MessageSquare className="h-4 w-4 md:h-5 md:w-5" />
             Anfrage stellen
-            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+            <ArrowRight className="h-4 w-4 md:h-5 md:w-5 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
       </div>

@@ -17,7 +17,7 @@ interface ProjectControllingTabProps {
   }
 }
 
-export function ProjectControllingTab({ formData, calculations }: ProjectControllingTabProps) {
+export function ProjectControllingTab({ calculations }: ProjectControllingTabProps) {
   return (
     <div className="animate-in fade-in slide-in-from-right-4 space-y-10">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

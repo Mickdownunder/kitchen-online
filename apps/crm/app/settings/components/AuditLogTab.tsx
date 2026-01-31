@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Clock, User, FileText } from 'lucide-react'
 
 interface AuditLog {
@@ -27,11 +27,7 @@ export default function AuditLogTab() {
     limit: 100,
   })
 
-  useEffect(() => {
-    loadLogs()
-  }, [filter])
-
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -51,7 +47,11 @@ export default function AuditLogTab() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter])
+
+  useEffect(() => {
+    loadLogs()
+  }, [loadLogs])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

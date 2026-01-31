@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { message, projects, chatId: _chatId, sessionId: _sessionId, chatHistory } = requestBody
+    const { message, projects, chatHistory } = requestBody
 
     // Projekte sind bereits im Frontend optimiert, verwende sie direkt
     const optimizedProjects = projects

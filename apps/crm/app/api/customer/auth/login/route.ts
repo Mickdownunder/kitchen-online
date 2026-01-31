@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { rateLimit } from '@/lib/middleware/rateLimit'
 
 // Schema für Login-Request (Code oder Email/Passwort)
 const CodeLoginSchema = z.object({
@@ -26,6 +27,23 @@ const EmailLoginSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const limitCheck = await rateLimit(request)
+    if (!limitCheck || !limitCheck.allowed) {
+      const resetTime = limitCheck?.resetTime || Date.now() + 60000
+      return NextResponse.json(
+        { success: false, error: 'RATE_LIMITED', resetTime },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': resetTime.toString(),
+          },
+        }
+      )
+    }
+
     const body = await request.json()
 
     // Supabase Admin Client
@@ -214,17 +232,32 @@ async function handleCodeLogin(
     
     needsPasswordSetup = true
     
-    // Claims aktualisieren (nur customer_id, KEIN project_id mehr!)
+    // Claims und Metadaten aktualisieren
     await supabase.auth.admin.updateUserById(userId, {
       app_metadata: {
         customer_id: customer.id,
         role: 'customer',
+      },
+      user_metadata: {
+        ...existingUser.user_metadata,
+        customer_email: customer.email,
+        customer_name: customerName,
+        full_name: customerName, // For Supabase display name column
+        name: customerName, // Alternative field some UIs use
       },
     })
   } else {
     // Neuen User erstellen - Erstlogin!
     needsPasswordSetup = true
     
+    const userMetadataToSet = {
+      password_set: false,
+      customer_email: customer.email,
+      customer_name: customerName,
+      full_name: customerName, // For Supabase display name column
+      name: customerName, // Alternative field some UIs use
+    }
+
     const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
       email: magicEmail,
       email_confirm: true,
@@ -232,11 +265,7 @@ async function handleCodeLogin(
         customer_id: customer.id,
         role: 'customer',
       },
-      user_metadata: {
-        password_set: false,
-        customer_email: customer.email,
-        customer_name: customerName,
-      },
+      user_metadata: userMetadataToSet,
     })
 
     if (createError || !newUser.user) {

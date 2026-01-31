@@ -31,7 +31,6 @@ export default function DeliveryNoteDetail({
     deliveryNote.matchedProjectId || ''
   )
   const [loading, setLoading] = useState(false)
-  const [_bookingGoodsReceipt, _setBookingGoodsReceipt] = useState(false) // Reserved for goods receipt booking
   const [deleting, setDeleting] = useState(false)
 
   const matchedProject = deliveryNote.matchedProjectId

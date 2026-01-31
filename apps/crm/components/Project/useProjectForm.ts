@@ -43,7 +43,7 @@ export function useProjectForm(
   })
 
   // Local state für setIsManualNameUpdate (wird an beide Hooks weitergegeben)
-  const [_isManualNameUpdate, setIsManualNameUpdate] = useState(false)
+  const [, setIsManualNameUpdate] = useState(false)
 
   // Address-Autocomplete Hook (muss vor Customer-Selection kommen, da setAddressInput benötigt wird)
   const addressAutocomplete = useAddressAutocomplete({

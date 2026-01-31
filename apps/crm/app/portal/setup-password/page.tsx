@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, Loader2, AlertCircle, CheckCircle2, ChefHat, Eye, EyeOff } from 'lucide-react'
+import Image from 'next/image'
+import { Lock, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { portalSupabase } from '@/lib/supabase/portal-client'
+
+const LOGO_URL = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-02%20schwarz.png'
 
 export default function SetupPasswordPage() {
   const router = useRouter()
@@ -100,10 +103,17 @@ export default function SetupPasswordPage() {
       <div className="relative w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 shadow-xl shadow-emerald-500/30">
-            <ChefHat className="h-10 w-10 text-white" />
+          <div className="mx-auto mb-6">
+            <Image
+              src={LOGO_URL}
+              alt="KüchenOnline"
+              width={200}
+              height={60}
+              className="h-14 w-auto mx-auto"
+              unoptimized
+            />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">Passwort erstellen</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Passwort erstellen</h1>
           <p className="mt-2 text-slate-500">
             Erstellen Sie ein Passwort für zukünftige Anmeldungen
           </p>
