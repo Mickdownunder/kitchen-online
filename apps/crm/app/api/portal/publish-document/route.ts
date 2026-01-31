@@ -166,6 +166,24 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Map items to full InvoiceItem type with required fields
+      const mappedItems: InvoiceItem[] = (project.items || []).map((item, index) => {
+        const netTotal = item.netTotal || (item.pricePerUnit || 0) * item.quantity
+        const taxRate = (item.taxRate as InvoiceItem['taxRate']) || 20
+        return {
+          id: `item-${index}`,
+          position: index + 1,
+          description: item.description,
+          quantity: item.quantity,
+          unit: (item.unit as InvoiceItem['unit']) || 'Stk',
+          pricePerUnit: item.pricePerUnit || 0,
+          taxRate,
+          netTotal,
+          taxAmount: netTotal * (taxRate / 100),
+          grossTotal: netTotal * (1 + taxRate / 100),
+        }
+      })
+
       const invoiceData: InvoiceData = {
         type: invoiceType,
         invoiceNumber: invoice.invoiceNumber,
@@ -179,10 +197,10 @@ export async function POST(request: NextRequest) {
           address: project.address,
           phone: project.phone,
           email: project.email,
-          orderNumber: project.orderNumber,
+          orderNumber: project.orderNumber || '',
           customerId: project.customerId,
           id: project.id,
-          items: project.items || [],
+          items: mappedItems,
         },
         priorInvoices,
         company: companySettings,
@@ -218,7 +236,10 @@ export async function POST(request: NextRequest) {
             deliveryNoteNumber: body.deliveryNote.deliveryNoteNumber,
             deliveryDate: body.deliveryNote.deliveryDate,
             deliveryAddress: body.deliveryNote.deliveryAddress,
-            items: body.deliveryNote.items,
+            items: body.deliveryNote.items?.map(item => ({
+              ...item,
+              unit: item.unit || 'Stk',
+            })),
           },
           project: deliveryNoteProject,
           company: companySettings,
@@ -241,7 +262,7 @@ export async function POST(request: NextRequest) {
         orderNumber: project.orderNumber,
         customerId: project.customerId,
         items: (project.items || []).map((item, idx) => ({
-          id: item.id || `item-${idx}`,
+          id: `item-${idx}`,
           position: idx + 1,
           description: item.description,
           quantity: item.quantity || 1,

@@ -1,53 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { getAuditLogs } from '@/lib/supabase/services/audit'
+import { getAuditLogs, logAuditEvent } from '@/lib/supabase/services/audit'
 import { logger } from '@/lib/utils/logger'
 
+// GET - Read audit logs
 export async function GET(request: NextRequest) {
   const apiLogger = logger.api('/api/audit-logs', 'GET')
-  const startTime = apiLogger.start()
+  apiLogger.start()
 
   try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
-    }
-
-    const { data: canManage, error: canManageError } = await supabase.rpc('can_manage_users')
-    if (canManageError || !canManage) {
-      apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
-    }
-
-    const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
-    if (companyError || !companyId) {
-      apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
-    }
-
-    const { searchParams } = new URL(request.url)
+    const searchParams = request.nextUrl.searchParams
     const limit = parseInt(searchParams.get('limit') || '100')
+    const offset = parseInt(searchParams.get('offset') || '0')
     const action = searchParams.get('action') || undefined
     const entityType = searchParams.get('entityType') || undefined
+    const entityId = searchParams.get('entityId') || undefined
+    const startDate = searchParams.get('startDate')
+      ? new Date(searchParams.get('startDate')!)
+      : undefined
+    const endDate = searchParams.get('endDate')
+      ? new Date(searchParams.get('endDate')!)
+      : undefined
 
     const logs = await getAuditLogs({
       limit,
+      offset,
       action,
       entityType,
+      entityId,
+      startDate,
+      endDate,
     })
 
-    apiLogger.end(startTime, 200)
+    apiLogger.complete({ logCount: logs.length })
     return NextResponse.json({ logs })
-  } catch (error: unknown) {
-    apiLogger.error(error as Error, 500)
+  } catch (error) {
+    apiLogger.error(error as Error)
     logger.error(
       'Audit logs API error',
       {
@@ -55,9 +42,47 @@ export async function GET(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
+    return NextResponse.json({ error: 'Failed to fetch audit logs' }, { status: 500 })
+  }
+}
+
+// POST - Create audit log entry
+export async function POST(request: NextRequest) {
+  const apiLogger = logger.api('/api/audit-logs', 'POST')
+  apiLogger.start()
+
+  try {
+    const body = await request.json()
+    const { action, entityType, entityId, changes, metadata } = body
+
+    if (!action || !entityType) {
+      return NextResponse.json(
+        { error: 'action and entityType are required' },
+        { status: 400 }
+      )
+    }
+
+    const logId = await logAuditEvent({
+      action,
+      entityType,
+      entityId,
+      changes,
+      metadata,
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+    })
+
+    apiLogger.complete({ logId })
+    return NextResponse.json({ success: true, logId })
+  } catch (error) {
+    apiLogger.error(error as Error)
+    logger.error(
+      'Audit log creation API error',
+      {
+        component: 'api/audit-logs',
+      },
+      error as Error
     )
+    return NextResponse.json({ error: 'Failed to create audit log' }, { status: 500 })
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 function extractStoragePath(fileUrlOrPath: string) {
   const bucketMarker = '/documents/'
@@ -47,7 +47,7 @@ async function getCustomerSession(request: NextRequest) {
 }
 
 async function isCustomerProject(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   customerId: string,
   projectId: string
 ) {

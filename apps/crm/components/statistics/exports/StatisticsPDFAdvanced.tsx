@@ -388,7 +388,6 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
                 <Image
                   src={chartImages.monthlyRevenue}
                   style={styles.chartImage}
-                  alt="Monatsumsatz"
                 />
               </View>
             </View>
@@ -487,7 +486,6 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
                 <Image
                   src={chartImages.invoiceTypes}
                   style={styles.chartImage}
-                  alt="Rechnungsarten"
                 />
               </View>
             </View>
@@ -500,7 +498,6 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
                 <Image
                   src={chartImages.paymentStatus}
                   style={styles.chartImage}
-                  alt="Zahlungsstatus"
                 />
               </View>
             </View>

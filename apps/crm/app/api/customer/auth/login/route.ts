@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/middleware/rateLimit'
+
+// Types for database queries
+interface CustomerRow {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+}
+
+interface ProjectRow {
+  id: string
+  customer_name: string
+  status: string
+  customer_id: string | null
+  order_number: string
+}
 
 // Schema für Login-Request (Code oder Email/Passwort)
 const CodeLoginSchema = z.object({
@@ -95,7 +111,7 @@ export async function POST(request: NextRequest) {
  * Login mit Email und Passwort (für wiederkehrende Kunden)
  */
 async function handleEmailLogin(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   email: string,
   password: string
 ) {
@@ -104,7 +120,7 @@ async function handleEmailLogin(
     .from('customers')
     .select('id, first_name, last_name, email')
     .eq('email', email)
-    .single()
+    .single() as { data: CustomerRow | null; error: unknown }
 
   if (customerError || !customer) {
     return NextResponse.json(
@@ -135,7 +151,7 @@ async function handleEmailLogin(
     .select('id, customer_name, status, order_number')
     .eq('customer_id', customer.id)
     .is('deleted_at', null)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }) as { data: ProjectRow[] | null }
 
   const customerName = `${customer.first_name} ${customer.last_name}`.trim()
 
@@ -160,7 +176,7 @@ async function handleEmailLogin(
  * Login mit Projektcode (Erstlogin oder Code-basiert)
  */
 async function handleCodeLogin(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   accessCode: string
 ) {
   // 1. Projekt mit diesem Access Code suchen
@@ -168,7 +184,7 @@ async function handleCodeLogin(
     .from('projects')
     .select('id, customer_name, status, customer_id, order_number')
     .eq('access_code', accessCode)
-    .single()
+    .single() as { data: ProjectRow | null; error: unknown }
 
   if (projectError || !project) {
     return NextResponse.json(
@@ -189,7 +205,7 @@ async function handleCodeLogin(
     .from('customers')
     .select('id, first_name, last_name, email')
     .eq('id', project.customer_id)
-    .single()
+    .single() as { data: CustomerRow | null; error: unknown }
 
   if (customerError || !customer) {
     return NextResponse.json(
@@ -306,7 +322,7 @@ async function handleCodeLogin(
     .select('id, customer_name, status, order_number')
     .eq('customer_id', customer.id)
     .is('deleted_at', null)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }) as { data: ProjectRow[] | null }
 
   // 8. Response
   return NextResponse.json({

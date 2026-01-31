@@ -2,6 +2,7 @@ import { supabase } from '../client'
 import { Invoice, InvoiceType, InvoiceScheduleType, CustomerProject } from '@/types'
 import { getCurrentUser } from './auth'
 import { getNextInvoiceNumber } from './company'
+import { audit } from '@/lib/utils/auditLogger'
 
 // ============================================
 // INVOICE SERVICE - CRUD Operations
@@ -249,7 +250,17 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
     throw error
   }
 
-  return mapInvoiceFromDB(data)
+  const createdInvoice = mapInvoiceFromDB(data)
+
+  // Audit logging
+  audit.invoiceCreated(createdInvoice.id, {
+    invoiceNumber: createdInvoice.invoiceNumber,
+    type: createdInvoice.type,
+    amount: createdInvoice.amount,
+    projectId: createdInvoice.projectId,
+  })
+
+  return createdInvoice
 }
 
 /**
@@ -301,20 +312,31 @@ export async function updateInvoice(
  * Rechnung als bezahlt markieren
  */
 export async function markInvoicePaid(id: string, paidDate?: string): Promise<Invoice> {
-  return updateInvoice(id, {
+  const actualPaidDate = paidDate || new Date().toISOString().split('T')[0]
+  const invoice = await updateInvoice(id, {
     isPaid: true,
-    paidDate: paidDate || new Date().toISOString().split('T')[0],
+    paidDate: actualPaidDate,
   })
+
+  // Audit logging
+  audit.invoicePaid(id, actualPaidDate)
+
+  return invoice
 }
 
 /**
  * Rechnung als unbezahlt markieren
  */
 export async function markInvoiceUnpaid(id: string): Promise<Invoice> {
-  return updateInvoice(id, {
+  const invoice = await updateInvoice(id, {
     isPaid: false,
     paidDate: undefined,
   })
+
+  // Audit logging
+  audit.invoiceUnpaid(id)
+
+  return invoice
 }
 
 /**

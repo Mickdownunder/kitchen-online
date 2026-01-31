@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+
+// Types for database queries
+interface ProjectWithUserId {
+  id: string
+  user_id: string | null
+}
 
 // Schema für Ticket-Erstellung
 const CreateTicketSchema = z.object({
@@ -55,10 +61,10 @@ async function getCustomerSession(request: NextRequest) {
 }
 
 async function resolveProjectId(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   customerId: string,
   requestedProjectId?: string | null
-) {
+): Promise<ProjectWithUserId | null> {
   if (requestedProjectId) {
     const { data: project, error } = await supabase
       .from('projects')
@@ -66,7 +72,7 @@ async function resolveProjectId(
       .eq('id', requestedProjectId)
       .eq('customer_id', customerId)
       .is('deleted_at', null)
-      .single()
+      .single() as { data: ProjectWithUserId | null; error: unknown }
 
     if (error || !project) return null
     return project
@@ -78,7 +84,7 @@ async function resolveProjectId(
     .eq('customer_id', customerId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
-    .limit(1)
+    .limit(1) as { data: ProjectWithUserId[] | null; error: unknown }
 
   if (error || !projects || projects.length === 0) return null
   return projects[0]

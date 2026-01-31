@@ -96,7 +96,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     })
 
   const handleDayClick = (date: Date) => {
-    _setSelectedDay(date.getDate())
     setSelectedDate(date)
     setIsAssignModalOpen(true)
     setIsCreatingNewAppointment(false)

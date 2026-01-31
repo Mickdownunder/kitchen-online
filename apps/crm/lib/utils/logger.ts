@@ -90,13 +90,15 @@ export class Logger {
 
   // Convenience method for API routes
   api(route: string, method: string, context?: LogContext) {
+    let startTime = 0
     return {
       start: () => {
+        startTime = Date.now()
         this.info(`[API] ${method} ${route} started`, { ...context, route, method })
-        return Date.now()
+        return startTime
       },
-      end: (startTime: number, statusCode?: number) => {
-        const duration = Date.now() - startTime
+      end: (explicitStartTime: number, statusCode?: number) => {
+        const duration = Date.now() - explicitStartTime
         const level = statusCode && statusCode >= 400 ? LogLevel.ERROR : LogLevel.INFO
         this.log(level, `[API] ${method} ${route} completed`, {
           ...context,
@@ -104,6 +106,16 @@ export class Logger {
           method,
           statusCode,
           duration: `${duration}ms`,
+        })
+      },
+      complete: (metadata?: Record<string, unknown>) => {
+        const duration = startTime ? Date.now() - startTime : 0
+        this.info(`[API] ${method} ${route} completed`, {
+          ...context,
+          route,
+          method,
+          duration: `${duration}ms`,
+          ...metadata,
         })
       },
       error: (err: Error, statusCode?: number) => {

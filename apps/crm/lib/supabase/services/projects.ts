@@ -27,6 +27,7 @@ import {
   calculateProjectTotals,
 } from '@/lib/utils/priceCalculations'
 import { createFirstPayment } from '@/lib/utils/paymentSchedule'
+import { audit } from '@/lib/utils/auditLogger'
 
 export async function getProjects(): Promise<CustomerProject[]> {
   try {
@@ -312,7 +313,16 @@ export async function createProject(
       }
     }
 
-    return (await getProject(projectId)) as CustomerProject
+    const createdProject = (await getProject(projectId)) as CustomerProject
+
+    // Audit logging
+    audit.projectCreated(projectId, {
+      customerName: createdProject.customerName,
+      orderNumber: createdProject.orderNumber,
+      totalAmount: createdProject.totalAmount,
+    })
+
+    return createdProject
   } catch (error: unknown) {
     console.error('createProject failed:', JSON.stringify(error, null, 2))
     const err = error as { message?: string; code?: string; details?: string; hint?: string }
@@ -645,7 +655,22 @@ export async function updateProject(
     }
 
     // Fetch the complete project with items
-    return (await getProject(id)) as CustomerProject
+    const updatedProject = (await getProject(id)) as CustomerProject
+
+    // Audit logging - log the fields that were updated
+    const changedFields: Record<string, unknown> = {}
+    if (project.customerName !== undefined) changedFields.customerName = project.customerName
+    if (project.status !== undefined) changedFields.status = project.status
+    if (project.totalAmount !== undefined) changedFields.totalAmount = project.totalAmount
+    if (project.isPaid !== undefined) changedFields.isPaid = project.isPaid
+    if (project.isDepositPaid !== undefined) changedFields.isDepositPaid = project.isDepositPaid
+    if (project.isFinalPaid !== undefined) changedFields.isFinalPaid = project.isFinalPaid
+
+    if (Object.keys(changedFields).length > 0) {
+      audit.projectUpdated(id, {}, changedFields)
+    }
+
+    return updatedProject
   } catch (error) {
     console.error('updateProject failed:', error)
     throw error

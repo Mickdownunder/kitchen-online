@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+
+// Types for database queries
+interface ProjectIdRow {
+  id: string
+}
+
+interface DocumentRow {
+  id: string
+  name: string
+  uploaded_at: string
+}
 
 // Upload Limits
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -45,7 +56,7 @@ async function getCustomerSession(request: NextRequest) {
 }
 
 async function resolveProjectId(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   customerId: string,
   requestedProjectId?: string | null
 ) {
@@ -56,7 +67,7 @@ async function resolveProjectId(
       .eq('id', requestedProjectId)
       .eq('customer_id', customerId)
       .is('deleted_at', null)
-      .single()
+      .single() as { data: ProjectIdRow | null; error: unknown }
 
     if (error || !project) return null
     return project.id
@@ -68,7 +79,7 @@ async function resolveProjectId(
     .eq('customer_id', customerId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
-    .limit(1)
+    .limit(1) as { data: ProjectIdRow[] | null; error: unknown }
 
   if (error || !projects || projects.length === 0) return null
   return projects[0].id
@@ -178,9 +189,9 @@ export async function POST(request: NextRequest) {
         uploaded_at: uploadedAt,
       })
       .select('id, name, uploaded_at')
-      .single()
+      .single() as { data: DocumentRow | null; error: unknown }
 
-    if (dbError) {
+    if (dbError || !document) {
       console.error('DB error:', dbError)
       // Cleanup: File aus Storage löschen
       await supabase.storage.from('documents').remove([storagePath])

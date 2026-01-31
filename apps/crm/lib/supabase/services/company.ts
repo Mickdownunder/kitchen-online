@@ -1,6 +1,7 @@
 import { supabase } from '../client'
 import { BankAccount, CompanySettings, Employee } from '@/types'
 import { getCurrentUser } from './auth'
+import { audit, logAudit } from '@/lib/utils/auditLogger'
 
 export async function getCompanySettings(): Promise<CompanySettings | null> {
   try {
@@ -86,7 +87,16 @@ export async function saveCompanySettings(
     .single()
 
   if (error) throw error
-  return mapCompanySettingsFromDB(data)
+
+  const savedSettings = mapCompanySettingsFromDB(data)
+
+  // Audit logging
+  audit.companySettingsUpdated(savedSettings.id, {}, {
+    companyName: savedSettings.companyName,
+    updatedFields: Object.keys(settings).filter(k => settings[k as keyof typeof settings] !== undefined),
+  })
+
+  return savedSettings
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -316,11 +326,38 @@ export async function saveEmployee(employee: Partial<Employee>): Promise<Employe
       .select()
       .single()
     if (error) throw error
-    return mapEmployeeFromDB(data)
+
+    const savedEmployee = mapEmployeeFromDB(data)
+
+    // Audit logging for employee update
+    audit.userRoleChanged(employee.id, {}, {
+      name: `${savedEmployee.firstName} ${savedEmployee.lastName}`,
+      role: savedEmployee.role,
+      isActive: savedEmployee.isActive,
+    })
+
+    return savedEmployee
   } else {
     const { data, error } = await supabase.from('employees').insert(dbData).select().single()
     if (error) throw error
-    return mapEmployeeFromDB(data)
+
+    const savedEmployee = mapEmployeeFromDB(data)
+
+    // Audit logging for new employee
+    logAudit({
+      action: 'employee.created',
+      entityType: 'employee',
+      entityId: savedEmployee.id,
+      changes: {
+        after: {
+          name: `${savedEmployee.firstName} ${savedEmployee.lastName}`,
+          role: savedEmployee.role,
+          email: savedEmployee.email,
+        },
+      },
+    })
+
+    return savedEmployee
   }
 }
 
