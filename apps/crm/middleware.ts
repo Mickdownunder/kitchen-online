@@ -55,6 +55,10 @@ function createPortalClient(request: NextRequest, response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const host = request.headers.get('host') || ''
+  
+  // Check if request is coming from portal subdomain
+  const isPortalSubdomain = host.startsWith('portal.')
   
   // Check env vars
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -65,6 +69,10 @@ export async function middleware(request: NextRequest) {
   // Add pathname header for layout detection
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-pathname', pathname)
+  // Add portal subdomain header for components to detect
+  if (isPortalSubdomain) {
+    requestHeaders.set('x-is-portal-subdomain', 'true')
+  }
 
   const response = NextResponse.next({
     request: {
@@ -75,16 +83,20 @@ export async function middleware(request: NextRequest) {
   // ============================================
   // PORTAL ROUTES (Customer Portal) - Separate cookies
   // ============================================
-  const isPortalRoute = pathname.startsWith('/portal')
+  // Portal route if: path starts with /portal OR request is from portal subdomain
+  const isPortalRoute = pathname.startsWith('/portal') || isPortalSubdomain
   
   // Public portal routes (no auth required)
+  // When on portal subdomain, paths are /login instead of /portal/login
+  const publicPortalPaths = ['/login', '/forgot-password', '/reset-password', '/setup-password']
   const publicPortalRoutes = [
     '/portal/login',
     '/portal/forgot-password',
     '/portal/reset-password',
     '/portal/setup-password',
   ]
-  const isPublicPortalRoute = publicPortalRoutes.includes(pathname)
+  const isPublicPortalRoute = publicPortalRoutes.includes(pathname) || 
+    (isPortalSubdomain && publicPortalPaths.includes(pathname))
 
   if (isPortalRoute) {
     let portalUser = null
@@ -101,8 +113,11 @@ export async function middleware(request: NextRequest) {
     if (isPublicPortalRoute) {
       // If customer is already logged in and on login page, redirect to portal dashboard
       const userRole = portalUser?.app_metadata?.role
-      if (portalUser && userRole === 'customer' && pathname === '/portal/login') {
-        return NextResponse.redirect(new URL('/portal', request.url))
+      const isOnLoginPage = pathname === '/portal/login' || (isPortalSubdomain && pathname === '/login')
+      if (portalUser && userRole === 'customer' && isOnLoginPage) {
+        // On portal subdomain, redirect to / (which maps to /portal)
+        const redirectPath = isPortalSubdomain ? '/' : '/portal'
+        return NextResponse.redirect(new URL(redirectPath, request.url))
       }
       return response
     }
@@ -110,8 +125,10 @@ export async function middleware(request: NextRequest) {
     // For all other portal routes, require customer session
     const userRole = portalUser?.app_metadata?.role
     if (!portalUser || userRole !== 'customer') {
-      console.log('[Middleware] Portal access denied, redirecting to /portal/login')
-      return NextResponse.redirect(new URL('/portal/login', request.url))
+      // On portal subdomain, redirect to /login (which maps to /portal/login)
+      const loginPath = isPortalSubdomain ? '/login' : '/portal/login'
+      console.log(`[Middleware] Portal access denied, redirecting to ${loginPath}`)
+      return NextResponse.redirect(new URL(loginPath, request.url))
     }
 
     // Customer is authenticated, allow access
@@ -137,11 +154,12 @@ export async function middleware(request: NextRequest) {
     '/settings',
     '/clear-data',
   ]
-  const isRootRoute = pathname === '/'
+  // Root route on CRM domain should redirect to CRM login, but NOT on portal subdomain
+  const isRootRoute = pathname === '/' && !isPortalSubdomain
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
-  // Only check CRM auth for protected routes
-  if (isProtectedRoute || isRootRoute) {
+  // Only check CRM auth for protected routes (and not on portal subdomain)
+  if ((isProtectedRoute || isRootRoute) && !isPortalSubdomain) {
     let crmUser = null
     
     try {
