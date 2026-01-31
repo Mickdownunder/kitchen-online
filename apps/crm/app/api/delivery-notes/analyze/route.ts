@@ -1,19 +1,105 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI, Type } from '@google/genai'
-import { getProjects } from '@/lib/supabase/services'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+    }
+
+    if (user.app_metadata?.role === 'customer') {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
+    const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
+    if (companyError || !companyId) {
+      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+    }
+
+    const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
+      p_permission_code: 'edit_projects',
+    })
+    if (permError || !hasPermission) {
+      return NextResponse.json(
+        { error: 'Keine Berechtigung zum Analysieren von Lieferscheinen' },
+        { status: 403 }
+      )
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+    }
+
     const { rawText, supplierName } = await request.json()
 
     if (!rawText) {
       return NextResponse.json({ error: 'rawText is required' }, { status: 400 })
     }
 
-    // Get all projects for matching
-    const projects = await getProjects()
+    // Get all projects for matching (scoped to company)
+    const serviceClient = await createServiceClient()
+    const { data: members, error: membersError } = await serviceClient
+      .from('company_members')
+      .select('user_id')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+
+    if (membersError) {
+      return NextResponse.json({ error: 'Fehler beim Laden der Mitglieder' }, { status: 500 })
+    }
+
+    const memberUserIds = (members || []).map(m => m.user_id).filter(Boolean)
+    let projects: Array<{
+      id: string
+      customerName?: string
+      orderNumber?: string
+      status?: string
+      items?: Array<{ description: string; modelNumber?: string | null }>
+    }> = []
+
+    if (memberUserIds.length > 0) {
+      const { data: projectRows, error: projectsError } = await serviceClient
+        .from('projects')
+        .select(
+          `
+          id,
+          customer_name,
+          order_number,
+          status,
+          invoice_items (
+            description,
+            model_number
+          )
+        `
+        )
+        .in('user_id', memberUserIds)
+
+      if (projectsError) {
+        return NextResponse.json({ error: 'Fehler beim Laden der Projekte' }, { status: 500 })
+      }
+
+      projects = (projectRows || []).map(project => ({
+        id: project.id,
+        customerName: project.customer_name || undefined,
+        orderNumber: project.order_number || undefined,
+        status: project.status || undefined,
+        items: (project.invoice_items || []).map(
+          (item: { description: string; model_number?: string | null }) => ({
+            description: item.description,
+            modelNumber: item.model_number || undefined,
+          })
+        ),
+      }))
+    }
 
     // AI Analysis: Extract delivery note data
     const analysisResponse = await ai.models.generateContent({

@@ -21,6 +21,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
     }
 
+    if (user.app_metadata?.role === 'customer') {
+      apiLogger.error(new Error('No permission'), 403)
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
+    const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
+    if (companyError || !companyId) {
+      apiLogger.error(new Error('No company assigned'), 403)
+      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { to, subject, html, text, from: requestedFrom, replyTo, attachments } = body
 

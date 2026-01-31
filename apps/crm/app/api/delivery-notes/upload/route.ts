@@ -71,9 +71,13 @@ export async function POST(request: NextRequest) {
     const rawText = ocrResponse.text || ''
 
     // Analyze the extracted text
+    const cookieHeader = request.headers.get('cookie')
     const analyzeResponse = await fetch(`${request.nextUrl.origin}/api/delivery-notes/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      },
       body: JSON.stringify({ rawText, supplierName }),
     })
 

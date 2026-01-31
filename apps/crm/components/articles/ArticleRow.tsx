@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
-import { Edit2, Trash2, CheckCircle2 } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Edit2, Trash2, CheckCircle2, X } from 'lucide-react'
 import type { Article } from '@/types'
 import { usePriceInput } from '@/hooks/usePriceInput'
 
@@ -83,57 +83,70 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({
   onSave,
   onCancelEdit,
 }) => {
+  // Lokaler State für die Bearbeitung - wird erst beim Speichern übertragen
+  const [editData, setEditData] = useState<Article>(article)
+  
+  // Reset editData wenn article sich ändert oder Bearbeitung beginnt
+  useEffect(() => {
+    setEditData(article)
+  }, [article, isEditing])
+
+  const handleSave = () => {
+    onSave(editData)
+    onCancelEdit()
+  }
+
+  const handleCancel = () => {
+    setEditData(article) // Reset
+    onCancelEdit()
+  }
+
   if (isEditing) {
     return (
-      <tr className="cursor-pointer transition-colors hover:bg-slate-50">
+      <tr className="bg-amber-50 transition-colors">
         <td className="px-4 py-3">
           <input
             type="text"
-            value={article.sku}
-            onChange={e => onSave({ ...article, sku: e.target.value })}
+            value={editData.sku}
+            onChange={e => setEditData({ ...editData, sku: e.target.value })}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
             autoFocus
           />
         </td>
         <td className="px-4 py-3">
           <input
             type="text"
-            value={article.name}
-            onChange={e => onSave({ ...article, name: e.target.value })}
+            value={editData.name}
+            onChange={e => setEditData({ ...editData, name: e.target.value })}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
           />
         </td>
         <td className="px-4 py-3">
           <input
             type="text"
-            value={article.manufacturer || ''}
-            onChange={e => onSave({ ...article, manufacturer: e.target.value })}
+            value={editData.manufacturer || ''}
+            onChange={e => setEditData({ ...editData, manufacturer: e.target.value })}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
           />
         </td>
         <td className="px-4 py-3">
           <input
             type="text"
-            value={article.modelNumber || ''}
-            onChange={e => onSave({ ...article, modelNumber: e.target.value })}
+            value={editData.modelNumber || ''}
+            onChange={e => setEditData({ ...editData, modelNumber: e.target.value })}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
           />
         </td>
         <td className="px-4 py-3">
           <select
-            value={article.category}
-            onChange={e => onSave({ ...article, category: e.target.value as Article['category'] })}
+            value={editData.category}
+            onChange={e => setEditData({ ...editData, category: e.target.value as Article['category'] })}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
           >
             <option value="Kitchen">Küche</option>
             <option value="Appliance">Gerät</option>
@@ -146,28 +159,27 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({
         {canViewPurchasePrices && (
           <td className="px-4 py-3 text-right">
             <ArticlePriceInput
-              value={article.defaultPurchasePrice}
-              onChange={value => onSave({ ...article, defaultPurchasePrice: value || 0 })}
+              value={editData.defaultPurchasePrice}
+              onChange={value => setEditData({ ...editData, defaultPurchasePrice: value || 0 })}
               placeholder="0,00"
             />
           </td>
         )}
         <td className="px-4 py-3 text-right">
           <ArticlePriceInput
-            value={article.defaultSalePrice}
-            onChange={value => onSave({ ...article, defaultSalePrice: value || 0 })}
+            value={editData.defaultSalePrice}
+            onChange={value => setEditData({ ...editData, defaultSalePrice: value || 0 })}
             placeholder="0,00"
           />
         </td>
         <td className="px-4 py-3 text-center">
           <select
-            value={article.taxRate}
+            value={editData.taxRate}
             onChange={e =>
-              onSave({ ...article, taxRate: parseInt(e.target.value) as 10 | 13 | 20 })
+              setEditData({ ...editData, taxRate: parseInt(e.target.value) as 10 | 13 | 20 })
             }
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
           >
             <option value={10}>10%</option>
             <option value={13}>13%</option>
@@ -176,11 +188,10 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({
         </td>
         <td className="px-4 py-3 text-center">
           <select
-            value={article.unit}
-            onChange={e => onSave({ ...article, unit: e.target.value as Article['unit'] })}
+            value={editData.unit}
+            onChange={e => setEditData({ ...editData, unit: e.target.value as Article['unit'] })}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
           >
             <option value="Stk">Stk</option>
             <option value="Pkg">Pkg</option>
@@ -194,11 +205,10 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({
         <td className="px-4 py-3 text-center">
           <input
             type="number"
-            value={article.stockQuantity || 0}
-            onChange={e => onSave({ ...article, stockQuantity: parseInt(e.target.value) || 0 })}
+            value={editData.stockQuantity || 0}
+            onChange={e => setEditData({ ...editData, stockQuantity: parseInt(e.target.value) || 0 })}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-center text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-            onBlur={onCancelEdit}
           />
         </td>
         <td className="px-4 py-3">
@@ -207,7 +217,14 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({
             onClick={e => e.stopPropagation()}
           >
             <button
-              onClick={onCancelEdit}
+              onClick={handleCancel}
+              className="rounded bg-slate-100 p-1.5 transition-all hover:bg-slate-200"
+              title="Abbrechen"
+            >
+              <X className="h-4 w-4 text-slate-600" />
+            </button>
+            <button
+              onClick={handleSave}
               className="rounded bg-emerald-50 p-1.5 transition-all hover:bg-emerald-100"
               title="Speichern"
             >

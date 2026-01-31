@@ -48,6 +48,8 @@ export function ApplianceModal({ item, isOpen, onClose, onSave, projectId }: App
 
   const [formData, setFormData] = useState({
     showInPortal: item.showInPortal || false,
+    manufacturer: item.manufacturer || '',
+    modelNumber: item.modelNumber || '',
     serialNumber: item.serialNumber || '',
     installationDate: item.installationDate || '',
     warrantyYears: getWarrantyYears(),
@@ -64,6 +66,8 @@ export function ApplianceModal({ item, isOpen, onClose, onSave, projectId }: App
   useEffect(() => {
     setFormData({
       showInPortal: item.showInPortal || false,
+      manufacturer: item.manufacturer || '',
+      modelNumber: item.modelNumber || '',
       serialNumber: item.serialNumber || '',
       installationDate: item.installationDate || '',
       warrantyYears: getWarrantyYears(),
@@ -126,6 +130,8 @@ export function ApplianceModal({ item, isOpen, onClose, onSave, projectId }: App
 
     const updates = {
       showInPortal: formData.showInPortal,
+      manufacturer: formData.manufacturer || undefined,
+      modelNumber: formData.modelNumber || undefined,
       serialNumber: formData.serialNumber || undefined,
       installationDate: formData.installationDate || undefined,
       warrantyUntil,
@@ -222,10 +228,38 @@ export function ApplianceModal({ item, isOpen, onClose, onSave, projectId }: App
         {/* Form Fields - only shown if showInPortal is true */}
         {formData.showInPortal && (
           <div className="space-y-4">
+            {/* Manufacturer & Model */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Hersteller *
+                </label>
+                <input
+                  type="text"
+                  value={formData.manufacturer}
+                  onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                  placeholder="z.B. Bosch, Siemens, Miele"
+                  className="w-full rounded-xl border-0 bg-slate-100 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Modell *
+                </label>
+                <input
+                  type="text"
+                  value={formData.modelNumber}
+                  onChange={(e) => setFormData({ ...formData, modelNumber: e.target.value })}
+                  placeholder="z.B. Serie 8 HBG675BS1"
+                  className="w-full rounded-xl border-0 bg-slate-100 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                />
+              </div>
+            </div>
+
             {/* Category */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Gerätekategorie
+                Gerätekategorie *
               </label>
               <select
                 value={formData.applianceCategory}

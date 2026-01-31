@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 // CustomerProject type is available via projects parameter
 import { agentTools } from '@/lib/ai/agentTools'
@@ -18,12 +18,38 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    // Rate limiting - get user ID first
+    // Auth + permission checks
     const supabase = await createClient()
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
-    const userId = user?.id
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+    }
+
+    if (user.app_metadata?.role === 'customer') {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
+    const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
+    if (companyError || !companyId) {
+      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+    }
+
+    const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
+      p_permission_code: 'edit_projects',
+    })
+    if (permError || !hasPermission) {
+      return NextResponse.json(
+        { error: 'Keine Berechtigung zur Nutzung des AI-Assistenten' },
+        { status: 403 }
+      )
+    }
+
+    // Rate limiting - use authenticated user ID
+    const userId = user.id
 
     const limitCheck = await rateLimit(request, userId)
     if (!limitCheck || !limitCheck.allowed) {

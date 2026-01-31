@@ -12,6 +12,7 @@ const CreateTicketSchema = z.object({
     .string()
     .min(10, 'Nachricht muss mindestens 10 Zeichen haben')
     .max(5000, 'Nachricht darf maximal 5000 Zeichen haben'),
+  projectId: z.string().uuid().optional(),
 })
 
 /**
@@ -43,15 +44,44 @@ async function getCustomerSession(request: NextRequest) {
     return null
   }
 
-  const project_id = user.app_metadata?.project_id
   const customer_id = user.app_metadata?.customer_id
   const role = user.app_metadata?.role
 
-  if (!project_id || !customer_id || role !== 'customer') {
+  if (!customer_id || role !== 'customer') {
     return null
   }
 
-  return { project_id, customer_id, user_id: user.id }
+  return { customer_id, user_id: user.id }
+}
+
+async function resolveProjectId(
+  supabase: ReturnType<typeof createClient>,
+  customerId: string,
+  requestedProjectId?: string | null
+) {
+  if (requestedProjectId) {
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('id, user_id')
+      .eq('id', requestedProjectId)
+      .eq('customer_id', customerId)
+      .is('deleted_at', null)
+      .single()
+
+    if (error || !project) return null
+    return project
+  }
+
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select('id, user_id')
+    .eq('customer_id', customerId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error || !projects || projects.length === 0) return null
+  return projects[0]
 }
 
 /**
@@ -71,7 +101,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { project_id, customer_id } = session
+    const { customer_id } = session
 
     // 2. Request Body parsen
     const body = await request.json()
@@ -89,7 +119,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { subject, message } = parsed.data
+    const { subject, message, projectId: requestedProjectId } = parsed.data
 
     // 4. Supabase Admin Client
     const supabase = createClient(
@@ -103,12 +133,13 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // 5. Get company_id from project
-    const { data: project } = await supabase
-      .from('projects')
-      .select('user_id')
-      .eq('id', project_id)
-      .single()
+    const project = await resolveProjectId(supabase, customer_id, requestedProjectId)
+    if (!project) {
+      return NextResponse.json(
+        { success: false, error: 'PROJECT_NOT_FOUND' },
+        { status: 404 }
+      )
+    }
 
     let companyId: string | null = null
     if (project?.user_id) {
@@ -132,7 +163,7 @@ export async function POST(request: NextRequest) {
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
       .insert({
-        project_id,
+        project_id: project.id,
         subject,
         status: 'OFFEN',
         type: 'KUNDENANFRAGE',

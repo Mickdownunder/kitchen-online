@@ -19,6 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
     }
 
+    if (user.app_metadata?.role === 'customer') {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
     // Check company context
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {

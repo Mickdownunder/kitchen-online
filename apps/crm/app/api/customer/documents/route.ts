@@ -34,15 +34,44 @@ async function getCustomerSession(request: NextRequest) {
     return null
   }
 
-  const project_id = user.app_metadata?.project_id
   const customer_id = user.app_metadata?.customer_id
   const role = user.app_metadata?.role
 
-  if (!project_id || !customer_id || role !== 'customer') {
+  if (!customer_id || role !== 'customer') {
     return null
   }
 
-  return { project_id, customer_id, user_id: user.id }
+  return { customer_id, user_id: user.id }
+}
+
+async function resolveProjectId(
+  supabase: ReturnType<typeof createClient>,
+  customerId: string,
+  requestedProjectId?: string | null
+) {
+  if (requestedProjectId) {
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', requestedProjectId)
+      .eq('customer_id', customerId)
+      .is('deleted_at', null)
+      .single()
+
+    if (error || !project) return null
+    return project.id
+  }
+
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('customer_id', customerId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error || !projects || projects.length === 0) return null
+  return projects[0].id
 }
 
 /**
@@ -63,11 +92,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { project_id, customer_id } = session
+    const { customer_id } = session
 
     // 2. FormData parsen
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const requestedProjectId = formData.get('projectId')?.toString() ?? null
 
     if (!file) {
       return NextResponse.json(
@@ -103,10 +133,18 @@ export async function POST(request: NextRequest) {
       }
     )
 
+    const projectId = await resolveProjectId(supabase, customer_id, requestedProjectId)
+    if (!projectId) {
+      return NextResponse.json(
+        { success: false, error: 'PROJECT_NOT_FOUND' },
+        { status: 404 }
+      )
+    }
+
     // 5. File zu Supabase Storage hochladen
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-    const storagePath = `documents/${project_id}/customer/${fileName}`
+    const storagePath = `documents/${projectId}/customer/${fileName}`
 
     const fileBuffer = await file.arrayBuffer()
     
@@ -130,7 +168,7 @@ export async function POST(request: NextRequest) {
     const { data: document, error: dbError } = await supabase
       .from('documents')
       .insert({
-        project_id,
+        project_id: projectId,
         type: 'KUNDEN_DOKUMENT',
         name: file.name,
         file_path: storagePath,

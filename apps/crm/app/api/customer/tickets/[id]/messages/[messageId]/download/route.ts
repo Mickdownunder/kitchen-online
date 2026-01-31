@@ -36,15 +36,30 @@ async function getCustomerSession(request: NextRequest) {
     return null
   }
 
-  const project_id = user.app_metadata?.project_id
   const customer_id = user.app_metadata?.customer_id
   const role = user.app_metadata?.role
 
-  if (!project_id || !customer_id || role !== 'customer') {
+  if (!customer_id || role !== 'customer') {
     return null
   }
 
-  return { project_id }
+  return { customer_id }
+}
+
+async function isCustomerProject(
+  supabase: ReturnType<typeof createClient>,
+  customerId: string,
+  projectId: string
+) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('id', projectId)
+    .eq('customer_id', customerId)
+    .is('deleted_at', null)
+    .single()
+
+  return !error && !!data
 }
 
 /**
@@ -91,7 +106,8 @@ export async function GET(
       )
     }
 
-    if (ticket.project_id !== session.project_id) {
+    const ownsProject = await isCustomerProject(supabase, session.customer_id, ticket.project_id)
+    if (!ownsProject) {
       return NextResponse.json(
         { success: false, error: 'FORBIDDEN' },
         { status: 403 }

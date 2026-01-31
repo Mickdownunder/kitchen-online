@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 /**
  * Helper: Customer Session aus Request extrahieren
+ * Nur noch customer_id erforderlich (kein project_id mehr!)
  */
 async function getCustomerSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
@@ -30,15 +31,14 @@ async function getCustomerSession(request: NextRequest) {
     return null
   }
 
-  const project_id = user.app_metadata?.project_id
   const customer_id = user.app_metadata?.customer_id
   const role = user.app_metadata?.role
 
-  if (!project_id || !customer_id || role !== 'customer') {
+  if (!customer_id || role !== 'customer') {
     return null
   }
 
-  return { project_id, customer_id, user_id: user.id }
+  return { customer_id, user_id: user.id }
 }
 
 /**
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { project_id } = session
+    const { customer_id } = session
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,7 +71,23 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    // Fetch invoice items that are marked as show_in_portal
+    // 1. Get all project IDs for this customer
+    const { data: projects, error: projectsError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('customer_id', customer_id)
+      .is('deleted_at', null)
+
+    if (projectsError || !projects || projects.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: { appliances: [], groupedByCategory: {}, totalCount: 0 },
+      })
+    }
+
+    const projectIds = projects.map(p => p.id)
+
+    // 2. Fetch invoice items that are marked as show_in_portal for all projects
     const { data: items, error } = await supabase
       .from('invoice_items')
       .select(`
@@ -86,9 +102,10 @@ export async function GET(request: NextRequest) {
         manufacturer_support_url,
         manufacturer_support_phone,
         manufacturer_support_email,
-        appliance_category
+        appliance_category,
+        project_id
       `)
-      .eq('project_id', project_id)
+      .in('project_id', projectIds)
       .eq('show_in_portal', true)
       .order('appliance_category', { ascending: true })
       .order('manufacturer', { ascending: true })

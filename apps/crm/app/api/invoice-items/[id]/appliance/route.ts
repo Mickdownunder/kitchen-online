@@ -17,12 +17,25 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
     }
 
+    if (user.app_metadata?.role === 'customer') {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
+    const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
+      p_permission_code: 'edit_projects',
+    })
+    if (permError || !hasPermission) {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
     const body = await request.json()
     
     // Map camelCase to snake_case for allowed appliance fields
     const updateData: Record<string, unknown> = {}
     
     if ('showInPortal' in body) updateData.show_in_portal = body.showInPortal
+    if ('manufacturer' in body) updateData.manufacturer = body.manufacturer || null
+    if ('modelNumber' in body) updateData.model_number = body.modelNumber || null
     if ('serialNumber' in body) updateData.serial_number = body.serialNumber || null
     if ('installationDate' in body) updateData.installation_date = body.installationDate || null
     if ('warrantyUntil' in body) updateData.warranty_until = body.warrantyUntil || null

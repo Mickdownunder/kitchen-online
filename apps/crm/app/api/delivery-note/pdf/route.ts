@@ -17,6 +17,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
     }
 
+    if (user.app_metadata?.role === 'customer') {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
+    const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
+    if (companyError || !companyId) {
+      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+    }
+
+    const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
+      p_permission_code: 'edit_projects',
+    })
+    if (permError || !hasPermission) {
+      return NextResponse.json(
+        { error: 'Keine Berechtigung zum Generieren von Lieferscheinen' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const { deliveryNote, project } = body
 

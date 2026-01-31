@@ -72,6 +72,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
     }
 
+    if (user.app_metadata?.role === 'customer') {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
     const body: PublishRequest = await request.json()
     const { documentType, projectId, invoice, project } = body
 
@@ -80,6 +84,49 @@ export async function POST(request: NextRequest) {
         { error: 'Fehlende Parameter' },
         { status: 400 }
       )
+    }
+
+    if (project.id && project.id !== projectId) {
+      return NextResponse.json(
+        { error: 'Projekt-ID stimmt nicht überein' },
+        { status: 400 }
+      )
+    }
+
+    const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
+    if (companyError || !companyId) {
+      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+    }
+
+    const permissionCode = documentType === 'invoice' ? 'create_invoices' : 'edit_projects'
+    const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
+      p_permission_code: permissionCode,
+    })
+    if (permError || !hasPermission) {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
+    const serviceClient = await createServiceClient()
+    const { data: projectRow, error: projectError } = await serviceClient
+      .from('projects')
+      .select('id, user_id')
+      .eq('id', projectId)
+      .single()
+
+    if (projectError || !projectRow) {
+      return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
+    }
+
+    const { data: ownerMembership, error: membershipError } = await serviceClient
+      .from('company_members')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('user_id', projectRow.user_id)
+      .eq('is_active', true)
+      .single()
+
+    if (membershipError || !ownerMembership) {
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
     }
 
     // Load company settings and bank account
@@ -222,8 +269,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if document already exists (prevent duplicates)
-    const serviceClient = await createServiceClient()
-    
     // Extract base name without timestamp for duplicate check
     const baseFileName = fileName.replace('.pdf', '')
     
