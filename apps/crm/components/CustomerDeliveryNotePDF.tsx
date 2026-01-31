@@ -330,7 +330,7 @@ const CustomerDeliveryNotePDFDocument: React.FC<CustomerDeliveryNotePDFProps> = 
                 <Text style={[styles.tableHeaderText, styles.colUnit]}>Einheit</Text>
               </View>
               {deliveryNote.items.map((item, idx) => (
-                <View key={idx} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
+                <View key={idx} style={[styles.tableRow, idx % 2 === 1 ? styles.tableRowAlt : {}]}>
                   <Text style={[styles.tableCell, styles.colPosition]}>{item.position}</Text>
                   <Text style={[styles.tableCell, styles.colDescription]}>{item.description}</Text>
                   <Text style={[styles.tableCell, styles.colQuantity]}>{item.quantity}</Text>

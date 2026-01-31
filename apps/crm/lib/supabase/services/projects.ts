@@ -662,7 +662,6 @@ export async function updateProject(
     if (project.customerName !== undefined) changedFields.customerName = project.customerName
     if (project.status !== undefined) changedFields.status = project.status
     if (project.totalAmount !== undefined) changedFields.totalAmount = project.totalAmount
-    if (project.isPaid !== undefined) changedFields.isPaid = project.isPaid
     if (project.isDepositPaid !== undefined) changedFields.isDepositPaid = project.isDepositPaid
     if (project.isFinalPaid !== undefined) changedFields.isFinalPaid = project.isFinalPaid
 

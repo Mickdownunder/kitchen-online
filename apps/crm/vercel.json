@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "portal.kuechenonline.com"
+        }
+      ],
+      "destination": "/portal/:path*"
+    }
+  ]
+}

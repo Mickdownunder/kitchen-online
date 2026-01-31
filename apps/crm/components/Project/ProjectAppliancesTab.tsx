@@ -71,6 +71,20 @@ const MANUFACTURERS = [
   'Sonstige',
 ]
 
+interface ApplianceFormData {
+  manufacturer: string
+  model: string
+  category: string
+  serialNumber: string
+  purchaseDate: string
+  installationDate: string
+  warrantyUntil: string
+  manufacturerSupportUrl: string
+  manufacturerSupportPhone: string
+  manufacturerSupportEmail: string
+  notes: string
+}
+
 interface ProjectAppliancesTabProps {
   projectId: string
 }
@@ -86,7 +100,7 @@ export default function ProjectAppliancesTab({ projectId }: ProjectAppliancesTab
   const [showAddForm, setShowAddForm] = useState(false)
   
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ApplianceFormData>({
     manufacturer: '',
     model: '',
     category: '',
@@ -400,8 +414,8 @@ function ApplianceForm({
   onCancel,
   saving,
 }: {
-  formData: typeof import('./ProjectAppliancesTab').default extends (props: infer P) => unknown ? Parameters<NonNullable<P['setFormData']>>[0] : never
-  setFormData: (data: typeof formData) => void
+  formData: ApplianceFormData
+  setFormData: (data: ApplianceFormData) => void
   onSave: () => void
   onCancel: () => void
   saving: boolean

@@ -210,8 +210,9 @@ export async function POST(request: NextRequest) {
       const pdfElement = React.createElement(
         InvoicePDFDocumentServer,
         { invoice: invoiceData }
-      ) as React.ReactElement
-      pdfBuffer = await renderToBuffer(pdfElement)
+      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pdfBuffer = await renderToBuffer(pdfElement as any)
       
       const invoiceTypeLabel = invoice.type === 'partial' ? 'Teilrechnung' : 'Schlussrechnung'
       fileName = `${invoiceTypeLabel}_${invoice.invoiceNumber.replace(/\//g, '-')}.pdf`
@@ -244,9 +245,10 @@ export async function POST(request: NextRequest) {
           project: deliveryNoteProject,
           company: companySettings,
         }
-      ) as React.ReactElement
+      )
 
-      pdfBuffer = await renderToBuffer(deliveryNoteElement)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pdfBuffer = await renderToBuffer(deliveryNoteElement as any)
       
       fileName = `Lieferschein_${body.deliveryNote.deliveryNoteNumber.replace(/\//g, '-')}.pdf`
       portalType = 'LIEFERSCHEINE'
@@ -282,9 +284,10 @@ export async function POST(request: NextRequest) {
         project: orderProject,
         company: companySettings,
         appendAgb: body.appendAgb ?? true,
-      }) as React.ReactElement
+      })
       
-      pdfBuffer = await renderToBuffer(orderElement)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pdfBuffer = await renderToBuffer(orderElement as any)
       
       fileName = `Auftrag_${(project.orderNumber || project.id.slice(0, 8)).replace(/\//g, '-')}.pdf`
       portalType = 'KAUFVERTRAG'

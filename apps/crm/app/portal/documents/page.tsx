@@ -237,7 +237,9 @@ export default function PortalDocumentsPage() {
       setTimeout(() => setUploadSuccess(false), 3000)
       
       // Reload documents
-      await loadDocuments()
+      if (selectedProject?.id) {
+        await loadDocuments(selectedProject.id)
+      }
     } catch (err) {
       console.error('Upload error:', err)
       setUploadError(err instanceof Error ? err.message : 'Upload fehlgeschlagen')

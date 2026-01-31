@@ -156,7 +156,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
   // Filter by tab first (Leads vs Orders)
   // Compare as string to handle both enum and raw DB values
   const tabFilteredProjects = projects.filter(p => {
-    const isLead = p.status === ProjectStatus.LEAD || p.status === 'Lead'
+    const statusStr = String(p.status)
+    const isLead = statusStr === ProjectStatus.LEAD || statusStr === 'Lead'
     if (activeTab === 'leads') {
       return isLead
     } else {
@@ -165,8 +166,14 @@ const ProjectList: React.FC<ProjectListProps> = ({
   })
 
   // Count leads for badge
-  const leadsCount = projects.filter(p => p.status === ProjectStatus.LEAD || p.status === 'Lead').length
-  const ordersCount = projects.filter(p => p.status !== ProjectStatus.LEAD && p.status !== 'Lead').length
+  const leadsCount = projects.filter(p => {
+    const statusStr = String(p.status)
+    return statusStr === ProjectStatus.LEAD || statusStr === 'Lead'
+  }).length
+  const ordersCount = projects.filter(p => {
+    const statusStr = String(p.status)
+    return statusStr !== ProjectStatus.LEAD && statusStr !== 'Lead'
+  }).length
 
   const { filteredProjects, availableYears } = useProjectFilters({
     projects: tabFilteredProjects,

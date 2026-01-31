@@ -267,10 +267,10 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
             <p className="mb-2 text-xs uppercase tracking-wider text-slate-400">
               Rechnungsempfänger
             </p>
-            <p className="text-lg font-bold text-slate-900">{project.customerName}</p>
-            {project.address && <p className="text-slate-600">{project.address}</p>}
-            {project.phone && <p className="text-slate-600">Tel: {project.phone}</p>}
-            {project.email && <p className="text-slate-600">E-Mail: {project.email}</p>}
+            <p className="text-lg font-bold text-slate-900">{project?.customerName}</p>
+            {project?.address && <p className="text-slate-600">{project.address}</p>}
+            {project?.phone && <p className="text-slate-600">Tel: {project.phone}</p>}
+            {project?.email && <p className="text-slate-600">E-Mail: {project.email}</p>}
           </div>
 
           {/* Invoice Title */}
@@ -337,7 +337,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
                     <td className="px-4 py-4 text-slate-400">-</td>
                     <td className="px-4 py-4">
                       <p className="font-medium text-slate-900">
-                        {invoice.description || `Anzahlung für Auftrag ${project.orderNumber}`}
+                        {invoice.description || `Anzahlung für Auftrag ${project?.orderNumber || '-'}`}
                       </p>
                       <p className="text-sm text-slate-500">Gemäß Vereinbarung</p>
                     </td>

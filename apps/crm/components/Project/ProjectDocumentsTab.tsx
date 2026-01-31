@@ -463,6 +463,11 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
           currentInvoice = doc.data.invoice
         }
 
+        if (!currentInvoice) {
+          console.error('[ProjectDocumentsTab] No invoice data available for PDF')
+          return
+        }
+
         // Debug logging before creating invoice data for download
         console.log('[ProjectDocumentsTab] handleDownload - Creating PDF data:', {
           docDataType: doc.data.type,
@@ -581,6 +586,11 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         // Fallback to cached data if fresh fetch failed
         if (!currentInvoice) {
           currentInvoice = doc.data.invoice
+        }
+
+        if (!currentInvoice) {
+          console.error('[ProjectDocumentsTab] No invoice data available for PDF preview')
+          return
         }
 
         const invoiceData: InvoiceData = {

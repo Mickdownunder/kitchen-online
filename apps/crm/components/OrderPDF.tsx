@@ -388,8 +388,8 @@ export const OrderPDFDocument: React.FC<OrderPDFProps> = ({
                   key={item.id || index}
                   style={[
                     styles.tableRow,
-                    isAlt && styles.tableRowAlt,
-                    isLast && styles.tableRowLast,
+                    isAlt ? styles.tableRowAlt : {},
+                    isLast ? styles.tableRowLast : {},
                   ]}
                 >
                   <Text style={[styles.tableCell, styles.colQty]}>

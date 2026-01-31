@@ -322,12 +322,14 @@ export default function PortalServicePage() {
   }, [selectedProject?.id, loadTickets])
 
   useEffect(() => {
+    if (!selectedProject?.id) return
+
     const interval = window.setInterval(() => {
-      loadTickets(false)
+      loadTickets(selectedProject.id, false)
     }, 10000)
 
     return () => window.clearInterval(interval)
-  }, [loadTickets])
+  }, [loadTickets, selectedProject?.id])
 
   if (isLoading) {
     return (
@@ -377,7 +379,7 @@ export default function PortalServicePage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Create Form */}
         <div className="lg:col-span-1">
-          <CreateTicketForm onSuccess={loadTickets} />
+          <CreateTicketForm onSuccess={() => selectedProject?.id && loadTickets(selectedProject.id)} />
         </div>
 
         {/* Ticket List */}
