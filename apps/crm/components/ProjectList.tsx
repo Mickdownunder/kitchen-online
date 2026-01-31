@@ -25,7 +25,6 @@ import {
   ProjectStatus,
   ProjectDocument,
   Customer,
-  CustomerDeliveryNote,
 } from '@/types'
 import ProjectModal from './ProjectModal'
 import { getCustomers, getComplaints } from '@/lib/supabase/services'
@@ -33,9 +32,9 @@ import CustomerDeliveryNoteModal from './CustomerDeliveryNoteModal'
 import MeasurementDateModal from './MeasurementDateModal'
 import InstallationDateModal from './InstallationDateModal'
 import DeliveryDateModal from './DeliveryDateModal'
-import { getCustomerDeliveryNotes } from '@/lib/supabase/services'
 import { useProjectFilters } from '@/hooks/useProjectFilters'
 import { useGroupedProjects } from '@/hooks/useGroupedProjects'
+import { useProjectModals } from '@/hooks/useProjectModals'
 import { ProjectRow } from '@/components/projects/ProjectRow'
 import { useToast } from '@/components/providers/ToastProvider'
 import { useApp } from '@/app/providers'
@@ -60,6 +59,15 @@ const ProjectList: React.FC<ProjectListProps> = ({
 }) => {
   const { success, error, warning } = useToast()
   const { refreshDeliveryNotes } = useApp()
+  
+  // ==========================================================================
+  // Modal State (consolidated in hook)
+  // ==========================================================================
+  const modals = useProjectModals()
+
+  // ==========================================================================
+  // UI State
+  // ==========================================================================
   const [activeTab, setActiveTab] = useState<'leads' | 'orders'>('orders')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'measurement' | 'order' | 'installation'>(
@@ -68,32 +76,14 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth() + 1)
   const [isScanning, setIsScanning] = useState(false)
-  const [editingProject, setEditingProject] = useState<CustomerProject | null>(null)
-  const [isAdding, setIsAdding] = useState(false)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
-  // expandedGroups is managed by useGroupedProjects(filteredProjects)
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [showDeliveryNoteModal, setShowDeliveryNoteModal] = useState(false)
-  const [selectedProjectForDeliveryNote, setSelectedProjectForDeliveryNote] =
-    useState<CustomerProject | null>(null)
-  const [existingDeliveryNote, setExistingDeliveryNote] = useState<CustomerDeliveryNote | null>(
-    null
-  )
-  const [showMeasurementModal, setShowMeasurementModal] = useState(false)
-  const [selectedProjectForMeasurement, setSelectedProjectForMeasurement] =
-    useState<CustomerProject | null>(null)
-  const [showInstallationModal, setShowInstallationModal] = useState(false)
-  const [selectedProjectForInstallation, setSelectedProjectForInstallation] =
-    useState<CustomerProject | null>(null)
-  const [showAbholungModal, setShowAbholungModal] = useState(false)
-  const [selectedProjectForAbholung, setSelectedProjectForAbholung] =
-    useState<CustomerProject | null>(null)
   const [visibleRows, setVisibleRows] = useState(200)
+
+  // ==========================================================================
+  // Data State
+  // ==========================================================================
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [complaintsByProject, setComplaintsByProject] = useState<Map<string, number>>(new Map())
-  
-  // Lead-specific state
-  const [selectedLead, setSelectedLead] = useState<CustomerProject | null>(null)
-  const [showLeadModal, setShowLeadModal] = useState(false)
 
   useEffect(() => {
     loadCustomers()
@@ -133,10 +123,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
     if (!initialOpenProjectId) return
     const p = projects.find(pr => pr.id === initialOpenProjectId)
     if (p) {
-      setEditingProject(p)
-      setIsAdding(false)
+      modals.openProjectModal(p)
     }
-  }, [initialOpenProjectId, projects])
+  }, [initialOpenProjectId, projects, modals])
 
   const loadCustomers = async () => {
     try {
@@ -403,7 +392,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
             isInstallationAssigned: false,
           }
 
-          setEditingProject(newProject as CustomerProject)
+          modals.openProjectModal(newProject as CustomerProject)
           success('Dokument erfolgreich gescannt')
         } catch (fetchError: unknown) {
           console.error('KI-Scan Fehler:', fetchError)
@@ -443,15 +432,13 @@ const ProjectList: React.FC<ProjectListProps> = ({
 
   // Lead-specific handlers
   const handleOpenLead = (lead: CustomerProject) => {
-    setSelectedLead(lead)
-    setShowLeadModal(true)
+    modals.openLeadModal(lead)
   }
 
   const handleConvertLeadToOrder = (lead: CustomerProject) => {
     // Change status from Lead to Planung
     onUpdateProject({ ...lead, status: ProjectStatus.PLANNING })
-    setShowLeadModal(false)
-    setSelectedLead(null)
+    modals.closeLeadModal()
     success('Lead wurde zum Auftrag umgewandelt!')
     // Switch to orders tab to show the new order
     setActiveTab('orders')
@@ -459,8 +446,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
 
   const handleDeleteLead = (lead: CustomerProject) => {
     onDeleteProject(lead.id)
-    setShowLeadModal(false)
-    setSelectedLead(null)
+    modals.closeLeadModal()
     success('Lead wurde gelöscht')
   }
 
@@ -514,7 +500,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
             />
           </label>
           <button
-            onClick={() => setIsAdding(true)}
+            onClick={() => modals.openAddProjectModal()}
             className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-900 shadow-xl shadow-amber-500/30 transition-all hover:from-amber-600 hover:to-amber-700 active:scale-95"
           >
             <Plus className="h-5 w-5" />
@@ -798,17 +784,14 @@ const ProjectList: React.FC<ProjectListProps> = ({
       )}
 
       {/* Lead Modal */}
-      {selectedLead && (
+      {modals.lead.lead && (
         <LeadModal
-          lead={selectedLead}
-          isOpen={showLeadModal}
-          onClose={() => {
-            setShowLeadModal(false)
-            setSelectedLead(null)
-          }}
-          onConvertToOrder={() => handleConvertLeadToOrder(selectedLead)}
-          onDelete={() => handleDeleteLead(selectedLead)}
-          onUpdateNotes={(notes) => handleUpdateLeadNotes(selectedLead, notes)}
+          lead={modals.lead.lead}
+          isOpen={modals.lead.isOpen}
+          onClose={modals.closeLeadModal}
+          onConvertToOrder={() => handleConvertLeadToOrder(modals.lead.lead!)}
+          onDelete={() => handleDeleteLead(modals.lead.lead!)}
+          onUpdateNotes={(notes) => handleUpdateLeadNotes(modals.lead.lead!, notes)}
         />
       )}
 
@@ -894,10 +877,10 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                   key={project.id}
                                   project={p}
                                   isDropdownOpen={openDropdownId === project.id}
-                                  onOpen={() => setEditingProject(project)}
+                                  onOpen={() => modals.openProjectModal(project)}
                                   onEdit={e => {
                                     e.stopPropagation()
-                                    setEditingProject(project)
+                                    modals.openProjectModal(project)
                                   }}
                                   onToggleDropdown={e => {
                                     e.stopPropagation()
@@ -918,33 +901,13 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                       toggleStep(project, 'measured', e)
                                     } else {
                                       // If no date, open modal
-                                      setSelectedProjectForMeasurement(project)
-                                      setShowMeasurementModal(true)
+                                      modals.openMeasurementModal(project)
                                     }
                                   }}
                                   onToggleOrdered={e => toggleStep(project, 'ordered', e)}
                                   onOpenDeliveryNote={async e => {
                                     e.stopPropagation()
-                                    try {
-                                      const notes = await getCustomerDeliveryNotes(project.id)
-                                      setExistingDeliveryNote(notes[0] || null)
-                                      setSelectedProjectForDeliveryNote(project)
-                                      setShowDeliveryNoteModal(true)
-                                    } catch (error: unknown) {
-                                      // Ignore aborted requests (normal during page navigation)
-                                      const errMessage = error instanceof Error ? error.message : ''
-                                      const errName = error instanceof Error ? error.name : ''
-                                      if (
-                                        errMessage.includes('aborted') ||
-                                        errName === 'AbortError'
-                                      ) {
-                                        return
-                                      }
-                                      console.error('Error loading delivery notes:', error)
-                                      setExistingDeliveryNote(null)
-                                      setSelectedProjectForDeliveryNote(project)
-                                      setShowDeliveryNoteModal(true)
-                                    }
+                                    await modals.openDeliveryNoteModal(project)
                                   }}
                                   onOpenInstallationModal={e => {
                                     e.stopPropagation()
@@ -952,16 +915,14 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                     if (currentProject.installationDate) {
                                       toggleStep(project, 'installation', e)
                                     } else {
-                                      setSelectedProjectForInstallation(project)
-                                      setShowInstallationModal(true)
+                                      modals.openInstallationModal(project)
                                     }
                                   }}
                                   onOpenAbholungModal={
                                     p.deliveryType === 'pickup'
                                       ? e => {
                                           e.stopPropagation()
-                                          setSelectedProjectForAbholung(project)
-                                          setShowAbholungModal(true)
+                                          modals.openAbholungModal(project)
                                         }
                                       : undefined
                                   }
@@ -1033,103 +994,81 @@ const ProjectList: React.FC<ProjectListProps> = ({
       )}
 
       {/* Modal */}
-      {(editingProject || isAdding) && (
+      {(modals.project.editingProject || modals.project.isAdding) && (
         <ProjectModal
-          project={editingProject || undefined}
+          project={modals.project.editingProject || undefined}
           existingProjects={projects}
           existingCustomers={customers}
-          onClose={() => {
-            setEditingProject(null)
-            setIsAdding(false)
-          }}
+          onClose={modals.closeProjectModal}
           onSave={p => {
-            if (editingProject?.id) {
+            if (modals.project.editingProject?.id) {
               onUpdateProject(p)
               success('Projekt erfolgreich aktualisiert')
             } else {
               onAddProject(p)
               success('Projekt erfolgreich erstellt')
             }
-            setEditingProject(null)
-            setIsAdding(false)
+            modals.closeProjectModal()
           }}
           onDelete={id => {
             onDeleteProject(id)
             success('Projekt erfolgreich gelöscht')
-            setEditingProject(null)
+            modals.closeProjectModal()
           }}
         />
       )}
 
       {/* Customer Delivery Note Modal */}
-      {showDeliveryNoteModal && selectedProjectForDeliveryNote && (
+      {modals.deliveryNote.isOpen && modals.deliveryNote.project && (
         <CustomerDeliveryNoteModal
-          project={selectedProjectForDeliveryNote}
-          existingDeliveryNote={existingDeliveryNote ?? undefined}
-          onClose={() => {
-            setShowDeliveryNoteModal(false)
-            setSelectedProjectForDeliveryNote(null)
-            setExistingDeliveryNote(null)
-          }}
+          project={modals.deliveryNote.project}
+          existingDeliveryNote={modals.deliveryNote.existingNote ?? undefined}
+          onClose={modals.closeDeliveryNoteModal}
           onSuccess={async () => {
-            onUpdateProject(selectedProjectForDeliveryNote)
+            onUpdateProject(modals.deliveryNote.project!)
             // Aktualisiere die Delivery Notes Liste, damit der neue Lieferschein sofort sichtbar ist
             await refreshDeliveryNotes()
             success('Lieferschein erfolgreich erstellt')
-            setShowDeliveryNoteModal(false)
-            setSelectedProjectForDeliveryNote(null)
-            setExistingDeliveryNote(null)
+            modals.closeDeliveryNoteModal()
           }}
         />
       )}
 
       {/* Measurement Date Modal */}
-      {showMeasurementModal && selectedProjectForMeasurement && (
+      {modals.measurement.isOpen && modals.measurement.project && (
         <MeasurementDateModal
-          project={selectedProjectForMeasurement}
+          project={modals.measurement.project}
           onUpdateProject={onUpdateProject}
-          onClose={() => {
-            setShowMeasurementModal(false)
-            setSelectedProjectForMeasurement(null)
-          }}
+          onClose={modals.closeMeasurementModal}
           onSuccess={() => {
             success('Aufmaß-Datum erfolgreich gespeichert')
-            setShowMeasurementModal(false)
-            setSelectedProjectForMeasurement(null)
+            modals.closeMeasurementModal()
           }}
         />
       )}
 
       {/* Installation Date Modal */}
-      {showInstallationModal && selectedProjectForInstallation && (
+      {modals.installation.isOpen && modals.installation.project && (
         <InstallationDateModal
-          project={selectedProjectForInstallation}
+          project={modals.installation.project}
           onUpdateProject={onUpdateProject}
-          onClose={() => {
-            setShowInstallationModal(false)
-            setSelectedProjectForInstallation(null)
-          }}
+          onClose={modals.closeInstallationModal}
           onSuccess={() => {
             success('Montage-Datum erfolgreich gespeichert')
-            setShowInstallationModal(false)
-            setSelectedProjectForInstallation(null)
+            modals.closeInstallationModal()
           }}
         />
       )}
 
       {/* Abholung Date Modal (für Abholer) */}
-      {showAbholungModal && selectedProjectForAbholung && (
+      {modals.abholung.isOpen && modals.abholung.project && (
         <DeliveryDateModal
-          project={selectedProjectForAbholung}
+          project={modals.abholung.project}
           onUpdateProject={onUpdateProject}
-          onClose={() => {
-            setShowAbholungModal(false)
-            setSelectedProjectForAbholung(null)
-          }}
+          onClose={modals.closeAbholungModal}
           onSuccess={() => {
             success('Abholung-Datum gespeichert')
-            setShowAbholungModal(false)
-            setSelectedProjectForAbholung(null)
+            modals.closeAbholungModal()
           }}
         />
       )}
