@@ -20,6 +20,18 @@ export function useAuth() {
   const processedInviteRef = useRef(false)
 
   useEffect(() => {
+    // Sicherheits-Timeout: Verhindert ewigen Ladebalken (z. B. bei blockierten Requests durch Browser-Erweiterungen)
+    const timeoutMs = 12_000
+    const timeoutId = window.setTimeout(() => {
+      setLoading(prev => {
+        if (prev) {
+          logger.warn('[useAuth] Auth load timeout – loading forced to false', { component: 'useAuth', timeoutMs })
+          return false
+        }
+        return prev
+      })
+    }, timeoutMs)
+
     // Get initial session
     supabase.auth
       .getSession()
@@ -72,6 +84,7 @@ export function useAuth() {
     })
 
     return () => {
+      window.clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
   }, [])
