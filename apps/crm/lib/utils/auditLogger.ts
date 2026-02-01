@@ -20,13 +20,18 @@ export interface AuditLogData {
  */
 export async function logAudit(data: AuditLogData): Promise<void> {
   try {
-    await fetch('/api/audit-logs', {
+    const res = await fetch('/api/audit-logs', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     })
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}))
+      console.warn('Audit-Log POST fehlgeschlagen:', res.status, errBody?.error ?? res.statusText)
+    }
   } catch (error) {
     // Don't throw - audit logging should not break the main operation
     console.error('Failed to log audit event:', error)

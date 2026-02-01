@@ -21,6 +21,7 @@ interface AuditLog {
 export default function AuditLogTab() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [filter, setFilter] = useState({
     action: '',
     entityType: '',
@@ -29,6 +30,7 @@ export default function AuditLogTab() {
 
   const loadLogs = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const params = new URLSearchParams({
         limit: filter.limit.toString(),
@@ -36,14 +38,21 @@ export default function AuditLogTab() {
         ...(filter.entityType && { entityType: filter.entityType }),
       })
 
-      const res = await fetch(`/api/audit-logs?${params}`)
+      const res = await fetch(`/api/audit-logs?${params}`, { credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error('Failed to load audit logs')
+        const message =
+          data?.error ||
+          (res.status === 403 ? 'Keine Berechtigung für Audit-Logs (nur Geschäftsführer/Administration).' : 'Fehler beim Laden der Audit-Logs.')
+        setLoadError(message)
+        setLogs([])
+        return
       }
-      const data = await res.json()
       setLogs(data.logs || [])
     } catch (error) {
       console.error('Error loading audit logs:', error)
+      setLoadError('Audit-Logs konnten nicht geladen werden.')
+      setLogs([])
     } finally {
       setLoading(false)
     }
@@ -124,10 +133,21 @@ export default function AuditLogTab() {
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
             <p className="mt-2">Lade Audit-Logs...</p>
           </div>
+        ) : loadError ? (
+          <div className="p-8 text-center">
+            <FileText className="mx-auto mb-2 h-12 w-12 text-amber-500" />
+            <p className="font-medium text-slate-700">{loadError}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Nur Geschäftsführer und Administration können das Audit-Log einsehen.
+            </p>
+          </div>
         ) : logs.length === 0 ? (
           <div className="p-8 text-center text-slate-500">
             <FileText className="mx-auto mb-2 h-12 w-12 text-slate-400" />
-            <p>Keine Audit-Logs gefunden</p>
+            <p className="font-medium text-slate-700">Noch keine Audit-Einträge</p>
+            <p className="mt-1 text-sm">
+              Aktionen wie Auftrag anlegen, Rechnung buchen, Benutzer einladen oder Lieferschein löschen erscheinen hier.
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
