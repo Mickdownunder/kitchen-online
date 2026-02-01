@@ -25,6 +25,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
     }
 
+    if (user.app_metadata?.role === 'customer') {
+      apiLogger.error(new Error('No permission - customer role'), 403)
+      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+    }
+
+    // GEMINI_API_KEY vor Body prüfen (fail fast)
+    if (!process.env.GEMINI_API_KEY) {
+      apiLogger.error(new Error('GEMINI_API_KEY is not configured'), 500)
+      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+    }
+
     // Check company context
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
@@ -44,24 +55,70 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { message, projects } = (await request.json()) as {
+    const body = (await request.json()) as {
       message: string
       projects?: CustomerProject[]
       chatId?: string
     }
+    const message = typeof body.message === 'string' ? body.message : ''
+    const projectList = Array.isArray(body.projects) ? body.projects : []
 
-    if (!process.env.GEMINI_API_KEY) {
-      apiLogger.error(new Error('GEMINI_API_KEY is not configured'), 500)
-      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+    const MAX_MESSAGE_LENGTH = 10_000
+    const MAX_PROJECTS = 500
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      apiLogger.error(new Error('Message too long'), 400)
+      return NextResponse.json(
+        { error: `Nachricht zu lang (max. ${MAX_MESSAGE_LENGTH} Zeichen). Bitte kürzen.` },
+        { status: 400 }
+      )
+    }
+    if (projectList.length > MAX_PROJECTS) {
+      apiLogger.error(new Error('Too many projects'), 400)
+      return NextResponse.json(
+        { error: `Zu viele Projekte (max. ${MAX_PROJECTS}). Bitte weniger auswählen.` },
+        { status: 400 }
+      )
     }
 
     logger.info('Chat API request received', {
       component: 'api/chat',
-      projectsCount: projects?.length || 0,
+      projectsCount: projectList.length,
       messageLength: message.length,
     })
 
-    const projectSummary = buildProjectSummary(projects)
+    const projectIds = projectList.map(p => p.id).filter(Boolean)
+    let invoicesForSummary: import('@/types').Invoice[] = []
+    if (projectIds.length > 0) {
+      const { data: invoicesRows } = await supabase
+        .from('invoices')
+        .select('id, project_id, type, invoice_number, amount, is_paid, net_amount, tax_amount, tax_rate, invoice_date, due_date, paid_date, description, notes, schedule_type, reminders, created_at, updated_at, user_id')
+        .in('project_id', projectIds)
+      if (invoicesRows?.length) {
+        invoicesForSummary = invoicesRows.map((row: Record<string, unknown>) => ({
+          id: String(row.id),
+          userId: String(row.user_id ?? ''),
+          projectId: String(row.project_id ?? ''),
+          type: String(row.type ?? 'partial'),
+          invoiceNumber: String(row.invoice_number ?? ''),
+          amount: Number(row.amount ?? 0),
+          netAmount: Number(row.net_amount ?? 0),
+          taxAmount: Number(row.tax_amount ?? 0),
+          taxRate: Number(row.tax_rate ?? 20),
+          isPaid: Boolean(row.is_paid),
+          invoiceDate: row.invoice_date ? String(row.invoice_date) : '',
+          dueDate: row.due_date ? String(row.due_date) : undefined,
+          paidDate: row.paid_date ? String(row.paid_date) : undefined,
+          description: row.description ? String(row.description) : undefined,
+          notes: row.notes ? String(row.notes) : undefined,
+          scheduleType: row.schedule_type ? String(row.schedule_type) : undefined,
+          reminders: Array.isArray(row.reminders) ? row.reminders : [],
+          createdAt: row.created_at ? String(row.created_at) : undefined,
+          updatedAt: row.updated_at ? String(row.updated_at) : undefined,
+        })) as import('@/types').Invoice[]
+      }
+    }
+
+    const projectSummary = buildProjectSummary(projectList, invoicesForSummary)
 
     // Use flash model for faster responses
     const useFlashModel =

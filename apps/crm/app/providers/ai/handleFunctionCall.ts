@@ -47,6 +47,9 @@ import { handleSendEmail } from './handlers/emailHandlers'
 
 import { handleExecuteWorkflow, handleFindProjectsByCriteria } from './handlers/workflowHandlers'
 
+import { logFunctionCall } from '@/lib/ai/monitoring'
+import { logAudit } from '@/lib/utils/auditLogger'
+
 // Handler registry - maps function names to their handlers
 const handlerRegistry: Record<string, (ctx: HandlerContext) => Promise<string | void>> = {
   // Project handlers
@@ -133,9 +136,35 @@ export async function handleFunctionCallImpl(opts: {
   const handler = handlerRegistry[name]
 
   if (handler) {
-    return await handler(context)
+    const start = Date.now()
+    try {
+      const result = await handler(context)
+      const duration = Date.now() - start
+      logFunctionCall(name, args as Record<string, unknown>, result, duration)
+      logAudit({
+        action: 'ai.assistant.function_called',
+        entityType: 'ai_action',
+        entityId: (args.projectId as string) || (args.customerId as string) || (args.articleId as string) || undefined,
+        metadata: {
+          functionName: name,
+          resultSummary: typeof result === 'string' ? result.slice(0, 300) : undefined,
+          durationMs: duration,
+        },
+      })
+      return result
+    } catch (error: unknown) {
+      const duration = Date.now() - start
+      const errMsg = error instanceof Error ? error.message : 'Unbekannter Fehler'
+      logFunctionCall(name, args as Record<string, unknown>, `❌ ${errMsg}`, duration)
+      logAudit({
+        action: 'ai.assistant.function_called',
+        entityType: 'ai_action',
+        metadata: { functionName: name, error: errMsg, durationMs: duration },
+      })
+      throw error
+    }
   }
 
-  // Unknown function - return generic success
-  return '✅ Aktion ausgeführt.'
+  // Unbekannte Funktion – ehrliche Fehlermeldung (Best Practice)
+  return `⚠️ Unbekannte Aktion „${name}" – bitte manuell prüfen oder andere Formulierung wählen.`
 }

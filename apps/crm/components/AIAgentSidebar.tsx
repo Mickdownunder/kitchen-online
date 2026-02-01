@@ -305,8 +305,13 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
         }
       }
 
-      // Handle document archiving
-      if (fc.name === 'archiveDocument' && result === 'SUCCESS_ARCHIVED' && file) {
+      // Handle document archiving (Erfolg = Ergebnis beginnt mit ✅, Best Practice)
+      if (
+        fc.name === 'archiveDocument' &&
+        typeof result === 'string' &&
+        result.startsWith('✅') &&
+        file
+      ) {
         const newDoc: ProjectDocument = {
           id: 'ai-' + Date.now(),
           name: ((fc.args.documentType as string) || 'Dokument') + '_' + file.name,
@@ -324,7 +329,8 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
       })
     }
 
-    // Follow-up with function results
+    // Follow-up with function results (chatHistory für Kontext, Best Practice)
+    const chatHistoryForFollowUp = await getChatHistoryForContext(10)
     const followUpRes = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -332,6 +338,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
         message: `INFO: Aktionen ausgeführt. Rückmeldung: ${JSON.stringify(functionResponses)}. Bitte antworte dem Nutzer.`,
         projects: optimizeProjectsForAPI(projects),
         sessionId,
+        chatHistory: chatHistoryForFollowUp.map(m => ({ role: m.role, content: m.content })),
       }),
     })
 

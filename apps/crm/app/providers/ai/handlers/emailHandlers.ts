@@ -20,6 +20,19 @@ export async function handleSendEmail(ctx: HandlerContext): Promise<string> {
       return '❌ E-Mail-Parameter unvollständig. Benötigt: to, subject, body'
     }
 
+    // E-Mail-Whitelist (Best Practice): Nur an im Projekt/Kunde hinterlegte Adressen
+    const projectForWhitelist = emailProjectId ? findProject(emailProjectId) : null
+    const allowedEmails = projectForWhitelist?.email
+      ? [projectForWhitelist.email.trim().toLowerCase()]
+      : []
+    const toAddresses = emailTo.split(',').map((e: string) => e.trim().toLowerCase())
+    if (allowedEmails.length > 0) {
+      const disallowed = toAddresses.filter(addr => !allowedEmails.includes(addr))
+      if (disallowed.length > 0) {
+        return `❌ E-Mail-Adresse(n) "${disallowed.join(', ')}" sind nicht als Empfänger freigegeben. Bitte nur an im Projekt hinterlegte Kunden-E-Mail versenden.`
+      }
+    }
+
     // NEUE PROFESSIONELLE LÖSUNG: Wenn pdfType gesetzt ist, nutze neue API mit frischen DB-Daten
     if (pdfType) {
       if (!emailProjectId) {

@@ -140,14 +140,21 @@ export async function handleSendReminder(ctx: HandlerContext): Promise<string> {
   const project = findProject(args.projectId as string)
   if (!project) return '❌ Projekt nicht gefunden.'
 
-  // Finde die Rechnung in der neuen invoices-Tabelle
-  const invoiceId = args.invoiceId as string
+  // Finde die Rechnung in der neuen invoices-Tabelle (invoiceId "final" = Schlussrechnung)
+  const invoiceIdArg = args.invoiceId as string
   const invoices = await getInvoices(project.id)
-  const invoice = invoices.find(inv => inv.id === invoiceId)
+  const invoice =
+    invoiceIdArg === 'final'
+      ? invoices.find(inv => inv.type === 'final')
+      : invoices.find(inv => inv.id === invoiceIdArg)
 
   if (!invoice) {
-    return `❌ Rechnung ${invoiceId} nicht gefunden.`
+    return invoiceIdArg === 'final'
+      ? '❌ Keine Schlussrechnung für dieses Projekt gefunden.'
+      : `❌ Rechnung ${invoiceIdArg} nicht gefunden.`
   }
+
+  const invoiceId = invoice.id
 
   // Bestimme reminderType automatisch, falls nicht angegeben
   let reminderType = args.reminderType as string | undefined
@@ -160,8 +167,18 @@ export async function handleSendReminder(ctx: HandlerContext): Promise<string> {
     return `❌ Ungültiger reminderType: ${reminderType}. Muss "first", "second" oder "final" sein.`
   }
 
+  // E-Mail-Whitelist (Best Practice): Nur an im Projekt hinterlegte Kunden-E-Mail
+  const recipientEmail = args.recipientEmail as string | undefined
+  const projectEmail = project.email?.trim().toLowerCase()
+  if (recipientEmail) {
+    const allowed = projectEmail ? [projectEmail] : []
+    if (allowed.length > 0 && !allowed.includes(recipientEmail.trim().toLowerCase())) {
+      return `❌ E-Mail-Adresse "${recipientEmail}" ist nicht als Empfänger freigegeben. Bitte nur an im Projekt hinterlegte Kunden-E-Mail versenden.`
+    }
+  }
+  const effectiveEmail = recipientEmail || project.email
+
   try {
-    const recipientEmail = args.recipientEmail as string | undefined
     const response = await fetch('/api/reminders/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -169,7 +186,7 @@ export async function handleSendReminder(ctx: HandlerContext): Promise<string> {
         projectId: project.id,
         invoiceId,
         reminderType,
-        recipientEmail,
+        recipientEmail: effectiveEmail || undefined,
       }),
     })
 
@@ -193,7 +210,7 @@ export async function handleSendReminder(ctx: HandlerContext): Promise<string> {
       setProjects(prev => prev.map(p => (p.id === project.id ? updatedProject : p)))
     }
 
-    return `✅ ${reminderTypeText} für Rechnung ${invoice.invoiceNumber} erfolgreich gesendet an ${recipientEmail || project.email || 'Kunde'}.`
+    return `✅ ${reminderTypeText} für Rechnung ${invoice.invoiceNumber} erfolgreich gesendet an ${effectiveEmail || project.email || 'Kunde'}.`
   } catch (error: unknown) {
     console.error('Error sending reminder:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler'

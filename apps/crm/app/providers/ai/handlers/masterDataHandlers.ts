@@ -128,6 +128,7 @@ export async function handleUpdateArticle(ctx: HandlerContext): Promise<string> 
       defaultSalePrice: args.sellingPrice as number | undefined,
       taxRate: args.taxRate as 10 | 13 | 20 | undefined,
       manufacturer: args.supplier as string | undefined,
+      isActive: args.isActive as boolean | undefined,
     })
     return `✅ Artikel im Stamm aktualisiert.`
   } catch (error) {

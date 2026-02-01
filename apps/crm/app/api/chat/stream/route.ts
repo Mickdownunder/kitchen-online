@@ -75,6 +75,15 @@ export async function POST(request: NextRequest) {
         }
       )
     }
+
+    // GEMINI_API_KEY vor Body prüfen (fail fast)
+    if (!process.env.GEMINI_API_KEY) {
+      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY is not configured' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     // Prüfe Request-Body-Größe und reduziere Projektdaten falls nötig
     let requestBody
     try {
@@ -119,28 +128,76 @@ export async function POST(request: NextRequest) {
 
     const { message, projects, chatHistory } = requestBody
 
-    // Projekte sind bereits im Frontend optimiert, verwende sie direkt
-    const optimizedProjects = projects
-
-    if (!process.env.GEMINI_API_KEY) {
-      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY is not configured' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    // Best practice: Obergrenzen für Nachrichtenlänge und Projektanzahl
+    const MAX_MESSAGE_LENGTH = 10_000
+    const MAX_PROJECTS = 500
+    const msg = typeof message === 'string' ? message : ''
+    if (msg.length > MAX_MESSAGE_LENGTH) {
+      return new Response(
+        JSON.stringify({
+          error: `Nachricht zu lang (max. ${MAX_MESSAGE_LENGTH} Zeichen). Bitte kürzen.`,
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
     }
+    const projectList = Array.isArray(projects) ? projects : []
+    if (projectList.length > MAX_PROJECTS) {
+      return new Response(
+        JSON.stringify({
+          error: `Zu viele Projekte (max. ${MAX_PROJECTS}). Bitte weniger auswählen.`,
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Projekte sind bereits im Frontend optimiert, verwende sie direkt
+    const optimizedProjects = projectList
 
     logger.info('Chat Stream API request received', {
       component: 'api/chat/stream',
-      projectsCount: optimizedProjects?.length || 0,
+      projectsCount: optimizedProjects.length,
     })
 
-    const projectSummary = buildProjectSummary(optimizedProjects)
+    // Rechnungsdaten server-seitig laden für Projekt-Kontext (Best Practice)
+    const projectIds = optimizedProjects.map((p: { id?: string }) => p.id).filter(Boolean) as string[]
+    let invoicesForSummary: import('@/types').Invoice[] = []
+    if (projectIds.length > 0) {
+      const { data: invoicesRows } = await supabase
+        .from('invoices')
+        .select('id, project_id, type, invoice_number, amount, is_paid, net_amount, tax_amount, tax_rate, invoice_date, due_date, paid_date, description, notes, schedule_type, reminders, created_at, updated_at, user_id')
+        .in('project_id', projectIds)
+      if (invoicesRows?.length) {
+        invoicesForSummary = invoicesRows.map((row: Record<string, unknown>) => ({
+          id: String(row.id),
+          userId: String(row.user_id ?? ''),
+          projectId: String(row.project_id ?? ''),
+          type: String(row.type ?? 'partial'),
+          invoiceNumber: String(row.invoice_number ?? ''),
+          amount: Number(row.amount ?? 0),
+          netAmount: Number(row.net_amount ?? 0),
+          taxAmount: Number(row.tax_amount ?? 0),
+          taxRate: Number(row.tax_rate ?? 20),
+          isPaid: Boolean(row.is_paid),
+          invoiceDate: row.invoice_date ? String(row.invoice_date) : '',
+          dueDate: row.due_date ? String(row.due_date) : undefined,
+          paidDate: row.paid_date ? String(row.paid_date) : undefined,
+          description: row.description ? String(row.description) : undefined,
+          notes: row.notes ? String(row.notes) : undefined,
+          scheduleType: row.schedule_type ? String(row.schedule_type) : undefined,
+          reminders: Array.isArray(row.reminders) ? row.reminders : [],
+          createdAt: row.created_at ? String(row.created_at) : undefined,
+          updatedAt: row.updated_at ? String(row.updated_at) : undefined,
+        })) as import('@/types').Invoice[]
+      }
+    }
+
+    const projectSummary = buildProjectSummary(optimizedProjects, invoicesForSummary)
 
     // Use flash model for faster responses
     const useFlashModel =
-      !message.toLowerCase().includes('komplex') &&
-      !message.toLowerCase().includes('detailliert') &&
-      message.length < 1000
+      !msg.toLowerCase().includes('komplex') &&
+      !msg.toLowerCase().includes('detailliert') &&
+      msg.length < 1000
     const model = useFlashModel ? 'gemini-3-flash-preview' : 'gemini-3-pro-preview'
     logger.debug('Using AI model', {
       component: 'api/chat/stream',
@@ -184,7 +241,7 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start' })}\n\n`))
 
           // Stream the response
-          const response = await chat.sendMessage({ message })
+          const response = await chat.sendMessage({ message: msg })
 
           // Gemini API doesn't support true streaming yet, so we simulate it
           // by sending the response in chunks for better UX
