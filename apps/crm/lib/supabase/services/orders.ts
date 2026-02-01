@@ -1,6 +1,7 @@
 import { supabase } from '../client'
 import { Order, OrderStatus, CustomerProject } from '@/types'
 import { getCurrentUser } from './auth'
+import { logger } from '@/lib/utils/logger'
 
 // ============================================
 // ORDER SERVICE - CRUD Operations
@@ -26,7 +27,7 @@ export async function getOrders(projectId?: string): Promise<Order[]> {
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching orders:', error)
+    logger.error('Error fetching orders', { component: 'orders' }, error as Error)
     return []
   }
 
@@ -49,7 +50,7 @@ export async function getOrder(id: string): Promise<Order | null> {
 
   if (error) {
     if ((error as { code?: string }).code === 'PGRST116') return null
-    console.error('Error fetching order:', error)
+    logger.error('Error fetching order', { component: 'orders' }, error as Error)
     return null
   }
 
@@ -72,7 +73,7 @@ export async function getOrderByNumber(orderNumber: string): Promise<Order | nul
 
   if (error) {
     if ((error as { code?: string }).code === 'PGRST116') return null
-    console.error('Error fetching order by number:', error)
+    logger.error('Error fetching order by number', { component: 'orders' }, error as Error)
     return null
   }
 
@@ -95,7 +96,7 @@ export async function getOrderByProject(projectId: string): Promise<Order | null
 
   if (error) {
     if ((error as { code?: string }).code === 'PGRST116') return null
-    console.error('Error fetching order by project:', error)
+    logger.error('Error fetching order by project', { component: 'orders' }, error as Error)
     return null
   }
 
@@ -134,7 +135,7 @@ export async function getOrdersWithProject(status?: OrderStatus): Promise<Order[
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching orders with project:', error)
+    logger.error('Error fetching orders with project', { component: 'orders' }, error as Error)
     return []
   }
 
@@ -190,7 +191,7 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
     .single()
 
   if (error) {
-    console.error('Error creating order:', error)
+    logger.error('Error creating order', { component: 'orders' }, error as Error)
     throw error
   }
 
@@ -228,7 +229,7 @@ export async function updateOrder(
     .single()
 
   if (error) {
-    console.error('Error updating order:', error)
+    logger.error('Error updating order', { component: 'orders' }, error as Error)
     throw error
   }
 
@@ -274,7 +275,7 @@ export async function deleteOrder(id: string): Promise<void> {
   const { error } = await supabase.from('orders').delete().eq('id', id).eq('user_id', user.id)
 
   if (error) {
-    console.error('Error deleting order:', error)
+    logger.error('Error deleting order', { component: 'orders' }, error as Error)
     throw error
   }
 }
@@ -325,7 +326,7 @@ export async function getOrderStats(): Promise<{
   const { data, error } = await supabase.from('orders').select('status').eq('user_id', user.id)
 
   if (error) {
-    console.error('Error fetching order stats:', error)
+    logger.error('Error fetching order stats', { component: 'orders' }, error as Error)
     return { total: 0, draft: 0, sent: 0, confirmed: 0, cancelled: 0 }
   }
 

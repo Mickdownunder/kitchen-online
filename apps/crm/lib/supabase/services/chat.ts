@@ -187,7 +187,7 @@ export async function deleteChatSession(sessionId: string): Promise<void> {
     .single()
 
   if (sessionError) {
-    console.error('[deleteChatSession] Session nicht gefunden:', sessionError)
+    logger.error('[deleteChatSession] Session nicht gefunden', { component: 'chat' }, sessionError as Error)
     throw new Error(`Session nicht gefunden oder Zugriff verweigert: ${sessionError.message}`)
   }
 
@@ -207,10 +207,7 @@ export async function deleteChatSession(sessionId: string): Promise<void> {
     .eq('session_id', sessionId)
 
   if (messagesError) {
-    console.warn(
-      '[deleteChatSession] Fehler beim Löschen der Messages (möglicherweise CASCADE):',
-      messagesError
-    )
+    logger.warn('[deleteChatSession] Fehler beim Löschen der Messages (möglicherweise CASCADE)', { component: 'chat' }, messagesError as Error)
     // Nicht abbrechen, versuche Session trotzdem zu löschen
   }
 
@@ -222,7 +219,7 @@ export async function deleteChatSession(sessionId: string): Promise<void> {
     .eq('user_id', user.id)
 
   if (error) {
-    console.error('[deleteChatSession] Fehler beim Löschen der Session:', error)
+    logger.error('[deleteChatSession] Fehler beim Löschen der Session', { component: 'chat' }, error as Error)
     throw new Error(`Fehler beim Löschen der Session: ${error.message}`)
   }
 

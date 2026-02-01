@@ -38,7 +38,7 @@ export async function getProjects(): Promise<CustomerProject[]> {
   try {
     const user = await getCurrentUser()
     if (!user) {
-      console.warn('getProjects: No user authenticated, returning empty array')
+      logger.warn('getProjects: No user authenticated, returning empty array', { component: 'projects' })
       return []
     }
 
@@ -55,7 +55,7 @@ export async function getProjects(): Promise<CustomerProject[]> {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('getProjects error:', error)
+      logger.error('getProjects error', { component: 'projects' }, error as Error)
       throw error
     }
 
@@ -66,7 +66,7 @@ export async function getProjects(): Promise<CustomerProject[]> {
     if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
       return []
     }
-    console.error('getProjects failed:', error)
+    logger.error('getProjects failed', { component: 'projects' }, error as Error)
     // Return empty array instead of throwing to prevent 500 errors
     return []
   }
@@ -171,14 +171,14 @@ export async function createProject(
       .single()
 
     if (error) {
-      console.error('createProject error:', JSON.stringify(error, null, 2))
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      console.error('Error details:', {
+      logger.error('createProject error', {
+        component: 'projects',
         message: errObj?.message,
         code: errObj?.code,
         details: errObj?.details,
         hint: errObj?.hint,
-      })
+      }, error as Error)
       throw error
     }
 
@@ -297,7 +297,7 @@ export async function createProject(
       const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert)
 
       if (itemsError) {
-        console.error('Error inserting items:', JSON.stringify(itemsError, null, 2))
+        logger.error('Error inserting items', { component: 'projects' }, itemsError as Error)
         // KRITISCH: Rollback - Lösche das erstellte Projekt wenn Items fehlschlagen
         // Dies verhindert "Ghost Projects" ohne Items in der Datenbank
         const { error: rollbackError } = await supabase
@@ -306,7 +306,7 @@ export async function createProject(
           .eq('id', projectId)
 
         if (rollbackError) {
-          console.error('Rollback failed:', JSON.stringify(rollbackError, null, 2))
+          logger.error('Rollback failed', { component: 'projects' }, rollbackError as Error)
         } else {
           logger.debug('Rollback successful: Project deleted after item insertion failure', {
             component: 'projects',
@@ -330,14 +330,14 @@ export async function createProject(
 
     return createdProject
   } catch (error: unknown) {
-    console.error('createProject failed:', JSON.stringify(error, null, 2))
     const err = error as { message?: string; code?: string; details?: string; hint?: string }
-    console.error('Error details:', {
+    logger.error('createProject failed', {
+      component: 'projects',
       message: err?.message,
       code: err?.code,
       details: err?.details,
       hint: err?.hint,
-    })
+    }, error as Error)
     throw error
   }
 }
@@ -428,7 +428,7 @@ export async function updateProject(
 
     // Prüfe ob überhaupt Daten zum Update vorhanden sind
     if (Object.keys(updateData).length === 0) {
-      console.warn('updateProject: No fields to update, returning existing project')
+      logger.warn('updateProject: No fields to update, returning existing project', { component: 'projects' })
       return (await getProject(id)) as CustomerProject
     }
 
@@ -440,15 +440,15 @@ export async function updateProject(
       .single()
 
     if (error) {
-      console.error('updateProject error:', JSON.stringify(error, null, 2))
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      console.error('updateProject error details:', {
+      logger.error('updateProject error', {
+        component: 'projects',
         message: errObj?.message,
         code: errObj?.code,
         details: errObj?.details,
         hint: errObj?.hint,
         updateData: updateData,
-      })
+      }, error as Error)
       throw error
     }
 
@@ -475,7 +475,7 @@ export async function updateProject(
         .eq('project_id', id)
 
       if (fetchError) {
-        console.error('Error fetching existing items:', fetchError)
+        logger.error('Error fetching existing items', { component: 'projects' }, fetchError as Error)
         throw fetchError
       }
 
@@ -599,7 +599,7 @@ export async function updateProject(
               .eq('id', item.id)
 
             if (updateError) {
-              console.error(`Error updating item ${item.id}:`, updateError)
+              logger.error(`Error updating item ${item.id}`, { component: 'projects' }, updateError as Error)
               throw new Error(
                 `Fehler beim Aktualisieren des Artikels "${item.description || item.id}": ${updateError instanceof Error ? updateError.message : 'Unbekannter Fehler'}`
               )
@@ -616,7 +616,7 @@ export async function updateProject(
               .single()
 
             if (insertError) {
-              console.error('Error inserting item:', insertError)
+              logger.error('Error inserting item', { component: 'projects' }, insertError as Error)
               throw new Error(
                 `Fehler beim Einfügen des Artikels "${item.description || 'Neu'}": ${insertError instanceof Error ? insertError.message : 'Unbekannter Fehler'}`
               )
@@ -629,14 +629,14 @@ export async function updateProject(
         } catch (itemError: unknown) {
           // KRITISCH: Rollback bei Fehler - lösche neu eingefügte Items
           if (successfulInserts.length > 0) {
-            console.warn(`Rolling back ${successfulInserts.length} inserted items due to error`)
+            logger.warn(`Rolling back ${successfulInserts.length} inserted items due to error`, { component: 'projects' })
             const { error: rollbackError } = await supabase
               .from('invoice_items')
               .delete()
               .in('id', successfulInserts)
 
             if (rollbackError) {
-              console.error('Rollback of inserted items failed:', rollbackError)
+              logger.error('Rollback of inserted items failed', { component: 'projects' }, rollbackError as Error)
             }
           }
           throw itemError
@@ -652,11 +652,8 @@ export async function updateProject(
           .in('id', itemsToDelete)
 
         if (deleteError) {
-          console.error('Error deleting removed items:', deleteError)
-          // Warnung statt Fehler
-          console.warn(
-            'Some items could not be deleted, but foreign keys should be handled by DB constraints'
-          )
+          logger.error('Error deleting removed items', { component: 'projects' }, deleteError as Error)
+          logger.warn('Some items could not be deleted, but foreign keys should be handled by DB constraints', { component: 'projects' })
         }
       }
     }
@@ -678,7 +675,7 @@ export async function updateProject(
 
     return updatedProject
   } catch (error) {
-    console.error('updateProject failed:', error)
+    logger.error('updateProject failed', { component: 'projects' }, error as Error)
     throw error
   }
 }
@@ -718,7 +715,7 @@ function mapProjectFromDB(dbProject: ProjectRow): CustomerProject {
     try {
       finalInvoice = JSON.parse(finalInvoice)
     } catch (e) {
-      console.warn('Error parsing finalInvoice from string:', e)
+      logger.warn('Error parsing finalInvoice from string', { component: 'projects' }, e as Error)
       finalInvoice = undefined
     }
   }

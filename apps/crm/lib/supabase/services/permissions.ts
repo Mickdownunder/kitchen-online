@@ -1,6 +1,7 @@
 import { supabase } from '../client'
 import { UserRole } from '@/types'
 import { getCurrentUser } from './auth'
+import { logger } from '@/lib/utils/logger'
 
 export type PermissionCode =
   | 'menu_dashboard'
@@ -201,7 +202,7 @@ export async function getCurrentCompanyId(): Promise<string | null> {
     // Fallback: Hole company_id direkt aus company_members
     const user = await getCurrentUser()
     if (!user) {
-      console.warn('getCurrentCompanyId: No user found')
+      logger.warn('getCurrentCompanyId: No user found', { component: 'permissions' })
       return null
     }
 
@@ -230,10 +231,11 @@ export async function getCurrentCompanyId(): Promise<string | null> {
       // PGRST116 = no rows returned (not an error, just no data)
       const errorCode = (memberError as Error & { code?: string }).code
       if (errorCode === 'PGRST116') {
-        console.warn('getCurrentCompanyId: User not found in company_members')
+        logger.warn('getCurrentCompanyId: User not found in company_members', { component: 'permissions' })
         return null
       }
-      console.error('getCurrentCompanyId: Error fetching from company_members', {
+      logger.error('getCurrentCompanyId: Error fetching from company_members', {
+        component: 'permissions',
         error: memberError.message,
         code: errorCode,
         userId: user.id,
@@ -242,13 +244,14 @@ export async function getCurrentCompanyId(): Promise<string | null> {
     }
 
     if (!memberData?.company_id) {
-      console.warn('getCurrentCompanyId: No company_id found for user', { userId: user.id })
+      logger.warn('getCurrentCompanyId: No company_id found for user', { component: 'permissions', userId: user.id })
       return null
     }
 
     return memberData.company_id
   } catch (error: unknown) {
-    console.error('getCurrentCompanyId: Unexpected error', {
+    logger.error('getCurrentCompanyId: Unexpected error', {
+      component: 'permissions',
       message: error instanceof Error ? error.message : 'Unknown',
     })
     return null
@@ -266,7 +269,7 @@ export async function getEffectivePermissions(
     // If RPC fails, fall back to role-based permissions (which is deny-all if no role)
     if (error) {
       if (error.code !== 'P0001') {
-        console.warn('[getEffectivePermissions] RPC error (using role fallback):', error.message)
+        logger.warn('[getEffectivePermissions] RPC error (using role fallback)', { component: 'permissions', message: error.message })
       }
       return defaultPermissionsForRole(profileRole)
     }
@@ -287,10 +290,10 @@ export async function getEffectivePermissions(
     return result
   } catch (error: unknown) {
     // FAIL-CLOSED: On unexpected errors, use role fallback (deny-all if no role)
-    console.warn(
-      '[getEffectivePermissions] Unexpected error (using role fallback):',
-      error instanceof Error ? error.message : 'Unknown'
-    )
+    logger.warn('[getEffectivePermissions] Unexpected error (using role fallback)', {
+      component: 'permissions',
+      message: error instanceof Error ? error.message : 'Unknown',
+    })
     return defaultPermissionsForRole(profileRole)
   }
 }

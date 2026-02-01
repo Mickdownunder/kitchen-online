@@ -2,6 +2,7 @@ import { supabase } from '../client'
 import { BankAccount, CompanySettings, Employee } from '@/types'
 import { getCurrentUser } from './auth'
 import { audit, logAudit } from '@/lib/utils/auditLogger'
+import { logger } from '@/lib/utils/logger'
 
 export async function getCompanySettings(): Promise<CompanySettings | null> {
   try {
@@ -21,7 +22,7 @@ export async function getCompanySettings(): Promise<CompanySettings | null> {
       if (error?.message?.includes('aborted') || errObj.name === 'AbortError') {
         return null
       }
-      console.error('Error loading company settings:', error)
+      logger.error('Error loading company settings', { component: 'company' }, error as Error)
       return null
     }
 
@@ -33,7 +34,7 @@ export async function getCompanySettings(): Promise<CompanySettings | null> {
     if (errMessage.includes('aborted') || errName === 'AbortError') {
       return null
     }
-    console.error('Error loading company settings:', error)
+    logger.error('Error loading company settings', { component: 'company' }, error as Error)
     return null
   }
 }

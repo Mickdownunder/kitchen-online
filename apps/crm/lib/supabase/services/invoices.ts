@@ -3,6 +3,7 @@ import { Invoice, InvoiceType, InvoiceScheduleType, CustomerProject } from '@/ty
 import { getCurrentUser } from './auth'
 import { getNextInvoiceNumber } from './company'
 import { audit } from '@/lib/utils/auditLogger'
+import { logger } from '@/lib/utils/logger'
 
 // ============================================
 // INVOICE SERVICE - CRUD Operations
@@ -28,7 +29,7 @@ export async function getInvoices(projectId?: string): Promise<Invoice[]> {
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching invoices:', error)
+    logger.error('Error fetching invoices', { component: 'invoices' }, error as Error)
     return []
   }
 
@@ -51,7 +52,7 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
 
   if (error) {
     if ((error as { code?: string }).code === 'PGRST116') return null
-    console.error('Error fetching invoice:', error)
+    logger.error('Error fetching invoice', { component: 'invoices' }, error as Error)
     return null
   }
 
@@ -74,7 +75,7 @@ export async function getInvoiceByNumber(invoiceNumber: string): Promise<Invoice
 
   if (error) {
     if ((error as { code?: string }).code === 'PGRST116') return null
-    console.error('Error fetching invoice by number:', error)
+    logger.error('Error fetching invoice by number', { component: 'invoices' }, error as Error)
     return null
   }
 
@@ -96,7 +97,7 @@ export async function getOpenInvoices(): Promise<Invoice[]> {
     .order('due_date', { ascending: true })
 
   if (error) {
-    console.error('Error fetching open invoices:', error)
+    logger.error('Error fetching open invoices', { component: 'invoices' }, error as Error)
     return []
   }
 
@@ -121,7 +122,7 @@ export async function getOverdueInvoices(): Promise<Invoice[]> {
     .order('due_date', { ascending: true })
 
   if (error) {
-    console.error('Error fetching overdue invoices:', error)
+    logger.error('Error fetching overdue invoices', { component: 'invoices' }, error as Error)
     return []
   }
 
@@ -160,7 +161,7 @@ export async function getInvoicesWithProject(projectId?: string): Promise<Invoic
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching invoices with project:', error)
+    logger.error('Error fetching invoices with project', { component: 'invoices' }, error as Error)
     return []
   }
 
@@ -246,7 +247,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
     .single()
 
   if (error) {
-    console.error('Error creating invoice:', error)
+    logger.error('Error creating invoice', { component: 'invoices' }, error as Error)
     throw error
   }
 
@@ -301,7 +302,7 @@ export async function updateInvoice(
     .single()
 
   if (error) {
-    console.error('Error updating invoice:', error)
+    logger.error('Error updating invoice', { component: 'invoices' }, error as Error)
     throw error
   }
 
@@ -349,7 +350,7 @@ export async function deleteInvoice(id: string): Promise<void> {
   const { error } = await supabase.from('invoices').delete().eq('id', id).eq('user_id', user.id)
 
   if (error) {
-    console.error('Error deleting invoice:', error)
+    logger.error('Error deleting invoice', { component: 'invoices' }, error as Error)
     throw error
   }
 }
@@ -396,7 +397,7 @@ export async function getInvoiceStats(year: number): Promise<{
     .lte('invoice_date', endDate)
 
   if (error) {
-    console.error('Error fetching invoice stats:', error)
+    logger.error('Error fetching invoice stats', { component: 'invoices' }, error as Error)
     return {
       totalInvoiced: 0,
       totalPaid: 0,

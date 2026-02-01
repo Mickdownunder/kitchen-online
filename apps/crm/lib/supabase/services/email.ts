@@ -41,7 +41,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
         companySettings = await getCompanySettings()
       } catch (error) {
         // Ignoriere Fehler beim Laden der Company Settings (z.B. wenn client-seitig aufgerufen)
-        console.warn('Could not load company settings:', error)
+        logger.warn('Could not load company settings', { component: 'email' }, error as Error)
       }
     }
     const fromEmail = options.from || companySettings?.email || 'noreply@example.com'

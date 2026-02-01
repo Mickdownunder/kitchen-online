@@ -7,6 +7,7 @@ import {
   GoodsReceiptItem,
 } from '@/types'
 import { getCurrentUser } from './auth'
+import { logger } from '@/lib/utils/logger'
 
 // Delivery Notes
 export async function getDeliveryNotes(): Promise<DeliveryNote[]> {
@@ -25,7 +26,7 @@ export async function getDeliveryNotes(): Promise<DeliveryNote[]> {
     .order('received_date', { ascending: false })
 
   if (error) {
-    console.error('Error fetching delivery notes:', error)
+    logger.error('Error fetching delivery notes', { component: 'delivery' }, error as Error)
     return []
   }
 
@@ -188,7 +189,7 @@ export async function getGoodsReceipts(projectId?: string): Promise<GoodsReceipt
   const { data, error } = await query.order('receipt_date', { ascending: false })
 
   if (error) {
-    console.error('Error fetching goods receipts:', error)
+    logger.error('Error fetching goods receipts', { component: 'delivery' }, error as Error)
     return []
   }
 
@@ -417,7 +418,7 @@ export async function getCustomerDeliveryNotes(
   try {
     const user = await getCurrentUser()
     if (!user) {
-      console.warn('getCustomerDeliveryNotes: No user authenticated')
+      logger.warn('getCustomerDeliveryNotes: No user authenticated', { component: 'delivery' })
       return []
     }
 
@@ -435,7 +436,8 @@ export async function getCustomerDeliveryNotes(
 
     if (error) {
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      console.error('getCustomerDeliveryNotes error:', {
+      logger.error('getCustomerDeliveryNotes error', {
+        component: 'delivery',
         message: errObj.message,
         code: errObj.code,
         details: errObj.details,
@@ -443,7 +445,7 @@ export async function getCustomerDeliveryNotes(
       })
       // Wenn Tabelle nicht existiert, gib leeres Array zurück
       if (errObj.code === '42P01' || errObj.message?.includes('does not exist')) {
-        console.warn('customer_delivery_notes table does not exist yet. Please run the SQL script.')
+        logger.warn('customer_delivery_notes table does not exist yet. Please run the SQL script.', { component: 'delivery' })
         return []
       }
       return []
@@ -456,7 +458,8 @@ export async function getCustomerDeliveryNotes(
     if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
       return []
     }
-    console.error('getCustomerDeliveryNotes failed:', {
+    logger.error('getCustomerDeliveryNotes failed', {
+      component: 'delivery',
       message: err?.message,
       stack: err?.stack,
     })
@@ -477,13 +480,13 @@ export async function getCustomerDeliveryNote(id: string): Promise<CustomerDeliv
       .single()
 
     if (error) {
-      console.error('getCustomerDeliveryNote error:', error)
+      logger.error('getCustomerDeliveryNote error', { component: 'delivery' }, error as Error)
       return null
     }
 
     return mapCustomerDeliveryNoteFromDB(data)
   } catch (error) {
-    console.error('getCustomerDeliveryNote failed:', error)
+    logger.error('getCustomerDeliveryNote failed', { component: 'delivery' }, error as Error)
     return null
   }
 }
@@ -515,7 +518,8 @@ export async function createCustomerDeliveryNote(
 
     if (error) {
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      console.error('createCustomerDeliveryNote error:', {
+      logger.error('createCustomerDeliveryNote error', {
+        component: 'delivery',
         message: errObj.message,
         code: errObj.code,
         details: errObj.details,
@@ -532,7 +536,8 @@ export async function createCustomerDeliveryNote(
     return mapCustomerDeliveryNoteFromDB(data)
   } catch (error: unknown) {
     const err = error as { message?: string; stack?: string }
-    console.error('createCustomerDeliveryNote failed:', {
+    logger.error('createCustomerDeliveryNote failed', {
+      component: 'delivery',
       message: err?.message,
       stack: err?.stack,
     })
@@ -608,7 +613,7 @@ export async function deleteDeliveryNote(id: string): Promise<void> {
     .eq('delivery_note_id', id)
 
   if (itemsError) {
-    console.warn('Fehler beim Löschen der Items (möglicherweise CASCADE):', itemsError)
+    logger.warn('Fehler beim Löschen der Items (möglicherweise CASCADE)', { component: 'delivery' }, itemsError as Error)
     // Nicht abbrechen, versuche Lieferschein trotzdem zu löschen
   }
 
@@ -620,7 +625,7 @@ export async function deleteDeliveryNote(id: string): Promise<void> {
     .eq('user_id', user.id)
 
   if (error) {
-    console.error('Fehler beim Löschen des Lieferscheins:', error)
+    logger.error('Fehler beim Löschen des Lieferscheins', { component: 'delivery' }, error as Error)
     throw error
   }
 
@@ -645,7 +650,7 @@ export async function deleteCustomerDeliveryNote(id: string): Promise<void> {
     .eq('user_id', user.id)
 
   if (error) {
-    console.error('Fehler beim Löschen des Kunden-Lieferscheins:', error)
+    logger.error('Fehler beim Löschen des Kunden-Lieferscheins', { component: 'delivery' }, error as Error)
     throw error
   }
 

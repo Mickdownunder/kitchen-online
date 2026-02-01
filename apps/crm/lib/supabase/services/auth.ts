@@ -37,7 +37,7 @@ export async function signUp(
 
     if (profileError && (profileError as Error & { code?: string }).code !== 'PGRST116') {
       // PGRST116 means no rows found, which is OK if trigger hasn't run yet
-      console.warn('Profile may not be created yet:', profileError)
+      logger.warn('Profile may not be created yet', { component: 'auth' }, profileError as Error)
     }
 
     // Verknüpfung mit Employee über E-Mail-Matching
@@ -45,7 +45,7 @@ export async function signUp(
       await linkEmployeeToUser(email, data.user.id)
     } catch (linkError) {
       // Nicht kritisch - Verknüpfung kann später manuell erfolgen
-      console.warn('Could not link employee to user:', linkError)
+      logger.warn('Could not link employee to user', { component: 'auth' }, linkError as Error)
     }
   }
 
@@ -60,7 +60,7 @@ async function linkEmployeeToUser(email: string, userId: string): Promise<void> 
   // 1. Company Settings laden um companyId zu bekommen
   const companySettings = await getCompanySettings()
   if (!companySettings?.id) {
-    console.warn('No company settings found, cannot link employee')
+    logger.warn('No company settings found, cannot link employee', { component: 'auth' })
     return
   }
 
@@ -80,7 +80,7 @@ async function linkEmployeeToUser(email: string, userId: string): Promise<void> 
     .eq('id', matchingEmployee.id)
 
   if (updateError) {
-    console.error('Error linking employee to user:', updateError)
+    logger.error('Error linking employee to user', { component: 'auth' }, updateError as Error)
     throw updateError
   }
 
@@ -101,7 +101,7 @@ async function linkEmployeeToUser(email: string, userId: string): Promise<void> 
     })
 
     if (memberError) {
-      console.error('Error creating company_member:', memberError)
+      logger.error('Error creating company_member', { component: 'auth' }, memberError as Error)
       // Nicht werfen - Verknüpfung ist bereits erfolgt
     } else {
       logger.info('Successfully linked employee and created company_member', {
@@ -123,12 +123,12 @@ export async function signIn(email: string, password: string) {
   })
 
   if (error) {
-    console.error('❌ Sign in error:', error)
+    logger.error('Sign in error', { component: 'auth' }, error as Error)
     throw error
   }
 
   if (!data.session) {
-    console.error('❌ No session returned from signIn')
+    logger.error('No session returned from signIn', { component: 'auth' })
     throw new Error('Keine Session erstellt')
   }
 
@@ -178,9 +178,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 
     // Check for infinite recursion error first
     if (errorCode === '42P17' || errorMessage.includes('infinite recursion')) {
-      console.error(
-        'RLS Policy Recursion Error - Run supabase/fix_infinite_recursion.sql in Supabase SQL Editor'
-      )
+      logger.error('RLS Policy Recursion Error - Run supabase/fix_infinite_recursion.sql in Supabase SQL Editor', { component: 'auth' })
       return null
     }
 
@@ -212,7 +210,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
         .single()
 
       if (createError) {
-        console.error('Error creating profile:', JSON.stringify(createError, null, 2))
+        logger.error('Error creating profile', { component: 'auth' }, createError as Error)
         return null
       }
 
@@ -221,7 +219,8 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     }
 
     // For other errors, log details
-    console.error('Error loading profile:', {
+    logger.error('Error loading profile', {
+      component: 'auth',
       code: errorCode,
       message: errorMessage,
       details: errObj?.details,
