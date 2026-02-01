@@ -161,6 +161,29 @@ export default function PortalSidebar({ sidebarOpen, setSidebarOpen }: PortalSid
       <div className="border-t border-slate-200 p-4">
         <LogoutButton />
       </div>
+
+      {/* Legal Links */}
+      <div className="border-t border-slate-200 p-4 text-center text-xs text-slate-400">
+        <div className="flex items-center justify-center gap-3">
+          <a 
+            href="https://kuechenonline.com/impressum" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-slate-600 transition-colors"
+          >
+            Impressum
+          </a>
+          <span>·</span>
+          <a 
+            href="https://kuechenonline.com/datenschutz" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-slate-600 transition-colors"
+          >
+            Datenschutz
+          </a>
+        </div>
+      </div>
     </div>
   )
 

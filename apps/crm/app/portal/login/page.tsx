@@ -276,9 +276,28 @@ export default function PortalLoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="mt-8 text-center text-xs text-slate-400">
-          &copy; {new Date().getFullYear()} KüchenOnline. Alle Rechte vorbehalten.
-        </p>
+        <div className="mt-8 text-center text-xs text-slate-400">
+          <p>&copy; {new Date().getFullYear()} KüchenOnline GmbH</p>
+          <div className="mt-2 flex items-center justify-center gap-4">
+            <a 
+              href="https://kuechenonline.com/impressum" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-slate-600 transition-colors"
+            >
+              Impressum
+            </a>
+            <span>·</span>
+            <a 
+              href="https://kuechenonline.com/datenschutz" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-slate-600 transition-colors"
+            >
+              Datenschutz
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   )
