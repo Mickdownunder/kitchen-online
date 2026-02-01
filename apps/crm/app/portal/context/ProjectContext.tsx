@@ -41,13 +41,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      const { data: { user } } = await portalSupabase.auth.getUser()
-      
-      if (!user) {
-        setError('Nicht eingeloggt')
-        setProjects([])
-        return
-      }
+      // Skip user check - RLS handles access control
+      // This saves ~200ms per request
 
       // Projekte über RLS laden (filtert automatisch nach customer_id)
       const { data: projectsData, error: projectsError } = await portalSupabase

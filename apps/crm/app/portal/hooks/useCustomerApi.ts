@@ -43,18 +43,18 @@ export function useCustomerApi() {
   const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
-    const getToken = async () => {
-      const { data: { session } } = await portalSupabase.auth.getSession()
+    // Listen for auth changes FIRST (this is faster than getSession)
+    const { data: { subscription } } = portalSupabase.auth.onAuthStateChange((event, session) => {
+      setAccessToken(session?.access_token ?? null)
+      setIsReady(true)
+    })
+
+    // Also get session immediately (in case onAuthStateChange doesn't fire)
+    portalSupabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.access_token) {
         setAccessToken(session.access_token)
       }
       setIsReady(true)
-    }
-    getToken()
-
-    // Listen for auth changes
-    const { data: { subscription } } = portalSupabase.auth.onAuthStateChange((event, session) => {
-      setAccessToken(session?.access_token ?? null)
     })
 
     return () => subscription.unsubscribe()
