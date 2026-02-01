@@ -67,13 +67,21 @@ export async function middleware(request: NextRequest) {
   }
 
   // ============================================
-  // PORTAL SUBDOMAIN REWRITE
+  // PORTAL SUBDOMAIN HANDLING
   // ============================================
-  // When on portal subdomain and path doesn't start with /portal, rewrite to /portal/...
+  // When on portal subdomain, redirect/rewrite to /portal/...
   if (isPortalSubdomain && !pathname.startsWith('/portal') && !pathname.startsWith('/api') && !pathname.startsWith('/_next')) {
-    // Rewrite /login to /portal/login, / to /portal, etc.
+    const targetPath = `/portal${pathname === '/' ? '' : pathname}`
+    
+    // For root path, use redirect (more reliable on mobile Safari)
+    if (pathname === '/') {
+      console.log(`[Middleware] Portal subdomain redirect: ${pathname} -> ${targetPath}`)
+      return NextResponse.redirect(new URL(targetPath, request.url))
+    }
+    
+    // For other paths, use rewrite
     const rewriteUrl = request.nextUrl.clone()
-    rewriteUrl.pathname = `/portal${pathname === '/' ? '' : pathname}`
+    rewriteUrl.pathname = targetPath
     console.log(`[Middleware] Portal subdomain rewrite: ${pathname} -> ${rewriteUrl.pathname}`)
     return NextResponse.rewrite(rewriteUrl)
   }
