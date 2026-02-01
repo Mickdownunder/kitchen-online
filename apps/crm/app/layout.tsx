@@ -42,43 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if (isPortalRoute) {
     return (
       <html lang="de" className={inter.className}>
-        <head>
-          {/* Inline CSS for instant loading spinner (no JS required) */}
-          <style dangerouslySetInnerHTML={{ __html: `
-            .portal-initial-loader {
-              position: fixed;
-              inset: 0;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: linear-gradient(to bottom right, #f8fafc, #ffffff, rgba(16, 185, 129, 0.1));
-              z-index: 9999;
-              transition: opacity 0.3s;
-            }
-            .portal-initial-loader.loaded { opacity: 0; pointer-events: none; }
-            .portal-spinner {
-              width: 48px;
-              height: 48px;
-              border: 4px solid #10b981;
-              border-top-color: transparent;
-              border-radius: 50%;
-              animation: spin 1s linear infinite;
-            }
-            @keyframes spin { to { transform: rotate(360deg); } }
-          `}} />
-        </head>
         <body className="bg-slate-50 text-slate-900">
-          {/* Instant loading spinner (pure CSS, no JS) */}
-          <div id="portal-loader" className="portal-initial-loader">
-            <div className="portal-spinner" />
-          </div>
-          {/* Hide loader when page is ready */}
-          <script dangerouslySetInnerHTML={{ __html: `
-            window.addEventListener('load', function() {
-              var loader = document.getElementById('portal-loader');
-              if (loader) loader.classList.add('loaded');
-            });
-          `}} />
           {children}
         </body>
       </html>
