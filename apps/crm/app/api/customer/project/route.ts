@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    // 3. Alle Projekte des Kunden laden
+    // 3. Alle Projekte des Kunden laden (inkl. Termin-Daten)
     const { data: allProjects, error: projectsError } = await supabase
       .from('projects')
       .select(`
@@ -85,7 +85,13 @@ export async function GET(request: NextRequest) {
         order_number,
         salesperson_id,
         salesperson_name,
-        created_at
+        created_at,
+        measurement_date,
+        measurement_time,
+        delivery_date,
+        delivery_time,
+        installation_date,
+        installation_time
       `)
       .eq('customer_id', customer_id)
       .is('deleted_at', null)
@@ -134,8 +140,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 6. Nächster Termin
+    // 6. Nächster Termin (aus planning_appointments UND Projekt-Daten)
     const today = new Date().toISOString().slice(0, 10)
+    
+    // 6a. Planning Appointments laden
     const { data: appointments } = await supabase
       .from('planning_appointments')
       .select('id, type, date, time')
@@ -143,14 +151,88 @@ export async function GET(request: NextRequest) {
       .gte('date', today)
       .order('date', { ascending: true })
       .order('time', { ascending: true })
-      .limit(1)
 
-    const nextAppointment = appointments?.[0]
+    // 6b. Alle möglichen Termine sammeln (Appointments + Projekt-Daten)
+    interface UpcomingDate {
+      type: string
+      date: string
+      time: string | null
+    }
+    
+    const upcomingDates: UpcomingDate[] = []
+    
+    // Planning Appointments hinzufügen
+    appointments?.forEach(apt => {
+      if (apt.date >= today) {
+        upcomingDates.push({
+          type: apt.type,
+          date: apt.date,
+          time: apt.time,
+        })
+      }
+    })
+    
+    // Projekt-Daten hinzufügen (falls vorhanden und in der Zukunft)
+    // Verwende Type Assertion da wir die Felder jetzt laden
+    const projectWithDates = project as typeof project & {
+      measurement_date?: string | null
+      measurement_time?: string | null
+      delivery_date?: string | null
+      delivery_time?: string | null
+      installation_date?: string | null
+      installation_time?: string | null
+    }
+    
+    if (projectWithDates.measurement_date && projectWithDates.measurement_date >= today) {
+      // Nur hinzufügen wenn nicht bereits als planning_appointment vorhanden
+      const hasAppointment = upcomingDates.some(d => d.type === 'Aufmaß' || d.type === 'Measurement')
+      if (!hasAppointment) {
+        upcomingDates.push({
+          type: 'Aufmaß',
+          date: projectWithDates.measurement_date,
+          time: projectWithDates.measurement_time || null,
+        })
+      }
+    }
+    
+    if (projectWithDates.delivery_date && projectWithDates.delivery_date >= today) {
+      const hasAppointment = upcomingDates.some(d => d.type === 'Lieferung' || d.type === 'Delivery')
+      if (!hasAppointment) {
+        upcomingDates.push({
+          type: 'Lieferung',
+          date: projectWithDates.delivery_date,
+          time: projectWithDates.delivery_time || null,
+        })
+      }
+    }
+    
+    if (projectWithDates.installation_date && projectWithDates.installation_date >= today) {
+      const hasAppointment = upcomingDates.some(d => d.type === 'Montage' || d.type === 'Installation')
+      if (!hasAppointment) {
+        upcomingDates.push({
+          type: 'Montage',
+          date: projectWithDates.installation_date,
+          time: projectWithDates.installation_time || null,
+        })
+      }
+    }
+    
+    // Nach Datum sortieren und frühesten nehmen
+    upcomingDates.sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date)
+      if (dateCompare !== 0) return dateCompare
+      // Bei gleichem Datum nach Zeit sortieren
+      const timeA = a.time || '00:00'
+      const timeB = b.time || '00:00'
+      return timeA.localeCompare(timeB)
+    })
+    
+    const nextAppointment = upcomingDates[0]
       ? {
-          title: appointments[0].type,
-          startTime: appointments[0].time
-            ? `${appointments[0].date}T${appointments[0].time}`
-            : `${appointments[0].date}T00:00:00`,
+          title: upcomingDates[0].type,
+          startTime: upcomingDates[0].time
+            ? `${upcomingDates[0].date}T${upcomingDates[0].time}`
+            : `${upcomingDates[0].date}T00:00:00`,
         }
       : null
 
