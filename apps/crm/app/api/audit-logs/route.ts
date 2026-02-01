@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { getAuditLogs, logAuditEvent } from '@/lib/supabase/services/audit'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuditLogs } from '@/lib/supabase/services/audit'
 import { logger } from '@/lib/utils/logger'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 
@@ -131,18 +131,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const logId = await logAuditEvent({
-      action,
-      entityType,
-      entityId,
-      changes,
-      metadata,
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
-    })
+    // Direkt in audit_logs schreiben mit Service-Client, damit company_id garantiert gesetzt ist
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const userAgent = request.headers.get('user-agent') || 'unknown'
+    const serviceSupabase = await createServiceClient()
+    const { data: row, error: insertError } = await serviceSupabase
+      .from('audit_logs')
+      .insert({
+        user_id: user.id,
+        company_id: companyId,
+        action: String(action),
+        entity_type: String(entityType),
+        entity_id: entityId || null,
+        changes: changes ?? null,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        request_id: null,
+        metadata: metadata ?? null,
+      })
+      .select('id')
+      .single()
 
-    apiLogger.complete({ logId })
-    return NextResponse.json({ success: true, logId })
+    if (insertError) {
+      logger.error('Audit log insert failed', { component: 'api/audit-logs', action }, insertError)
+      return NextResponse.json({ error: 'Fehler beim Schreiben des Audit-Logs' }, { status: 500 })
+    }
+
+    apiLogger.complete({ logId: row?.id })
+    return NextResponse.json({ success: true, logId: row?.id })
   } catch (error) {
     apiLogger.error(error as Error)
     logger.error(
