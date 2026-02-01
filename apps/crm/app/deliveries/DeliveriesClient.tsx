@@ -63,10 +63,13 @@ export default function DeliveriesClient() {
   }, [projects])
 
   useEffect(() => {
-    // Keep URL in sync for sharing / deep linking
+    // Keep URL in sync for sharing / deep linking (nur ersetzen wenn sich was geändert hat, um replaceState-Limit zu vermeiden)
     const params = new URLSearchParams(searchParams.toString())
     params.set('type', activeTab)
-    router.replace(`/deliveries?${params.toString()}`)
+    const target = `/deliveries?${params.toString()}`
+    if (typeof window !== 'undefined' && `${window.location.pathname}${window.location.search}` !== target) {
+      router.replace(target)
+    }
   }, [activeTab, router, searchParams])
 
   // Reset pagination when switching tabs or filters

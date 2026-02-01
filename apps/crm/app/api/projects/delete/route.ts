@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { logAuditEvent } from '@/lib/supabase/services/audit'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
 
 export async function DELETE(request: NextRequest) {
@@ -88,38 +87,38 @@ export async function DELETE(request: NextRequest) {
         throw deleteError
       }
 
-      // Logge Audit-Event
-      try {
-        await logAuditEvent({
-          action: 'project.deleted',
-          entityType: 'project',
-          entityId: id,
-          changes: {
-            before: {
-              customerName: projectData.customer_name,
-              orderNumber: projectData.order_number,
-              status: projectData.status,
-              totalAmount: projectData.total_amount,
-            },
-            after: undefined,
+      // Audit-Eintrag direkt schreiben (Service-Client, gleiche company_id wie beim Lesen – zuverlässig)
+      const companyIdStr = typeof companyId === 'string' ? companyId : String(companyId ?? '')
+      const serviceSupabase = await createServiceClient()
+      const { error: auditError } = await serviceSupabase.from('audit_logs').insert({
+        user_id: user.id,
+        company_id: companyIdStr,
+        action: 'project.deleted',
+        entity_type: 'project',
+        entity_id: id,
+        changes: {
+          before: {
+            customerName: projectData.customer_name,
+            orderNumber: projectData.order_number,
+            status: projectData.status,
+            totalAmount: projectData.total_amount,
           },
-          metadata: {
-            deletedAt: new Date().toISOString(),
-            deletedBy: user.id,
-          },
-        })
-      } catch (auditError) {
-        logger.warn(
-          'Fehler beim Loggen des Audit-Events',
-          {
-            component: 'api/projects/delete',
-          },
-          auditError as Error
-        )
-        // Nicht abbrechen, Löschung war erfolgreich
+        },
+        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        user_agent: request.headers.get('user-agent') || 'unknown',
+        request_id: null,
+        metadata: { deletedAt: new Date().toISOString(), deletedBy: user.id },
+      })
+      if (auditError) {
+        logger.error('Audit-Eintrag bei Projekt-Löschung fehlgeschlagen', {
+          component: 'api/projects/delete',
+          projectId: id,
+          message: auditError.message,
+          code: auditError.code,
+        }, auditError)
       }
 
-      logger.info('Projekt gelöscht (soft delete)', {
+      logger.info('Projekt gelöscht', {
         component: 'api/projects/delete',
         projectId: id,
         orderNumber: projectData.order_number,

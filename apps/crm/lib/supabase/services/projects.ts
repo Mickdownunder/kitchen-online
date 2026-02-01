@@ -681,6 +681,22 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<void> {
+  // Vor dem Löschen Projekt-Daten holen für Audit-Log (wird von der UI genutzt, nicht die API-Route)
+  let projectData: { customerName?: string; orderNumber?: string; totalAmount?: number; status?: string } = {}
+  try {
+    const project = await getProject(id)
+    if (project) {
+      projectData = {
+        customerName: project.customerName,
+        orderNumber: project.orderNumber,
+        totalAmount: project.totalAmount,
+        status: project.status,
+      }
+    }
+  } catch {
+    // Projekt nicht gefunden – trotzdem löschen, nur ohne Audit-Daten
+  }
+
   // TODO: Re-enable soft delete after applying migration: supabase/migrations/20260126113814_add_deleted_at_to_projects.sql
   // Soft delete: Set deleted_at timestamp instead of actually deleting
   // const { error } = await supabase
@@ -692,6 +708,9 @@ export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabase.from('projects').delete().eq('id', id)
 
   if (error) throw error
+
+  // Audit-Log (client-seitig, damit in der UI gelöschte Aufträge im Audit erscheinen)
+  audit.projectDeleted(id, projectData)
 }
 
 function mapProjectFromDB(dbProject: ProjectRow): CustomerProject {

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -34,6 +34,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile, companyRole, loading, hasPermission } = useAuth()
+  const hasRedirectedToLogin = useRef(false)
+
+  useEffect(() => {
+    if (user) hasRedirectedToLogin.current = false
+  }, [user])
 
   // Load company display name
   React.useEffect(() => {
@@ -78,9 +83,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     )
   }
 
-  // If not logged in and not on auth page: redirect to login (vermeidet weißen Bildschirm, falls Middleware schon durch war)
+  // If not logged in and not on auth page: redirect to login (nur einmal, um replaceState-Limit zu vermeiden)
   if (!user) {
-    router.replace('/login')
+    if (!hasRedirectedToLogin.current) {
+      hasRedirectedToLogin.current = true
+      router.replace('/login')
+    }
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />

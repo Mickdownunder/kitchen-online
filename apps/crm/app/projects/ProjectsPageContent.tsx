@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import ProjectList from '@/components/ProjectList'
 import { useApp } from '../providers'
 import AIAgentButton from '@/components/AIAgentButton'
-import { createProject, updateProject, deleteProject } from '@/lib/supabase/services'
+import { createProject, updateProject } from '@/lib/supabase/services'
 import { CustomerProject } from '@/types'
 import { logger } from '@/lib/utils/logger'
 
@@ -64,24 +64,22 @@ function ProjectsPageContent() {
   }
 
   const handleDeleteProject = async (id: string) => {
-    // Optimistisches Update: Erst UI aktualisieren, dann API-Call
-    // Das verhindert das "muss refreshen" Problem
     const previousProjects = projects
     setProjects(prev => prev.filter(p => p.id !== id))
 
     try {
-      await deleteProject(id)
+      const res = await fetch(`/api/projects/delete?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Löschen fehlgeschlagen')
+      }
     } catch (error: unknown) {
-      // AbortError ignorieren (passiert bei Navigation/Modal-Schließen)
       const errMessage = error instanceof Error ? error.message : ''
       const errName = error instanceof Error ? error.name : ''
-      if (errMessage.includes('aborted') || errName === 'AbortError') {
-        // Request wurde abgebrochen, aber das Löschen war vielleicht trotzdem erfolgreich
-        // UI bleibt optimistisch aktualisiert
-        return
-      }
-      
-      // Bei echtem Fehler: State zurücksetzen
+      if (errMessage.includes('aborted') || errName === 'AbortError') return
       logger.error('Error deleting project', { component: 'ProjectsPageContent' }, error as Error)
       setProjects(previousProjects)
       alert('Fehler beim Löschen des Auftrags')

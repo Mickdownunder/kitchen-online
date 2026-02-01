@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { getAuditLogs } from '@/lib/supabase/services/audit'
 import { logger } from '@/lib/utils/logger'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 
@@ -56,8 +55,8 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Max 500
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const limitParam = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10), 1), 500)
+    const offsetParam = Math.max(parseInt(searchParams.get('offset') || '0', 10), 0)
     const action = searchParams.get('action') || undefined
     const entityType = searchParams.get('entityType') || undefined
     const entityId = searchParams.get('entityId') || undefined
@@ -68,14 +67,66 @@ export async function GET(request: NextRequest) {
       ? new Date(searchParams.get('endDate')!)
       : undefined
 
-    const logs = await getAuditLogs({
-      limit,
-      offset,
-      action,
-      entityType,
-      entityId,
-      startDate,
-      endDate,
+    // Eine durchgängige Abfrage-Kette (company_id als String sicherstellen)
+    const companyIdStr = typeof companyId === 'string' ? companyId : String(companyId ?? '')
+    const serviceSupabase = await createServiceClient()
+
+    const rangeFrom = offsetParam
+    const rangeTo = offsetParam + limitParam - 1
+
+    const { data: rows, error: fetchError } = await serviceSupabase
+      .from('audit_logs')
+      .select('id, user_id, action, entity_type, entity_id, changes, metadata, created_at')
+      .eq('company_id', companyIdStr)
+      .order('created_at', { ascending: false })
+      .range(rangeFrom, rangeTo)
+
+    if (fetchError) {
+      logger.error('Audit logs fetch failed', { component: 'api/audit-logs', message: fetchError.message }, fetchError)
+      return NextResponse.json({ error: 'Fehler beim Laden der Audit-Logs' }, { status: 500 })
+    }
+
+    const list = (rows || []) as { id: string; user_id: string | null; action: string; entity_type: string; entity_id: string | null; changes: unknown; metadata: unknown; created_at: string }[]
+
+    // Optionale Filter clientseitig anwenden (Abfrage liefert bereits paginiert)
+    const filtered = list.filter(row => {
+      if (action && row.action !== action) return false
+      if (entityType && row.entity_type !== entityType) return false
+      if (entityId && row.entity_id !== entityId) return false
+      if (startDate && new Date(row.created_at) < startDate) return false
+      if (endDate && new Date(row.created_at) > endDate) return false
+      return true
+    })
+
+    const userIds = [...new Set(filtered.map(r => r.user_id).filter(Boolean))] as string[]
+    if (filtered.length === 0) {
+      apiLogger.complete({ logCount: 0 })
+      return NextResponse.json({ logs: [] })
+    }
+    const profilesMap: Record<string, { email: string | null; full_name: string | null }> = {}
+    if (userIds.length > 0) {
+      const { data: profiles } = await serviceSupabase
+        .from('user_profiles')
+        .select('id, email, full_name')
+        .in('id', userIds)
+      ;(profiles || []).forEach((p: { id: string; email: string | null; full_name: string | null }) => {
+        profilesMap[p.id] = { email: p.email ?? null, full_name: p.full_name ?? null }
+      })
+    }
+
+    const logs = filtered.map(row => {
+      const profile = row.user_id ? profilesMap[row.user_id] : null
+      return {
+        id: row.id,
+        action: row.action,
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        createdAt: row.created_at,
+        userName: profile?.full_name ?? null,
+        userEmail: profile?.email ?? null,
+        changes: row.changes,
+        metadata: row.metadata ?? null,
+      }
     })
 
     apiLogger.complete({ logCount: logs.length })
