@@ -15,6 +15,9 @@ import {
   Save,
   Euro,
   Building2,
+  Upload,
+  FileCheck,
+  ExternalLink,
 } from 'lucide-react'
 import { SupplierInvoice, SupplierInvoiceCategory, PaymentMethod } from '@/types'
 import {
@@ -24,6 +27,8 @@ import {
   deleteSupplierInvoice,
   markSupplierInvoicePaid,
   markSupplierInvoiceUnpaid,
+  getSupplierInvoiceCustomCategories,
+  addSupplierInvoiceCustomCategory,
   CreateSupplierInvoiceInput,
 } from '@/lib/supabase/services/supplierInvoices'
 
@@ -52,6 +57,14 @@ const CATEGORY_COLORS: Record<SupplierInvoiceCategory, string> = {
   other: 'bg-slate-100 text-slate-700',
 }
 
+function getCategoryLabel(category: string): string {
+  return (CATEGORY_LABELS as Record<string, string>)[category] ?? category
+}
+
+function getCategoryColor(category: string): string {
+  return (CATEGORY_COLORS as Record<string, string>)[category] ?? 'bg-slate-100 text-slate-700'
+}
+
 interface SupplierInvoicesViewProps {
   onStatsChange?: (stats: { totalTax: number; count: number }) => void
 }
@@ -60,7 +73,8 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
   const [invoices, setInvoices] = useState<SupplierInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterCategory, setFilterCategory] = useState<SupplierInvoiceCategory | 'all'>('all')
+  const [filterCategory, setFilterCategory] = useState<string | 'all'>('all')
+  const [customCategories, setCustomCategories] = useState<{ id: string; name: string }[]>([])
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'open' | 'overdue'>('all')
 
   // Form state
@@ -75,6 +89,9 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
     category: 'material',
   })
   const [saving, setSaving] = useState(false)
+  const [scanStatus, setScanStatus] = useState<'idle' | 'uploading' | 'analyzing' | 'done' | 'error'>('idle')
+  const [scanError, setScanError] = useState<string | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Payment modal
   const [payingInvoice, setPayingInvoice] = useState<SupplierInvoice | null>(null)
@@ -85,10 +102,19 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
   const onStatsChangeRef = React.useRef(onStatsChange)
   onStatsChangeRef.current = onStatsChange
 
+  const loadCustomCategories = useCallback(async () => {
+    try {
+      const data = await getSupplierInvoiceCustomCategories()
+      setCustomCategories(data.map(c => ({ id: c.id, name: c.name })))
+    } catch {
+      setCustomCategories([])
+    }
+  }, [])
+
   const loadInvoices = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getSupplierInvoices()
+      const [data] = await Promise.all([getSupplierInvoices(), loadCustomCategories()])
       setInvoices(data)
 
       // Stats für Parent-Komponente (use ref to avoid dependency)
@@ -123,10 +149,8 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
         }
       }
 
-      // Category filter
-      if (filterCategory !== 'all' && inv.category !== filterCategory) {
-        return false
-      }
+      // Category filter (category is string: standard code or custom name)
+      if (filterCategory !== 'all' && inv.category !== filterCategory) return false
 
       // Status filter
       if (filterStatus === 'paid' && !inv.isPaid) return false
@@ -193,7 +217,105 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
       netAmount: 0,
       taxRate: 20,
       category: 'material',
+      skontoPercent: undefined,
+      skontoAmount: undefined,
     })
+    setScanStatus('idle')
+    setScanError(null)
+  }
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        const base64 = result.includes(',') ? result.split(',')[1] : result
+        resolve(base64 || '')
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const processScannedFile = async (file: File) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (!allowed.includes(file.type)) {
+      setScanError('Bitte PDF oder Bild (JPG, PNG, WebP) wählen.')
+      setScanStatus('error')
+      return
+    }
+    setScanError(null)
+    setScanStatus('uploading')
+
+    try {
+      const [uploadRes, analyzeRes] = await Promise.all([
+        (async () => {
+          const form = new FormData()
+          form.append('file', file)
+          const r = await fetch('/api/accounting/supplier-invoices/upload', {
+            method: 'POST',
+            body: form,
+          })
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}))
+            throw new Error(err.error || 'Hochladen fehlgeschlagen')
+          }
+          return r.json() as Promise<{ documentUrl: string; documentName: string }>
+        })(),
+        (async () => {
+          setScanStatus('analyzing')
+          const base64 = await fileToBase64(file)
+          const r = await fetch('/api/accounting/supplier-invoices/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ base64Data: base64, mimeType: file.type }),
+          })
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}))
+            throw new Error(err.error || 'Auslesen fehlgeschlagen')
+          }
+          return r.json() as Promise<{
+            supplierName?: string
+            supplierUid?: string | null
+            invoiceNumber?: string
+            invoiceDate?: string
+            dueDate?: string | null
+            netAmount?: number
+            taxRate?: number
+            category?: string
+          }>
+        })(),
+      ])
+
+      setFormData(prev => ({
+        ...prev,
+        supplierName: analyzeRes.supplierName ?? prev.supplierName,
+        supplierUid: analyzeRes.supplierUid ?? prev.supplierUid,
+        invoiceNumber: analyzeRes.invoiceNumber ?? prev.invoiceNumber,
+        invoiceDate: analyzeRes.invoiceDate ?? prev.invoiceDate,
+        dueDate: analyzeRes.dueDate ?? prev.dueDate,
+        netAmount: analyzeRes.netAmount ?? prev.netAmount,
+        taxRate: analyzeRes.taxRate ?? prev.taxRate,
+        category: (analyzeRes.category as SupplierInvoiceCategory) ?? prev.category,
+        documentUrl: uploadRes.documentUrl,
+        documentName: uploadRes.documentName,
+      }))
+      setScanStatus('done')
+    } catch (e) {
+      setScanError(e instanceof Error ? e.message : 'Fehler beim Verarbeiten')
+      setScanStatus('error')
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) processScannedFile(file)
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) processScannedFile(file)
+    e.target.value = ''
   }
 
   const handleEdit = (invoice: SupplierInvoice) => {
@@ -208,9 +330,28 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
       netAmount: invoice.netAmount,
       taxRate: invoice.taxRate,
       category: invoice.category,
+      skontoPercent: invoice.skontoPercent,
+      skontoAmount: invoice.skontoAmount,
       notes: invoice.notes,
+      documentUrl: invoice.documentUrl,
+      documentName: invoice.documentName,
     })
+    setScanStatus('idle')
+    setScanError(null)
     setShowForm(true)
+  }
+
+  const handleAddCustomCategory = async () => {
+    const name = window.prompt('Neue Kategorie eingeben (z. B. „Beratung“, „Schulung“):')
+    if (!name?.trim()) return
+    try {
+      const added = await addSupplierInvoiceCustomCategory(name.trim())
+      await loadCustomCategories()
+      setFormData(prev => ({ ...prev, category: added.name }))
+    } catch (e) {
+      console.error(e)
+      alert(e instanceof Error ? e.message : 'Kategorie konnte nicht hinzugefügt werden.')
+    }
   }
 
   const handleDelete = async (invoice: SupplierInvoice) => {
@@ -330,13 +471,18 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
           <Filter className="h-5 w-5 text-slate-400" />
           <select
             value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value as SupplierInvoiceCategory | 'all')}
+            onChange={e => setFilterCategory(e.target.value)}
             className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold focus:border-amber-500 focus:outline-none"
           >
             <option value="all">Alle Kategorien</option>
             {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
+              </option>
+            ))}
+            {customCategories.map(c => (
+              <option key={c.id} value={c.name}>
+                {c.name}
               </option>
             ))}
           </select>
@@ -436,9 +582,9 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${CATEGORY_COLORS[invoice.category]}`}
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getCategoryColor(invoice.category)}`}
                         >
-                          {CATEGORY_LABELS[invoice.category]}
+                          {getCategoryLabel(invoice.category)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-slate-700">
@@ -448,8 +594,17 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                         {formatCurrency(invoice.taxAmount)} €
                         <span className="ml-1 text-xs">({invoice.taxRate}%)</span>
                       </td>
-                      <td className="px-6 py-4 text-right font-black text-slate-900">
-                        {formatCurrency(invoice.grossAmount)} €
+                      <td className="px-6 py-4 text-right">
+                        <div>
+                          <span className="font-black text-slate-900">
+                            {formatCurrency(invoice.grossAmount)} €
+                          </span>
+                          {invoice.skontoAmount != null && invoice.skontoAmount > 0 && (
+                            <p className="text-xs text-slate-500">
+                              nach Skonto: {formatCurrency(invoice.grossAmount - invoice.skontoAmount)} €
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         {invoice.isPaid ? (
@@ -480,6 +635,17 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
+                          {invoice.documentUrl && (
+                            <a
+                              href={`/api/accounting/supplier-invoices/${invoice.id}/document`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-amber-600"
+                              title="Beleg anzeigen"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </a>
+                          )}
                           <button
                             onClick={() => handleEdit(invoice)}
                             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
@@ -523,6 +689,81 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Rechnung scannen / hochladen – so einfach wie möglich */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={e => e.preventDefault()}
+                className="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/80 p-6 transition-colors hover:border-amber-400 hover:bg-amber-50"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,image/jpeg,image/png,image/webp"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full flex-col items-center gap-3 py-4 text-left"
+                >
+                  {scanStatus === 'uploading' || scanStatus === 'analyzing' ? (
+                    <>
+                      <div className="h-12 w-12 animate-spin rounded-full border-4 border-amber-400 border-t-transparent" />
+                      <span className="font-medium text-slate-700">
+                        {scanStatus === 'uploading'
+                          ? 'Wird hochgeladen…'
+                          : 'Rechnung wird ausgelesen…'}
+                      </span>
+                    </>
+                  ) : scanStatus === 'done' ? (
+                    <>
+                      <FileCheck className="h-12 w-12 text-emerald-500" />
+                      <span className="font-medium text-emerald-700">
+                        Felder wurden vorausgefüllt – bitte prüfen Sie die Daten unten.
+                      </span>
+                    </>
+                  ) : scanStatus === 'error' ? (
+                    <>
+                      <AlertCircle className="h-12 w-12 text-red-500" />
+                      <span className="font-medium text-red-700">{scanError}</span>
+                      <span className="text-sm text-slate-600">
+                        Klicken Sie hier, um es erneut zu versuchen.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-12 w-12 text-amber-500" />
+                      <span className="text-lg font-bold text-slate-800">
+                        Rechnung hier ablegen oder Foto/PDF auswählen
+                      </span>
+                      <span className="text-sm text-slate-500">
+                        PDF oder Bild (JPG, PNG) – die KI füllt die Felder vor.
+                      </span>
+                    </>
+                  )}
+                </button>
+                {(formData.documentName || formData.documentUrl) && (
+                  <p className="mt-2 text-center text-sm text-slate-600">
+                    Beleg: <span className="font-medium">{formData.documentName || 'Datei'}</span>
+                    {editingInvoice?.id && editingInvoice.documentUrl && (
+                      <>
+                        {' · '}
+                        <a
+                          href={`/api/accounting/supplier-invoices/${editingInvoice.id}/document`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-medium text-amber-600 hover:underline"
+                        >
+                          Beleg anzeigen
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+
               {/* Lieferant */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
                 <h4 className="mb-4 flex items-center gap-2 font-bold text-slate-900">
@@ -656,25 +897,87 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                 </div>
               </div>
 
-              {/* Kategorie */}
+              {/* Kategorie (Standard + benutzerdefiniert) */}
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">Kategorie</label>
-                <select
-                  value={formData.category}
-                  onChange={e =>
-                    setFormData({
-                      ...formData,
-                      category: e.target.value as SupplierInvoiceCategory,
-                    })
-                  }
-                  className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 font-medium transition-all focus:border-amber-500 focus:outline-none"
-                >
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={formData.category}
+                    onChange={e =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    className="flex-1 rounded-xl border-2 border-slate-200 px-4 py-3 font-medium transition-all focus:border-amber-500 focus:outline-none"
+                  >
+                    {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                    {customCategories.map(c => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomCategory}
+                    className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition-colors hover:bg-amber-100"
+                  >
+                    + Kategorie
+                  </button>
+                </div>
+              </div>
+
+              {/* Skonto (für Steuerberater separat) */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                <h4 className="mb-2 font-bold text-slate-900">Skonto (optional)</h4>
+                <p className="mb-4 text-xs text-slate-500">
+                  Wird beim Steuerberater separat angegeben – Vorsteuer bezieht sich auf den tatsächlich gezahlten Betrag.
+                </p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700">Skonto %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={formData.skontoPercent ?? ''}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          skontoPercent: e.target.value ? parseFloat(e.target.value) : undefined,
+                        })
+                      }
+                      className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 font-medium transition-all focus:border-amber-500 focus:outline-none"
+                      placeholder="z. B. 2"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700">Skontobetrag €</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.skontoAmount ?? ''}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          skontoAmount: e.target.value ? parseFloat(e.target.value) : undefined,
+                        })
+                      }
+                      className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 font-medium transition-all focus:border-amber-500 focus:outline-none"
+                      placeholder="0,00"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700">Zahlungsbetrag</label>
+                    <div className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 font-medium text-slate-700">
+                      {formatCurrency(calculatedAmounts.gross - (formData.skontoAmount ?? 0))} €
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Notizen */}

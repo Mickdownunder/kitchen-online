@@ -19,6 +19,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Calculator,
+  Landmark,
 } from 'lucide-react'
 import { CustomerProject, Invoice, SupplierInvoice } from '@/types'
 import {
@@ -37,12 +38,13 @@ import {
 } from './AccountingExports'
 import SupplierInvoicesView from './accounting/SupplierInvoicesView'
 import AccountingValidation from './accounting/AccountingValidation'
+import BankReconciliationView from './accounting/BankReconciliationView'
 
 interface AccountingViewProps {
   projects: CustomerProject[]
 }
 
-type TimeRange = 'month' | 'quarter' | 'year'
+type TimeRange = 'month' | 'quarter' | 'year' | 'custom'
 type ExportType = 'uva' | 'invoices' | 'datev' | 'all'
 
 interface UVAEntry {
@@ -68,7 +70,7 @@ interface InvoiceData {
   type: 'partial' | 'final'
 }
 
-type AccountingTab = 'overview' | 'outgoing' | 'incoming'
+type AccountingTab = 'overview' | 'outgoing' | 'incoming' | 'bank'
 
 const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
   const [activeTab, setActiveTab] = useState<AccountingTab>('overview')
@@ -83,6 +85,12 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
   })
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [timeRange, setTimeRange] = useState<TimeRange>('month')
+  const [customStartDate, setCustomStartDate] = useState(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 1)
+    return d.toISOString().split('T')[0]
+  })
+  const [customEndDate, setCustomEndDate] = useState(() => new Date().toISOString().split('T')[0])
   const [isExporting, setIsExporting] = useState(false)
   const [showDetails, setShowDetails] = useState(true)
 
@@ -128,19 +136,28 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
         }),
       }
     } else if (timeRange === 'quarter') {
-      const [year, quarter] = selectedQuarter
-        .split('-Q')
-        .map((v, i) => (i === 0 ? Number(v) : Number(v)))
+      const parts = selectedQuarter.split('-Q')
+      const year = Number(parts[0])
+      const quarter = Number(parts[1])
       const startMonth = (quarter - 1) * 3
       const startDate = new Date(year, startMonth, 1)
       const endDate = new Date(year, startMonth + 3, 0, 23, 59, 59)
       return { startDate, endDate, label: `${quarter}. Quartal ${year}` }
+    } else if (timeRange === 'custom') {
+      const startDate = new Date(customStartDate)
+      const endDate = new Date(customEndDate)
+      endDate.setHours(23, 59, 59, 999)
+      return {
+        startDate,
+        endDate,
+        label: `${customStartDate} – ${customEndDate}`,
+      }
     } else {
       const startDate = new Date(selectedYear, 0, 1)
       const endDate = new Date(selectedYear, 11, 31, 23, 59, 59)
       return { startDate, endDate, label: `Jahr ${selectedYear}` }
     }
-  }, [timeRange, selectedMonth, selectedQuarter, selectedYear])
+  }, [timeRange, selectedMonth, selectedQuarter, selectedYear, customStartDate, customEndDate])
 
   // Lade Eingangsrechnungen für den ausgewählten Zeitraum
   const loadSupplierInvoices = useCallback(async () => {
@@ -290,18 +307,16 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
     return missing.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [projects, dbInvoices, getDateRange])
 
-  // Calculate UVA (Umsatzsteuervoranmeldung) - Use actual invoice data
+  // Calculate UVA (Umsatzsteuervoranmeldung) - Use actual invoice data, dynamic buckets per tax rate
   const uvaData = useMemo(() => {
-    const uva: { [key: number]: UVAEntry } = {
-      20: { taxRate: 20, netAmount: 0, taxAmount: 0, grossAmount: 0, invoiceCount: 0 },
-      13: { taxRate: 13, netAmount: 0, taxAmount: 0, grossAmount: 0, invoiceCount: 0 },
-      10: { taxRate: 10, netAmount: 0, taxAmount: 0, grossAmount: 0, invoiceCount: 0 },
-      0: { taxRate: 0, netAmount: 0, taxAmount: 0, grossAmount: 0, invoiceCount: 0 },
-    }
+    const uva: { [key: number]: UVAEntry } = {}
 
-    // Calculate from filtered invoices (more accurate)
     filteredInvoices.forEach(invoice => {
-      const entry = uva[invoice.taxRate] || uva[20]
+      const rate = invoice.taxRate
+      if (!uva[rate]) {
+        uva[rate] = { taxRate: rate, netAmount: 0, taxAmount: 0, grossAmount: 0, invoiceCount: 0 }
+      }
+      const entry = uva[rate]
       entry.netAmount += invoice.netAmount
       entry.taxAmount += invoice.taxAmount
       entry.grossAmount += invoice.grossAmount
@@ -315,7 +330,9 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
       entry.grossAmount = Math.round(entry.grossAmount * 100) / 100
     })
 
-    return Object.values(uva).filter(entry => entry.invoiceCount > 0 || entry.grossAmount > 0)
+    return Object.values(uva)
+      .filter(entry => entry.invoiceCount > 0 || entry.grossAmount > 0)
+      .sort((a, b) => b.taxRate - a.taxRate)
   }, [filteredInvoices])
 
   // Calculate totals (Ausgangsrechnungen)
@@ -508,9 +525,21 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
             {supplierInvoices.length}
           </span>
         </button>
+        <button
+          onClick={() => setActiveTab('bank')}
+          className={`flex items-center gap-2 rounded-xl px-6 py-3 font-bold transition-all ${
+            activeTab === 'bank'
+              ? 'bg-amber-500 text-white shadow-lg'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Landmark className="h-5 w-5" />
+          Bankabgleich
+        </button>
       </div>
 
-      {/* Zeitraum-Auswahl - Prominent */}
+      {/* Zeitraum-Auswahl - nur wenn nicht Bankabgleich */}
+      {activeTab !== 'bank' && (
       <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-xl">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div>
@@ -531,6 +560,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
                 <option value="month">Monat</option>
                 <option value="quarter">Quartal</option>
                 <option value="year">Jahr</option>
+                <option value="custom">Benutzerdefiniert</option>
               </select>
             </div>
 
@@ -590,6 +620,31 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
               </select>
             )}
 
+            {/* Benutzerdefiniert: Von – Bis */}
+            {timeRange === 'custom' && (
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <label className="sr-only">Von</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={e => setCustomStartDate(e.target.value)}
+                    className="cursor-pointer rounded-2xl border-2 border-amber-500 bg-white px-4 py-3 text-base font-black text-slate-900 shadow-lg outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <span className="font-bold text-slate-500">–</span>
+                <div>
+                  <label className="sr-only">Bis</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={e => setCustomEndDate(e.target.value)}
+                    className="cursor-pointer rounded-2xl border-2 border-amber-500 bg-white px-4 py-3 text-base font-black text-slate-900 shadow-lg outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Aktueller Zeitraum Anzeige */}
             <div className="rounded-2xl bg-amber-500 px-6 py-3 text-base font-black text-white">
               {periodLabel}
@@ -597,6 +652,10 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Tab: Bankabgleich */}
+      {activeTab === 'bank' && <BankReconciliationView />}
 
       {/* Tab: Eingangsrechnungen */}
       {activeTab === 'incoming' && (
@@ -782,6 +841,15 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
                       )}
                     </tbody>
                   </table>
+                  {supplierInvoices.some(inv => (inv.skontoAmount ?? 0) > 0) && (
+                    <p className="mt-3 text-xs text-slate-500">
+                      Skonto im Zeitraum:{' '}
+                      {formatCurrency(
+                        supplierInvoices.reduce((sum, inv) => sum + (inv.skontoAmount ?? 0), 0)
+                      )}{' '}
+                      € – wird beim Steuerberater separat angegeben (Vorsteuer auf tatsächlich gezahlten Betrag).
+                    </p>
+                  )}
                 </div>
               </div>
             )}

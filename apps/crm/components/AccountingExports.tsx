@@ -319,6 +319,9 @@ export async function exportInvoicesExcel(
         'Netto (€)',
         'VSt (€)',
         'Brutto (€)',
+        'Skonto %',
+        'Skonto (€)',
+        'Zahlungsbetrag (€)',
         'Satz',
         'Status',
       ],
@@ -337,6 +340,8 @@ export async function exportInvoicesExcel(
     }
 
     supplierInvoices.forEach(inv => {
+      const skontoAmount = inv.skontoAmount ?? 0
+      const zahlungsbetrag = inv.grossAmount - skontoAmount
       incomingSheetData.push([
         inv.invoiceNumber,
         new Date(inv.invoiceDate).toLocaleDateString('de-DE'),
@@ -346,6 +351,9 @@ export async function exportInvoicesExcel(
         inv.netAmount.toFixed(2),
         inv.taxAmount.toFixed(2),
         inv.grossAmount.toFixed(2),
+        inv.skontoPercent != null ? inv.skontoPercent.toFixed(2) : '',
+        skontoAmount > 0 ? skontoAmount.toFixed(2) : '',
+        zahlungsbetrag.toFixed(2),
         `${inv.taxRate}%`,
         inv.isPaid ? 'Bezahlt' : 'Offen',
       ])
@@ -354,6 +362,8 @@ export async function exportInvoicesExcel(
     const suppTotalNet = supplierInvoices.reduce((sum, inv) => sum + inv.netAmount, 0)
     const suppTotalTax = supplierInvoices.reduce((sum, inv) => sum + inv.taxAmount, 0)
     const suppTotalGross = supplierInvoices.reduce((sum, inv) => sum + inv.grossAmount, 0)
+    const suppTotalSkonto = supplierInvoices.reduce((sum, inv) => sum + (inv.skontoAmount ?? 0), 0)
+    const suppTotalZahlung = suppTotalGross - suppTotalSkonto
 
     incomingSheetData.push([])
     incomingSheetData.push([
@@ -365,6 +375,9 @@ export async function exportInvoicesExcel(
       suppTotalNet.toFixed(2),
       suppTotalTax.toFixed(2),
       suppTotalGross.toFixed(2),
+      '',
+      suppTotalSkonto.toFixed(2),
+      suppTotalZahlung.toFixed(2),
       '',
       '',
     ])
@@ -379,6 +392,9 @@ export async function exportInvoicesExcel(
       { wch: 12 },
       { wch: 12 },
       { wch: 12 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 14 },
       { wch: 6 },
       { wch: 10 },
     ]

@@ -28,6 +28,8 @@ interface DBSupplierInvoice {
   paid_date: string | null
   payment_method: string | null
   category: string
+  skonto_percent?: number | null
+  skonto_amount?: number | null
   project_id: string | null
   document_url: string | null
   document_name: string | null
@@ -55,7 +57,9 @@ function mapFromDB(db: DBSupplierInvoice): SupplierInvoice {
     isPaid: db.is_paid,
     paidDate: db.paid_date || undefined,
     paymentMethod: (db.payment_method as PaymentMethod) || undefined,
-    category: db.category as SupplierInvoiceCategory,
+    category: db.category as SupplierInvoiceCategory | string,
+    skontoPercent: db.skonto_percent ?? undefined,
+    skontoAmount: db.skonto_amount ?? undefined,
     projectId: db.project_id || undefined,
     documentUrl: db.document_url || undefined,
     documentName: db.document_name || undefined,
@@ -82,7 +86,9 @@ export interface CreateSupplierInvoiceInput {
   taxAmount?: number
   grossAmount?: number
   taxRate?: number
-  category?: SupplierInvoiceCategory
+  category?: SupplierInvoiceCategory | string
+  skontoPercent?: number
+  skontoAmount?: number
   projectId?: string
   documentUrl?: string
   documentName?: string
@@ -122,6 +128,8 @@ export async function createSupplierInvoice(
       gross_amount: grossAmount,
       tax_rate: taxRate,
       category: input.category || 'material',
+      skonto_percent: input.skontoPercent ?? null,
+      skonto_amount: input.skontoAmount ?? null,
       project_id: input.projectId || null,
       document_url: input.documentUrl || null,
       document_name: input.documentName || null,
@@ -231,7 +239,9 @@ export interface UpdateSupplierInvoiceInput {
   isPaid?: boolean
   paidDate?: string
   paymentMethod?: PaymentMethod
-  category?: SupplierInvoiceCategory
+  category?: SupplierInvoiceCategory | string
+  skontoPercent?: number
+  skontoAmount?: number
   projectId?: string | null
   documentUrl?: string
   documentName?: string
@@ -264,6 +274,8 @@ export async function updateSupplierInvoice(
   if (input.paidDate !== undefined) updateData.paid_date = input.paidDate || null
   if (input.paymentMethod !== undefined) updateData.payment_method = input.paymentMethod || null
   if (input.category !== undefined) updateData.category = input.category
+  if (input.skontoPercent !== undefined) updateData.skonto_percent = input.skontoPercent ?? null
+  if (input.skontoAmount !== undefined) updateData.skonto_amount = input.skontoAmount ?? null
   if (input.projectId !== undefined) updateData.project_id = input.projectId
   if (input.documentUrl !== undefined) updateData.document_url = input.documentUrl || null
   if (input.documentName !== undefined) updateData.document_name = input.documentName || null
@@ -314,6 +326,61 @@ export async function markSupplierInvoiceUnpaid(id: string): Promise<SupplierInv
 export async function deleteSupplierInvoice(id: string): Promise<void> {
   const { error } = await supabase.from('supplier_invoices').delete().eq('id', id)
 
+  if (error) throw error
+}
+
+// ============================================
+// Benutzerdefinierte Kategorien
+// ============================================
+
+export interface SupplierInvoiceCustomCategory {
+  id: string
+  userId: string
+  name: string
+  createdAt: string
+}
+
+export async function getSupplierInvoiceCustomCategories(): Promise<SupplierInvoiceCustomCategory[]> {
+  const { data, error } = await supabase
+    .from('supplier_invoice_custom_categories')
+    .select('id, user_id, name, created_at')
+    .order('name')
+
+  if (error) throw error
+  return (data || []).map(row => ({
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    createdAt: row.created_at,
+  }))
+}
+
+export async function addSupplierInvoiceCustomCategory(name: string): Promise<SupplierInvoiceCustomCategory> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Nicht authentifiziert')
+
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Kategorie-Name darf nicht leer sein')
+
+  const { data, error } = await supabase
+    .from('supplier_invoice_custom_categories')
+    .insert({ user_id: user.id, name: trimmed })
+    .select('id, user_id, name, created_at')
+    .single()
+
+  if (error) throw error
+  return {
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    createdAt: data.created_at,
+  }
+}
+
+export async function deleteSupplierInvoiceCustomCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('supplier_invoice_custom_categories').delete().eq('id', id)
   if (error) throw error
 }
 

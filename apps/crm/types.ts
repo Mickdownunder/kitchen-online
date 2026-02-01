@@ -108,6 +108,22 @@ export interface BankAccount {
   updatedAt: string
 }
 
+// Bankabgleich: Kontobewegung aus Monatsliste
+export interface BankTransaction {
+  id: string
+  userId: string
+  bankAccountId: string | null
+  transactionDate: string
+  amount: number
+  reference: string | null
+  counterpartyName: string | null
+  counterpartyIban: string | null
+  supplierInvoiceId: string | null
+  invoiceId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 // Employee / Verkäufer
 export interface Employee {
   id: string
@@ -387,8 +403,11 @@ export interface SupplierInvoice {
   paidDate?: string
   paymentMethod?: PaymentMethod
 
-  // Kategorisierung für Buchhaltung
-  category: SupplierInvoiceCategory
+  // Kategorisierung für Buchhaltung (Standard-Code oder benutzerdefinierter Name)
+  category: SupplierInvoiceCategory | string
+  // Skonto – für Steuerberater separat (Vorsteuer auf tatsächlich gezahlten Betrag)
+  skontoPercent?: number
+  skontoAmount?: number
 
   // Optionale Projekt-Zuordnung
   projectId?: string

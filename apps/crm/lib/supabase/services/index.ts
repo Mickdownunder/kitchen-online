@@ -1,6 +1,7 @@
 export * from './appointments'
 export * from './articles'
 export * from './auth'
+export * from './bankTransactions'
 export * from './chat'
 export * from './company'
 export * from './complaints'

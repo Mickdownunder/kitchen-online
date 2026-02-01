@@ -211,15 +211,16 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
   // Rechnungsnummer generieren wenn nicht angegeben
   const invoiceNumber = params.invoiceNumber || (await getNextInvoiceNumber())
 
-  // Beträge berechnen wenn nicht alle angegeben
+  // Beträge berechnen wenn nicht alle angegeben (immer auf 2 Dezimalen für Buchhaltung)
   const taxRate = params.taxRate || 20
   let netAmount = params.netAmount
   let taxAmount = params.taxAmount
 
   if (netAmount === undefined || taxAmount === undefined) {
-    // Brutto ist angegeben, berechne Netto und MwSt
-    netAmount = params.amount / (1 + taxRate / 100)
-    taxAmount = params.amount - netAmount
+    // Brutto ist angegeben: Netto auf 2 Dezimalen, MwSt = Brutto - Netto (damit net + tax = amount exakt)
+    const netRounded = Math.round((params.amount / (1 + taxRate / 100)) * 100) / 100
+    netAmount = netRounded
+    taxAmount = Math.round((params.amount - netRounded) * 100) / 100
   }
 
   const invoiceDate = params.invoiceDate || new Date().toISOString().split('T')[0]
