@@ -247,8 +247,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ projects, filter }) => {
                     border: 'none',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
                   }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any) => [`${formatCurrency(value)} €`, 'Umsatz']}
+                  formatter={(value: number) => [`${formatCurrency(value)} €`, 'Umsatz']}
                 />
                 <Bar dataKey="revenue" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Umsatz" />
               </BarChart>

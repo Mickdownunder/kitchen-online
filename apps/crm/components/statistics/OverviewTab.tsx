@@ -345,14 +345,13 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                     border: 'none',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
                   }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any, name: any) => {
+                  formatter={(value: number, name: string) => {
                     const labels: { [key: string]: string } = {
                       sold: 'Verkauft',
                       invoiced: 'Fakturiert',
                       received: 'Eingegangen',
                     }
-                    return [`${formatCurrency(value)} €`, labels[String(name) || ''] || name]
+                    return [`${formatCurrency(value)} €`, labels[name] || name]
                   }}
                 />
                 <Legend />
@@ -401,8 +400,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                     border: 'none',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
                   }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any) => [`${formatCurrency(value)} €`, 'Eingegangen']}
+                  formatter={(value: number) => [`${formatCurrency(value)} €`, 'Eingegangen']}
                 />
                 <Area
                   type="monotone"

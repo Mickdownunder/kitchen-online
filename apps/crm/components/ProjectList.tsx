@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   Search,
   Plus,
@@ -26,6 +26,7 @@ import {
   ProjectDocument,
   Customer,
 } from '@/types'
+import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
 import ProjectModal from './ProjectModal'
 import { getCustomers, getComplaints } from '@/lib/supabase/services'
 import CustomerDeliveryNoteModal from './CustomerDeliveryNoteModal'
@@ -125,7 +126,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
     if (p) {
       modals.openProjectModal(p)
     }
-  }, [initialOpenProjectId, projects, modals])
+    // Only depend on the specific function, not the entire modals object
+  }, [initialOpenProjectId, projects, modals.openProjectModal])
 
   const loadCustomers = async () => {
     try {
@@ -142,27 +144,32 @@ const ProjectList: React.FC<ProjectListProps> = ({
     }
   }
 
-  // Filter by tab first (Leads vs Orders)
-  // Compare as string to handle both enum and raw DB values
-  const tabFilteredProjects = projects.filter(p => {
-    const statusStr = String(p.status)
-    const isLead = statusStr === ProjectStatus.LEAD || statusStr === 'Lead'
-    if (activeTab === 'leads') {
-      return isLead
-    } else {
-      return !isLead
-    }
-  })
+  // ==========================================================================
+  // Memoized project counts and filtering (performance optimization)
+  // ==========================================================================
+  const { leadsCount, ordersCount } = useMemo(() => {
+    let leads = 0
+    let orders = 0
+    projects.forEach(p => {
+      const statusStr = String(p.status)
+      const isLead = statusStr === ProjectStatus.LEAD || statusStr === 'Lead'
+      if (isLead) {
+        leads++
+      } else {
+        orders++
+      }
+    })
+    return { leadsCount: leads, ordersCount: orders }
+  }, [projects])
 
-  // Count leads for badge
-  const leadsCount = projects.filter(p => {
-    const statusStr = String(p.status)
-    return statusStr === ProjectStatus.LEAD || statusStr === 'Lead'
-  }).length
-  const ordersCount = projects.filter(p => {
-    const statusStr = String(p.status)
-    return statusStr !== ProjectStatus.LEAD && statusStr !== 'Lead'
-  }).length
+  // Filter by tab (Leads vs Orders) - memoized to avoid recalculation on every render
+  const tabFilteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      const statusStr = String(p.status)
+      const isLead = statusStr === ProjectStatus.LEAD || statusStr === 'Lead'
+      return activeTab === 'leads' ? isLead : !isLead
+    })
+  }, [projects, activeTab])
 
   const { filteredProjects, availableYears } = useProjectFilters({
     projects: tabFilteredProjects,
@@ -178,6 +185,40 @@ const ProjectList: React.FC<ProjectListProps> = ({
   }, [searchTerm, filterType, selectedYear, selectedMonth])
 
   const { groupedProjects, expandedGroups, toggleGroup } = useGroupedProjects(filteredProjects)
+
+  // ==========================================================================
+  // Memoized stats calculations for Stats Cards (performance optimization)
+  // ==========================================================================
+  const statsData = useMemo(() => {
+    const totalRevenue = filteredProjects.reduce((sum, p) => sum + (p.totalAmount || 0), 0)
+    const totalNet = filteredProjects.reduce((sum, p) => sum + (p.netAmount || 0), 0)
+    const totalPurchase = filteredProjects.reduce((acc, p) => {
+      return acc + p.items.reduce((sum, item) => {
+        const purchasePrice = item.purchasePricePerUnit || 0
+        const quantity = item.quantity || 1
+        return sum + purchasePrice * quantity
+      }, 0)
+    }, 0)
+    const margin = totalNet - totalPurchase
+    const marginPercent = totalNet > 0 ? (margin / totalNet) * 100 : 0
+    const completedCount = filteredProjects.filter(p => p.status === ProjectStatus.COMPLETED).length
+    const completedPercent = filteredProjects.length > 0
+      ? Math.round((completedCount / filteredProjects.length) * 100)
+      : 0
+    const averageAmount = filteredProjects.length > 0
+      ? totalRevenue / filteredProjects.length
+      : 0
+
+    return {
+      totalRevenue,
+      margin,
+      marginPercent,
+      completedCount,
+      completedPercent,
+      averageAmount,
+      projectCount: filteredProjects.length,
+    }
+  }, [filteredProjects])
 
   // Lokaler State für sofortige UI-Updates
   const [localProjects, setLocalProjects] = useState<Map<string, Partial<CustomerProject>>>(
@@ -417,19 +458,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
     }
   }
 
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  }
-
   // Lead-specific handlers
   const handleOpenLead = (lead: CustomerProject) => {
     modals.openLeadModal(lead)
@@ -452,25 +480,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
 
   const handleUpdateLeadNotes = (lead: CustomerProject, notes: string) => {
     onUpdateProject({ ...lead, notes })
-  }
-
-  const getStatusColor = (status: ProjectStatus) => {
-    switch (status) {
-      case ProjectStatus.LEAD:
-        return 'bg-amber-100 text-amber-700 border-amber-200'
-      case ProjectStatus.COMPLETED:
-        return 'bg-green-100 text-green-700 border-green-200'
-      case ProjectStatus.COMPLAINT:
-        return 'bg-red-100 text-red-700 border-red-200'
-      case ProjectStatus.INSTALLATION:
-        return 'bg-orange-100 text-orange-700 border-orange-200'
-      case ProjectStatus.ORDERED:
-        return 'bg-purple-100 text-purple-700 border-purple-200'
-      case ProjectStatus.MEASURING:
-        return 'bg-indigo-100 text-indigo-700 border-indigo-200'
-      default:
-        return 'bg-slate-100 text-slate-700 border-slate-200'
-    }
   }
 
   return (
@@ -566,10 +575,10 @@ const ProjectList: React.FC<ProjectListProps> = ({
               </p>
             </div>
             <p className="text-3xl font-black text-slate-900">
-              {formatCurrency(filteredProjects.reduce((sum, p) => sum + (p.totalAmount || 0), 0))} €
+              {formatCurrency(statsData.totalRevenue)} €
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              {filteredProjects.length} Projekt{filteredProjects.length !== 1 ? 'e' : ''}
+              {statsData.projectCount} Projekt{statsData.projectCount !== 1 ? 'e' : ''}
             </p>
           </div>
           <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-lg">
@@ -579,16 +588,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
                 Projekte
               </p>
             </div>
-            <p className="text-3xl font-black text-slate-900">{filteredProjects.length}</p>
+            <p className="text-3xl font-black text-slate-900">{statsData.projectCount}</p>
             <p className="mt-1 text-xs text-slate-500">
-              Ø{' '}
-              {formatCurrency(
-                filteredProjects.length > 0
-                  ? filteredProjects.reduce((sum, p) => sum + (p.totalAmount || 0), 0) /
-                      filteredProjects.length
-                  : 0
-              )}{' '}
-              €
+              Ø {formatCurrency(statsData.averageAmount)} €
             </p>
           </div>
           <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-lg">
@@ -598,27 +600,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
                 Durchschnittliche Marge
               </p>
             </div>
-            {(() => {
-              const totalNet = filteredProjects.reduce((sum, p) => sum + (p.netAmount || 0), 0)
-              const totalPurchase = filteredProjects.reduce((acc, p) => {
-                return (
-                  acc +
-                  p.items.reduce((sum, item) => {
-                    const purchasePrice = item.purchasePricePerUnit || 0
-                    const quantity = item.quantity || 1
-                    return sum + purchasePrice * quantity
-                  }, 0)
-                )
-              }, 0)
-              const margin = totalNet - totalPurchase
-              const marginPercent = totalNet > 0 ? (margin / totalNet) * 100 : 0
-              return (
-                <>
-                  <p className="text-3xl font-black text-slate-900">{marginPercent.toFixed(1)}%</p>
-                  <p className="mt-1 text-xs text-slate-500">{formatCurrency(margin)} €</p>
-                </>
-              )
-            })()}
+            <p className="text-3xl font-black text-slate-900">{statsData.marginPercent.toFixed(1)}%</p>
+            <p className="mt-1 text-xs text-slate-500">{formatCurrency(statsData.margin)} €</p>
           </div>
           <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg">
             <div className="mb-2 flex items-center gap-3">
@@ -627,14 +610,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
                 Abgeschlossen
               </p>
             </div>
-            <p className="text-3xl font-black text-slate-900">
-              {filteredProjects.filter(p => p.status === ProjectStatus.COMPLETED).length}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {filteredProjects.length > 0
-                ? `${Math.round((filteredProjects.filter(p => p.status === ProjectStatus.COMPLETED).length / filteredProjects.length) * 100)}%`
-                : '0%'}
-            </p>
+            <p className="text-3xl font-black text-slate-900">{statsData.completedCount}</p>
+            <p className="mt-1 text-xs text-slate-500">{statsData.completedPercent}%</p>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/middleware/rateLimit'
+import crypto from 'crypto'
 
 // Types for database queries
 interface CustomerRow {
@@ -295,8 +296,8 @@ async function handleCodeLogin(
     userId = newUser.user.id
   }
 
-  // 5. Temporäres Passwort für Session
-  const tempPassword = `temp-${customer.id}-${Date.now()}`
+  // 5. Temporäres Passwort für Session (kryptographisch sicher)
+  const tempPassword = crypto.randomBytes(32).toString('base64url')
   
   await supabase.auth.admin.updateUserById(userId, {
     password: tempPassword,

@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { ArrowLeft, Download, FileText, Loader2 } from 'lucide-react'
 import { CompanySettings, BankAccount, InvoiceItem, CustomerProject } from '@/types'
 import { ListInvoice } from '@/hooks/useInvoiceFilters'
-import { downloadInvoicePDF, InvoiceData } from './InvoicePDF'
+// PDF function is dynamically imported when needed to reduce initial bundle size
+import type { InvoiceData } from './InvoicePDF'
 import { getCompanySettings, getBankAccounts, getInvoices, getProject, getInvoice } from '@/lib/supabase/services'
 
 interface InvoiceViewProps {
@@ -195,6 +196,8 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
         company: companySettings,
         bankAccount: bankAccount,
       }
+      // Dynamic import to reduce initial bundle size
+      const { downloadInvoicePDF } = await import('./InvoicePDF')
       await downloadInvoicePDF(invoiceData)
     } catch (error) {
       console.error('Error generating PDF:', error)

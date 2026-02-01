@@ -1,17 +1,18 @@
 'use client'
 
 import React from 'react'
-import { 
-  Calendar, 
-  Phone, 
-  Mail, 
-  Video, 
-  ArrowRight, 
+import {
+  Calendar,
+  Phone,
+  Mail,
+  Video,
+  ArrowRight,
   Trash2,
   Clock,
   User,
 } from 'lucide-react'
 import { CustomerProject } from '@/types'
+import { formatDate } from '@/lib/utils'
 
 interface LeadRowProps {
   lead: CustomerProject
@@ -20,26 +21,19 @@ interface LeadRowProps {
   onDelete: (e: React.MouseEvent) => void
 }
 
-export const LeadRow: React.FC<LeadRowProps> = ({
+/**
+ * LeadRow component - memoized to prevent unnecessary re-renders
+ * when other leads in the list change
+ */
+export const LeadRow = React.memo(function LeadRow({
   lead,
   onOpen,
   onConvertToOrder,
   onDelete,
-}) => {
+}: LeadRowProps) {
   // Parse appointment info from notes (Meeting-Link is stored there)
   const meetingLinkMatch = lead.notes?.match(/Meeting-Link:\s*(https?:\/\/[^\s\n]+)/)
   const meetingLink = meetingLinkMatch ? meetingLinkMatch[1] : null
-
-  // Format date
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleDateString('de-AT', {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  }
 
   return (
     <tr
@@ -92,7 +86,7 @@ export const LeadRow: React.FC<LeadRowProps> = ({
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
                 <Calendar className="h-3.5 w-3.5 text-amber-500" />
-                <span>{formatDate(lead.measurementDate)}</span>
+                <span>{formatDate(lead.measurementDate, { showWeekday: true, locale: 'de-AT' })}</span>
               </div>
               {lead.measurementTime && (
                 <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -142,4 +136,4 @@ export const LeadRow: React.FC<LeadRowProps> = ({
       </td>
     </tr>
   )
-}
+})

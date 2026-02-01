@@ -8,7 +8,7 @@ import {
   updateCustomerDeliveryNote,
   getCompanySettings,
 } from '@/lib/supabase/services'
-import { downloadCustomerDeliveryNotePDF } from './CustomerDeliveryNotePDF'
+// PDF function is dynamically imported when needed to reduce initial bundle size
 
 interface CustomerDeliveryNoteModalProps {
   project: CustomerProject
@@ -101,6 +101,8 @@ export default function CustomerDeliveryNoteModal({
     }
 
     try {
+      // Dynamic import to reduce initial bundle size
+      const { downloadCustomerDeliveryNotePDF } = await import('./CustomerDeliveryNotePDF')
       await downloadCustomerDeliveryNotePDF(
         {
           deliveryNoteNumber: existingDeliveryNote.deliveryNoteNumber,

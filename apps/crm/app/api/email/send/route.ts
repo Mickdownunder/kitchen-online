@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { logger } from '@/lib/utils/logger'
+import { rateLimit } from '@/lib/middleware/rateLimit'
+import { sendEmailSchema } from '@/lib/validations/email'
 
 export async function POST(request: NextRequest) {
   const apiLogger = logger.api('/api/email/send', 'POST')
@@ -26,22 +28,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
     }
 
+    // Rate Limiting (30 Emails pro Minute)
+    const limitCheck = await rateLimit(request, user.id)
+    if (!limitCheck?.allowed) {
+      apiLogger.end(startTime, 429)
+      return NextResponse.json(
+        { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
+        { status: 429 }
+      )
+    }
+
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
       return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
     }
 
+    // Zod-Validierung
     const body = await request.json()
-    const { to, subject, html, text, from: requestedFrom, replyTo, attachments } = body
+    const parsed = sendEmailSchema.safeParse(body)
 
-    if (!to || !subject || (!html && !text)) {
-      apiLogger.error(new Error('Missing required fields'), 400)
+    if (!parsed.success) {
+      apiLogger.error(new Error('Validation failed'), 400)
       return NextResponse.json(
-        { error: 'Fehlende Parameter: to, subject und (html oder text) sind erforderlich' },
+        { 
+          error: 'Ungültige Eingabedaten',
+          details: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       )
     }
+
+    const { to, subject, html, text, from: requestedFrom, replyTo, attachments } = parsed.data
 
     // Lade Company Settings server-seitig, wenn from nicht übergeben wurde
     let fromEmail = requestedFrom
@@ -51,7 +69,7 @@ export async function POST(request: NextRequest) {
         .from('company_settings')
         .select('email, company_name')
         .eq('user_id', user.id)
-        .single()
+        .single() as { data: { email: string; company_name: string } | null; error: unknown }
 
       if (!settingsError && companySettings) {
         fromEmail = companySettings.email
@@ -91,11 +109,13 @@ export async function POST(request: NextRequest) {
       'Email API error',
       {
         component: 'api/email/send',
+        errorMessage: error instanceof Error ? error.message : 'Unknown',
       },
       error as Error
     )
+    // Keine internen Fehlerdetails zurückgeben
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Fehler beim Versenden der E-Mail' },
+      { error: 'Fehler beim Versenden der E-Mail' },
       { status: 500 }
     )
   }

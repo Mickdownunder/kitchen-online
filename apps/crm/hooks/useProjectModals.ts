@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { CustomerProject, CustomerDeliveryNote } from '@/types'
 import { getCustomerDeliveryNotes } from '@/lib/supabase/services'
 
@@ -246,31 +246,56 @@ export function useProjectModals(): ProjectModalsState & ProjectModalsActions {
   }, [])
 
   // ---------------------------------------------------------------------------
-  // Return
+  // Return (memoized to prevent unnecessary re-renders in consumers)
   // ---------------------------------------------------------------------------
 
-  return {
-    // State
-    deliveryNote: deliveryNoteModal,
-    measurement: measurementModal,
-    installation: installationModal,
-    abholung: abholungModal,
-    lead: leadModal,
-    project: projectModal,
+  return useMemo(
+    () => ({
+      // State
+      deliveryNote: deliveryNoteModal,
+      measurement: measurementModal,
+      installation: installationModal,
+      abholung: abholungModal,
+      lead: leadModal,
+      project: projectModal,
 
-    // Actions
-    openDeliveryNoteModal,
-    closeDeliveryNoteModal,
-    openMeasurementModal,
-    closeMeasurementModal,
-    openInstallationModal,
-    closeInstallationModal,
-    openAbholungModal,
-    closeAbholungModal,
-    openLeadModal,
-    closeLeadModal,
-    openProjectModal,
-    openAddProjectModal,
-    closeProjectModal,
-  }
+      // Actions (already stable via useCallback)
+      openDeliveryNoteModal,
+      closeDeliveryNoteModal,
+      openMeasurementModal,
+      closeMeasurementModal,
+      openInstallationModal,
+      closeInstallationModal,
+      openAbholungModal,
+      closeAbholungModal,
+      openLeadModal,
+      closeLeadModal,
+      openProjectModal,
+      openAddProjectModal,
+      closeProjectModal,
+    }),
+    [
+      // State dependencies
+      deliveryNoteModal,
+      measurementModal,
+      installationModal,
+      abholungModal,
+      leadModal,
+      projectModal,
+      // Action dependencies (stable refs)
+      openDeliveryNoteModal,
+      closeDeliveryNoteModal,
+      openMeasurementModal,
+      closeMeasurementModal,
+      openInstallationModal,
+      closeInstallationModal,
+      openAbholungModal,
+      closeAbholungModal,
+      openLeadModal,
+      closeLeadModal,
+      openProjectModal,
+      openAddProjectModal,
+      closeProjectModal,
+    ]
+  )
 }

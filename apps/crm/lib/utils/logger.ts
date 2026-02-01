@@ -16,8 +16,7 @@ interface LogContext {
   requestId?: string
   component?: string
   action?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any // Logger metadata can have any additional properties
+  [key: string]: unknown // Logger metadata can have any additional properties
 }
 
 export class Logger {

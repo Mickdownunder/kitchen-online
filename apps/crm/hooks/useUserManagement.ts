@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { getErrorMessage } from '@/lib/utils/errorHandling'
 
-type RoleKey = 'geschaeftsfuehrer' | 'administration' | 'buchhaltung' | 'verkaeufer' | 'monteur'
+/** Role keys for company members */
+export type RoleKey = 'geschaeftsfuehrer' | 'administration' | 'buchhaltung' | 'verkaeufer' | 'monteur'
 
-interface CompanyMember {
+/** Company member data structure */
+export interface CompanyMember {
   id: string
   user_id: string
   email: string
@@ -15,7 +18,8 @@ interface CompanyMember {
   created_at: string
 }
 
-interface PendingInvite {
+/** Pending invite data structure */
+export interface PendingInvite {
   id: string
   email: string
   role: RoleKey
@@ -24,7 +28,8 @@ interface PendingInvite {
   created_at: string
 }
 
-interface Permission {
+/** Permission definition */
+export interface Permission {
   code: string
   label: string
   description: string
@@ -32,7 +37,8 @@ interface Permission {
   sort_order: number
 }
 
-interface RolePermission {
+/** Role permission mapping */
+export interface RolePermission {
   id: string
   company_id: string
   role: string
@@ -125,9 +131,9 @@ export function useUserManagement(opts: { companyId?: string }) {
         }
         // Reload permissions after successful save to ensure UI is in sync with database
         await loadMembersAndPermissions()
-      } catch (e: any) {
-        console.error('Error saving permission:', e)
-        alert(`Fehler beim Speichern: ${e.message}`)
+      } catch (error: unknown) {
+        console.error('Error saving permission:', error)
+        alert(`Fehler beim Speichern: ${getErrorMessage(error)}`)
         setRolePermissions(prev =>
           prev.map(r =>
             r.role === role && r.permission_code === permCode ? { ...r, allowed: !next } : r
@@ -154,8 +160,8 @@ export function useUserManagement(opts: { companyId?: string }) {
       setInviteEmail('')
       setInviteRole('verkaeufer')
       await loadMembersAndPermissions()
-    } catch (e: any) {
-      alert(e.message)
+    } catch (error: unknown) {
+      alert(getErrorMessage(error))
     } finally {
       setInviting(false)
     }
@@ -176,8 +182,8 @@ export function useUserManagement(opts: { companyId?: string }) {
         }
         await loadMembersAndPermissions()
         refreshPermissions?.()
-      } catch (e: any) {
-        alert(e.message)
+      } catch (error: unknown) {
+        alert(getErrorMessage(error))
       } finally {
         setSaving(false)
       }
@@ -195,8 +201,8 @@ export function useUserManagement(opts: { companyId?: string }) {
           throw new Error(data.error || 'Fehler')
         }
         await loadMembersAndPermissions()
-      } catch (e: any) {
-        alert(e.message)
+      } catch (error: unknown) {
+        alert(getErrorMessage(error))
       }
     },
     [loadMembersAndPermissions]
@@ -212,8 +218,8 @@ export function useUserManagement(opts: { companyId?: string }) {
           throw new Error(data.error || 'Fehler')
         }
         await loadMembersAndPermissions()
-      } catch (e: any) {
-        alert(e.message)
+      } catch (error: unknown) {
+        alert(getErrorMessage(error))
       }
     },
     [loadMembersAndPermissions]

@@ -7,10 +7,9 @@ const DB_NAME = 'kitchen-profi-cache'
 const DB_VERSION = 1
 const STORE_NAME = 'cache'
 
-interface CacheEntry {
+interface CacheEntry<T = unknown> {
   key: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any // Cache can store any type
+  value: T
   timestamp: number
   expiresAt?: number
 }

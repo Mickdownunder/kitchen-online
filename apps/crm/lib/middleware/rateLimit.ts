@@ -76,20 +76,45 @@ export class RateLimiter {
 const apiRateLimiter = new RateLimiter(60000, 100) // 100 requests per minute
 const authRateLimiter = new RateLimiter(60000, 10) // 10 requests per minute (stricter for auth)
 const aiRateLimiter = new RateLimiter(60000, 20) // 20 requests per minute (AI is expensive)
+const emailRateLimiter = new RateLimiter(60000, 30) // 30 emails per minute (anti-spam)
+const geocodeRateLimiter = new RateLimiter(60000, 60) // 60 requests per minute (external API)
+const auditRateLimiter = new RateLimiter(60000, 50) // 50 requests per minute (sensitive data)
 
 /**
  * Get rate limiter for a specific route
  */
 export function getRateLimiter(route: string): RateLimiter {
+  // Auth routes (strict)
   if (route.includes('/api/users/invite') || route.includes('/api/users/process-invite')) {
     return authRateLimiter
   }
   if (route.includes('/api/customer/auth')) {
     return authRateLimiter
   }
-  if (route.includes('/api/chat') || route.includes('/api/extract-project')) {
+  
+  // AI routes (expensive)
+  if (route.includes('/api/chat') || 
+      route.includes('/api/extract-project') ||
+      route.includes('/api/analyze-document') ||
+      route.includes('/api/delivery-notes/analyze')) {
     return aiRateLimiter
   }
+  
+  // Email routes (anti-spam)
+  if (route.includes('/api/email/send') || route.includes('/api/reminders/send')) {
+    return emailRateLimiter
+  }
+  
+  // Geocode (external API)
+  if (route.includes('/api/geocode')) {
+    return geocodeRateLimiter
+  }
+  
+  // Audit logs (sensitive)
+  if (route.includes('/api/audit-logs')) {
+    return auditRateLimiter
+  }
+  
   return apiRateLimiter
 }
 

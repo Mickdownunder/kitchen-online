@@ -20,9 +20,10 @@ export function useEmployees() {
     try {
       const data = await getEmployees()
       setEmployees(data)
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Ignore aborted requests (normal during page navigation)
-      if (error?.message?.includes('aborted') || error?.name === 'AbortError') {
+      const err = error as { message?: string; name?: string }
+      if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
         return
       }
       console.error('Error loading employees:', error)

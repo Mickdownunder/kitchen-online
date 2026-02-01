@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { logger } from '@/lib/utils/logger'
+import type { SpeechRecognition, SpeechRecognitionEvent, SpeechRecognitionErrorEvent } from '@/types/speech.d'
 
 interface UseAISpeechOptions {
   onTranscript?: (text: string) => void
@@ -18,19 +19,16 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
   const [speechError, setSpeechError] = useState<string | null>(null)
   const [interimTranscript, setInterimTranscript] = useState('')
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null)
 
   // Initialize Speech Recognition
   useEffect(() => {
-    const SpeechRecognition =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    setIsSpeechSupported(!!SpeechRecognition)
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition
+    setIsSpeechSupported(!!SpeechRecognitionAPI)
 
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition()
+    if (SpeechRecognitionAPI) {
+      const recognition = new SpeechRecognitionAPI()
       recognition.continuous = true
       recognition.interimResults = true
       recognition.lang = 'de-DE'
@@ -43,8 +41,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
         setInterimTranscript('')
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         let interim = ''
         let final = ''
 
@@ -68,8 +65,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('[Speech] Recognition error:', event.error)
         setIsListening(false)
         setInterimTranscript('')

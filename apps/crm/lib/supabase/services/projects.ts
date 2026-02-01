@@ -19,6 +19,11 @@
 
 import { supabase } from '../client'
 import { CustomerProject, InvoiceItem, ProjectDocument } from '@/types'
+import type { Database, Tables } from '@/types/database.types'
+
+// Type aliases for database rows
+type ProjectRow = Tables<'projects'> & { invoice_items?: Tables<'invoice_items'>[] }
+type InvoiceItemRow = Tables<'invoice_items'>
 import { getCurrentUser } from './auth'
 import { logger } from '@/lib/utils/logger'
 import {
@@ -690,8 +695,7 @@ export async function deleteProject(id: string): Promise<void> {
   if (error) throw error
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapProjectFromDB(dbProject: Record<string, any>): CustomerProject {
+function mapProjectFromDB(dbProject: ProjectRow): CustomerProject {
   // WICHTIG: Berechne totalAmount aus exakten grossTotal-Werten der Items,
   // falls die Items vorhanden sind (korrigiert falsche DB-Werte)
   // Verwende zentrale Utility-Funktion für konsistente Berechnung
@@ -777,8 +781,7 @@ function mapProjectFromDB(dbProject: Record<string, any>): CustomerProject {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapInvoiceItemFromDB(dbItem: Record<string, any>): InvoiceItem {
+function mapInvoiceItemFromDB(dbItem: InvoiceItemRow): InvoiceItem {
   // Map 'm' back to 'lfm' if description contains "laufmeter"
   let unit = dbItem.unit as InvoiceItem['unit']
   if (unit === 'm' && dbItem.description?.toLowerCase().includes('laufmeter')) {

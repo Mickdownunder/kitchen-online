@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect, useCallback, Suspense } from 'reac
 import { useSearchParams } from 'next/navigation'
 import { Filter, Download, Eye, EyeOff, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react'
 import { CustomerProject, Invoice } from '@/types'
-import { downloadStatisticsPDFAdvanced } from '@/components/statistics/exports/StatisticsPDFAdvanced'
+// PDF function is dynamically imported when needed to reduce initial bundle size
 import {
   exportStatisticsToExcel,
   exportTabToExcel,
@@ -21,13 +21,38 @@ import {
   calculateInvoiceStatsFromInvoices,
   calculateMonthlyInvoiceDataFromInvoices,
 } from '@/components/statistics/utils/revenueCalculations'
+import dynamic from 'next/dynamic'
 import StatisticsTabs, { StatisticsTab } from '@/components/statistics/StatisticsTabs'
-import OverviewTab from '@/components/statistics/OverviewTab'
-import ProjectsTab from '@/components/statistics/ProjectsTab'
-import InvoicesTab from '@/components/statistics/InvoicesTab'
-import DeliveriesTab from '@/components/statistics/DeliveriesTab'
-import CustomersTab from '@/components/statistics/CustomersTab'
 import { useApp } from '@/app/providers'
+
+// ==========================================================================
+// Dynamic imports for Statistics Tabs (each includes recharts ~300KB)
+// Only the active tab's code is loaded, significantly reducing initial bundle
+// ==========================================================================
+const OverviewTab = dynamic(() => import('@/components/statistics/OverviewTab'), {
+  loading: () => <TabLoadingSpinner />,
+})
+const ProjectsTab = dynamic(() => import('@/components/statistics/ProjectsTab'), {
+  loading: () => <TabLoadingSpinner />,
+})
+const InvoicesTab = dynamic(() => import('@/components/statistics/InvoicesTab'), {
+  loading: () => <TabLoadingSpinner />,
+})
+const DeliveriesTab = dynamic(() => import('@/components/statistics/DeliveriesTab'), {
+  loading: () => <TabLoadingSpinner />,
+})
+const CustomersTab = dynamic(() => import('@/components/statistics/CustomersTab'), {
+  loading: () => <TabLoadingSpinner />,
+})
+
+// Loading spinner for tab content
+function TabLoadingSpinner() {
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-amber-500" />
+    </div>
+  )
+}
 
 interface StatisticsViewProps {
   projects: CustomerProject[]
@@ -67,12 +92,16 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
     loadInvoices()
   }, [loadInvoices])
 
-  // Update URL when tab changes
+  // Update URL when tab changes (only activeTab, not searchParams to avoid infinite loop)
   React.useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('tab', activeTab)
-    window.history.replaceState({}, '', `/statistics?${params.toString()}`)
-  }, [activeTab, searchParams])
+    const currentParams = new URLSearchParams(window.location.search)
+    const currentTab = currentParams.get('tab')
+    // Only update if tab actually changed to avoid unnecessary replaceState calls
+    if (currentTab !== activeTab) {
+      currentParams.set('tab', activeTab)
+      window.history.replaceState({}, '', `/statistics?${currentParams.toString()}`)
+    }
+  }, [activeTab])
 
   // Build date filter
   const dateFilter: DateFilter = useMemo(() => {
@@ -281,6 +310,9 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
   // Export handlers
   const handleExportPDF = async (type: 'current' | 'all' | 'summary') => {
     try {
+      // Dynamic import to reduce initial bundle size
+      const { downloadStatisticsPDFAdvanced } = await import('@/components/statistics/exports/StatisticsPDFAdvanced')
+      
       const companySettings = await getCompanySettings()
       const companyName = companySettings?.companyName || 'KüchenProfi'
       const year = timeRange === 'all' ? 'all' : yearFilter

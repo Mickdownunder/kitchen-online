@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
-import { UserProfile } from '@/types'
+import { UserProfile, CompanyRole } from '@/types'
 import {
   getCurrentUserProfile,
   getEffectivePermissions,
@@ -11,7 +12,7 @@ import {
 import { logger } from '@/lib/utils/logger'
 
 export function useAuth() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [permissions, setPermissions] = useState<Record<string, boolean> | null>(null)
   const [companyRole, setCompanyRole] = useState<string | null>(null)
@@ -30,9 +31,10 @@ export function useAuth() {
           setLoading(false)
         }
       })
-      .catch((error: any) => {
+      .catch((error: unknown) => {
         // Ignore aborted requests (normal during page navigation or component unmount)
-        if (error?.message?.includes('aborted') || error?.name === 'AbortError') {
+        const err = error as { message?: string; name?: string }
+        if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
           return
         }
         console.error('Error getting session:', error)
@@ -59,9 +61,10 @@ export function useAuth() {
           processedInviteRef.current = false
           setLoading(false)
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Ignore aborted requests
-        if (error?.message?.includes('aborted') || error?.name === 'AbortError') {
+        const err = error as { message?: string; name?: string }
+        if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
           return
         }
         console.error('Error in auth state change:', error)
@@ -110,9 +113,10 @@ export function useAuth() {
       } else {
         console.warn('[useAuth] Process invite returned non-JSON response')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Ignore network errors or JSON parse errors
-      if (error?.message?.includes('JSON') || error?.name === 'SyntaxError') {
+      const err = error as { message?: string; name?: string }
+      if (err?.message?.includes('JSON') || err?.name === 'SyntaxError') {
         console.warn('[useAuth] Failed to parse invite response (likely HTML error page)')
       } else {
         console.error('[useAuth] Error processing invite:', error)
@@ -120,7 +124,7 @@ export function useAuth() {
     }
   }
 
-  const loadProfile = async (authUser?: any) => {
+  const loadProfile = async (authUser?: User) => {
     try {
       const userProfile = await getCurrentUserProfile()
       if (userProfile) {
@@ -139,7 +143,7 @@ export function useAuth() {
         // Fallback: use role-based defaults if RPCs not available or returned empty
         // Use companyRole if available, otherwise fall back to userProfile.role
         const roleToUse = role || userProfile?.role || 'viewer'
-        const perms = await getEffectivePermissions(roleToUse as any)
+        const perms = await getEffectivePermissions(roleToUse as CompanyRole)
         setPermissions(perms)
       } else {
         // Convert array to object { code: allowed }
@@ -149,12 +153,13 @@ export function useAuth() {
         })
         setPermissions(permsMap)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Ignore aborted requests (normal during page navigation)
-      if (error?.message?.includes('aborted') || error?.name === 'AbortError') {
+      const err = error as { message?: string; name?: string }
+      if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
         return
       }
-      console.error('Unexpected error loading profile:', error?.message || error)
+      console.error('Unexpected error loading profile:', err?.message || error)
 
       // Fallback to basic permissions
       setPermissions(null)

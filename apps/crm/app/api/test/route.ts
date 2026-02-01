@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/utils/logger'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
 export async function GET() {
-  try {
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    }
+  // In Production: Komplett blockieren ohne Informationen zu leaken
+  if (process.env.NODE_ENV === 'production') {
+    return new Response(null, { status: 404 })
+  }
 
+  try {
     const supabase = await createClient()
     const {
       data: { user },
@@ -38,16 +40,12 @@ export async function GET() {
       success: true,
       message: response.text || 'No response',
       duration: `${duration}ms`,
-      apiKeyConfigured: !!process.env.GEMINI_API_KEY,
     })
   } catch (error: unknown) {
-    console.error('Test API error:', error)
+    logger.error('Test API error', { component: 'api/test' }, error as Error)
+    // Keine Details in Error-Response
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to test API',
-        apiKeyConfigured: !!process.env.GEMINI_API_KEY,
-      },
+      { success: false, error: 'Test fehlgeschlagen' },
       { status: 500 }
     )
   }

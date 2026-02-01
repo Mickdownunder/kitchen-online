@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
+import type { User, AuthError } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
 
 // Server-side only admin client with service role key
 // NEVER import this file in client-side code!
@@ -12,7 +14,7 @@ if (!supabaseServiceKey) {
 }
 
 export const supabaseAdmin = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, {
+  ? createClient<Database>(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -29,8 +31,7 @@ export function requireAdminClient() {
 }
 
 // Invite user by email using Supabase Admin API
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function inviteUserByEmail(email: string): Promise<{ user: any; error: any }> {
+export async function inviteUserByEmail(email: string): Promise<{ user: User | null; error: AuthError | null }> {
   const admin = requireAdminClient()
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
@@ -41,8 +42,7 @@ export async function inviteUserByEmail(email: string): Promise<{ user: any; err
 }
 
 // Get user by email (to check if already exists)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getUserByEmail(email: string): Promise<{ user: any; error: any }> {
+export async function getUserByEmail(email: string): Promise<{ user: User | null; error: AuthError | null }> {
   const admin = requireAdminClient()
 
   // List users and find by email

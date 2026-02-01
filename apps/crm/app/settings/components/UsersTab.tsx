@@ -15,37 +15,38 @@ import {
   Users,
 } from 'lucide-react'
 import { CompanySettings } from '@/types'
+import type {
+  CompanyMember,
+  PendingInvite,
+  Permission,
+  RoleKey,
+} from '@/hooks/useUserManagement'
 
-export function UsersTab(props: {
+interface UsersTabProps {
   companySettings: Partial<CompanySettings>
   canManageUsers: boolean
   inviteEmail: string
   setInviteEmail: (v: string) => void
-  inviteRole: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  setInviteRole: (v: any) => void
+  inviteRole: RoleKey
+  setInviteRole: (v: RoleKey) => void
   inviting: boolean
   onInvite: () => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pendingInvites: any[]
+  pendingInvites: PendingInvite[]
   onCancelInvite: (id: string) => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  members: any[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  editingMember: any | null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  setEditingMember: (m: any | null) => void
+  members: CompanyMember[]
+  editingMember: CompanyMember | null
+  setEditingMember: (m: CompanyMember | null) => void
   saving: boolean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onUpdateMember: (memberId: string, role: any, isActive: boolean) => void
+  onUpdateMember: (memberId: string, role: RoleKey, isActive: boolean) => void
   onRemoveMember: (memberId: string) => void
   roleColors: Record<string, string>
   roleLabels: Record<string, string>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  permissions: any[]
+  permissions: Permission[]
   getPermissionState: (role: string, permCode: string) => boolean
   onToggleRolePermission: (role: string, permCode: string, next: boolean) => void
-}) {
+}
+
+export function UsersTab(props: UsersTabProps) {
   const {
     companySettings,
     canManageUsers,
@@ -97,7 +98,7 @@ export function UsersTab(props: {
             />
             <select
               value={inviteRole}
-              onChange={e => setInviteRole(e.target.value)}
+              onChange={e => setInviteRole(e.target.value as RoleKey)}
               className="rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-yellow-500"
             >
               <option value="geschaeftsfuehrer">Geschäftsführer</option>
@@ -171,7 +172,7 @@ export function UsersTab(props: {
       <div className="space-y-3">
         <h3 className="flex items-center gap-2 text-lg font-black text-slate-900">
           <Users className="h-5 w-5 text-amber-500" />
-          Team-Mitglieder ({members.filter((m: { is_active: boolean }) => m.is_active).length})
+          Team-Mitglieder ({members.filter((m) => m.is_active).length})
         </h3>
 
         {members.length === 0 ? (
@@ -182,8 +183,7 @@ export function UsersTab(props: {
           </div>
         ) : (
           <div className="grid gap-2">
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {members.map((member: any) => (
+            {members.map((member) => (
               <div
                 key={member.id}
                 className={`flex items-center justify-between rounded-xl border p-4 transition-all ${
@@ -212,7 +212,7 @@ export function UsersTab(props: {
                     <div className="flex items-center gap-2">
                       <select
                         value={editingMember.role}
-                        onChange={e => setEditingMember({ ...editingMember, role: e.target.value })}
+                        onChange={e => setEditingMember({ ...editingMember, role: e.target.value as RoleKey })}
                         className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-slate-200"
                         disabled={member.role === 'geschaeftsfuehrer'}
                       >
@@ -305,8 +305,7 @@ export function UsersTab(props: {
                   <th className="sticky left-0 w-48 bg-slate-50 p-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
                     Rolle
                   </th>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {permissions.map((p: any) => (
+                  {permissions.map((p) => (
                     <th
                       key={p.code}
                       className="min-w-[100px] p-3 text-center text-xs font-black uppercase tracking-widest text-slate-500"
@@ -335,8 +334,7 @@ export function UsersTab(props: {
                         {roleLabels[role]}
                       </span>
                     </td>
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {permissions.map((perm: any) => {
+                    {permissions.map((perm) => {
                       const allowed = getPermissionState(role, perm.code)
                       return (
                         <td key={`${role}-${perm.code}`} className="p-3 text-center">

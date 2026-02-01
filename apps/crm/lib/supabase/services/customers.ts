@@ -1,6 +1,10 @@
 import { supabase } from '../client'
 import { Customer } from '@/types'
 import { getCurrentUser } from './auth'
+import type { Tables } from '@/types/database.types'
+
+// Type alias for database row
+type CustomerRow = Tables<'customers'>
 
 export async function getCustomers(): Promise<Customer[]> {
   const { data, error } = await supabase
@@ -88,8 +92,7 @@ export async function deleteCustomer(id: string): Promise<void> {
   if (error) throw error
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapCustomerFromDB(dbCustomer: Record<string, any>): Customer {
+function mapCustomerFromDB(dbCustomer: CustomerRow): Customer {
   return {
     id: dbCustomer.id,
     userId: dbCustomer.user_id,

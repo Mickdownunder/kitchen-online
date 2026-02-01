@@ -4,16 +4,18 @@ import { sendEmail } from '@/lib/supabase/services/email'
 import { bookingConfirmationTemplate } from '@/lib/email-templates/booking-confirmation'
 import { generateOrderNumber } from '@/lib/utils/orderNumberGenerator'
 import { logger } from '@/lib/utils/logger'
+import crypto from 'crypto'
 
 /**
  * Cal.com Webhook Handler
  * 
  * Empfängt BOOKING_CREATED Events von Cal.com und:
- * 1. Dedupliziert via processed_webhooks Tabelle
- * 2. Legt Customer an (oder findet existierenden)
- * 3. Legt Projekt an mit Access Code
- * 4. Legt Planning Appointment an
- * 5. Sendet Bestätigungs-Email mit Portal-Zugang + Meet-Link
+ * 1. Validiert Webhook-Signatur (CALCOM_WEBHOOK_SECRET)
+ * 2. Dedupliziert via processed_webhooks Tabelle
+ * 3. Legt Customer an (oder findet existierenden)
+ * 4. Legt Projekt an mit Access Code
+ * 5. Legt Planning Appointment an
+ * 6. Sendet Bestätigungs-Email mit Portal-Zugang + Meet-Link
  */
 
 // Supabase Admin Client (bypasses RLS)
@@ -21,6 +23,58 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+/**
+ * Validiert die Cal.com Webhook-Signatur
+ * @param payload - Raw body als String
+ * @param signature - Signatur aus dem Header
+ * @param secret - Webhook Secret aus Cal.com Dashboard
+ * @returns true wenn Signatur gültig oder keine Validierung nötig
+ */
+function verifyCalcomSignature(
+  payload: string,
+  signature: string | null,
+  secret: string | undefined
+): boolean {
+  // In Development ohne Secret: Warning loggen und erlauben
+  if (!secret) {
+    if (process.env.NODE_ENV === 'development') {
+      logger.warn('CALCOM_WEBHOOK_SECRET not set - skipping signature check in development', {
+        component: 'booking-webhook',
+      })
+      return true
+    }
+    // In Production ohne Secret: Ablehnen
+    logger.error('CALCOM_WEBHOOK_SECRET not configured in production', {
+      component: 'booking-webhook',
+    })
+    return false
+  }
+
+  // Keine Signatur im Request
+  if (!signature) {
+    logger.warn('No webhook signature provided', {
+      component: 'booking-webhook',
+    })
+    return false
+  }
+
+  // Signatur berechnen und vergleichen
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex')
+
+  // Timing-safe comparison gegen Timing-Attacks
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature)
+    )
+  } catch {
+    return false
+  }
+}
 
 // Access Code Generator (wie im n8n Flow)
 function generateAccessCode(length = 12): string {
@@ -159,8 +213,35 @@ export async function POST(request: NextRequest) {
   const startTime = apiLogger.start()
 
   try {
-    // 1. Parse Payload
-    const body = await request.json()
+    // 1. Raw Body für Signatur-Validierung lesen
+    const rawBody = await request.text()
+    
+    // 2. Signatur aus Header extrahieren (Cal.com verwendet x-cal-signature-256)
+    const signature = request.headers.get('x-cal-signature-256') 
+                   || request.headers.get('x-webhook-signature')
+    const webhookSecret = process.env.CALCOM_WEBHOOK_SECRET
+
+    // 3. Signatur validieren
+    if (!verifyCalcomSignature(rawBody, signature, webhookSecret)) {
+      logger.warn('Invalid or missing webhook signature', {
+        component: 'booking-webhook',
+        hasSignature: !!signature,
+        hasSecret: !!webhookSecret,
+      })
+      
+      // In Production: Ablehnen
+      if (process.env.NODE_ENV === 'production') {
+        apiLogger.end(startTime, 401)
+        return NextResponse.json(
+          { error: 'Invalid webhook signature' },
+          { status: 401 }
+        )
+      }
+      // In Development: Warning wurde bereits geloggt, weitermachen
+    }
+
+    // 4. Parse Payload (bereits als Text gelesen)
+    const body = JSON.parse(rawBody)
     const payload: CalcomPayload = body.payload || body
 
     // Nur BOOKING_CREATED verarbeiten
@@ -170,7 +251,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'Not BOOKING_CREATED' })
     }
 
-    // 2. Daten extrahieren
+    // 5. Daten extrahieren
     const data = extractBookingData(payload)
     
     logger.info('Cal.com webhook received', {
@@ -407,10 +488,12 @@ export async function POST(request: NextRequest) {
     apiLogger.error(error as Error, 500)
     logger.error('Booking webhook error', {
       component: 'booking-webhook',
+      errorMessage: error instanceof Error ? error.message : 'Unknown',
     }, error as Error)
 
+    // Keine internen Fehlerdetails zurückgeben
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Webhook processing failed' },
+      { error: 'Webhook processing failed' },
       { status: 500 }
     )
   }

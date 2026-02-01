@@ -37,10 +37,9 @@ import {
   CheckCircle2,
   Loader2,
 } from 'lucide-react'
-import { downloadInvoicePDF, openInvoicePDFInNewTab, InvoiceData } from '../InvoicePDF'
-import { downloadCustomerDeliveryNotePDF } from '../CustomerDeliveryNotePDF'
-import { downloadOrderPDF, openOrderPDFInNewTab } from '../OrderPDF'
-// getBankAccounts used for invoice PDF generation
+// PDF functions are dynamically imported when needed to reduce initial bundle size (~300KB saving)
+// The InvoiceData type is imported separately for type checking
+import type { InvoiceData } from '../InvoicePDF'
 import CustomerDeliveryNoteViewModal from '../CustomerDeliveryNoteViewModal'
 
 interface ProjectDocumentsTabProps {
@@ -498,8 +497,12 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
           company: companySettings,
           bankAccount: bankAccount,
         }
+        // Dynamic import to reduce initial bundle size
+        const { downloadInvoicePDF } = await import('../InvoicePDF')
         await downloadInvoicePDF(invoiceData)
       } else if (doc.type === 'customer-delivery-note') {
+        // Dynamic import to reduce initial bundle size
+        const { downloadCustomerDeliveryNotePDF } = await import('../CustomerDeliveryNotePDF')
         await downloadCustomerDeliveryNotePDF(doc.data.note, doc.data.project, companySettings)
       } else if (doc.type === 'supplier-delivery-note') {
         // TODO: PDF für Lieferanten-Lieferscheine
@@ -529,6 +532,8 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         return
       }
       try {
+        // Dynamic import to reduce initial bundle size
+        const { openOrderPDFInNewTab } = await import('../OrderPDF')
         await openOrderPDFInNewTab(project, companySettings, {
           appendAgb: !!companySettings.agbText?.trim(),
         })
@@ -615,6 +620,8 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
           company: companySettings,
           bankAccount: bankAccount,
         }
+        // Dynamic import to reduce initial bundle size
+        const { openInvoicePDFInNewTab } = await import('../InvoicePDF')
         await openInvoicePDFInNewTab(invoiceData)
       } catch (err) {
         logger.error(
@@ -901,9 +908,11 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    downloadOrderPDF(project, companySettings!, {
+                    // Dynamic import to reduce initial bundle size
+                    const { downloadOrderPDF } = await import('../OrderPDF')
+                    await downloadOrderPDF(project, companySettings!, {
                       showUnitPrices: false,
                       appendAgb: orderDownloadAppendAgb,
                     })

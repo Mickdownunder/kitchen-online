@@ -63,11 +63,26 @@ function ProjectsPageContent() {
   }
 
   const handleDeleteProject = async (id: string) => {
+    // Optimistisches Update: Erst UI aktualisieren, dann API-Call
+    // Das verhindert das "muss refreshen" Problem
+    const previousProjects = projects
+    setProjects(prev => prev.filter(p => p.id !== id))
+
     try {
       await deleteProject(id)
-      setProjects(prev => prev.filter(p => p.id !== id))
-    } catch (error) {
+    } catch (error: unknown) {
+      // AbortError ignorieren (passiert bei Navigation/Modal-Schließen)
+      const errMessage = error instanceof Error ? error.message : ''
+      const errName = error instanceof Error ? error.name : ''
+      if (errMessage.includes('aborted') || errName === 'AbortError') {
+        // Request wurde abgebrochen, aber das Löschen war vielleicht trotzdem erfolgreich
+        // UI bleibt optimistisch aktualisiert
+        return
+      }
+      
+      // Bei echtem Fehler: State zurücksetzen
       console.error('Error deleting project:', error)
+      setProjects(previousProjects)
       alert('Fehler beim Löschen des Auftrags')
     }
   }

@@ -4,7 +4,7 @@ import React from 'react'
 import { X, Download, ExternalLink, Truck, Trash2 } from 'lucide-react'
 import { CustomerDeliveryNote, CustomerProject, CompanySettings, ProjectStatus } from '@/types'
 import { getCompanySettings } from '@/lib/supabase/services'
-import { downloadCustomerDeliveryNotePDF } from './CustomerDeliveryNotePDF'
+// PDF function is dynamically imported when needed to reduce initial bundle size
 import { useRouter } from 'next/navigation'
 
 interface CustomerDeliveryNoteViewModalProps {
@@ -125,6 +125,8 @@ export default function CustomerDeliveryNoteViewModal({
         items: displayItems,
       }
 
+      // Dynamic import to reduce initial bundle size
+      const { downloadCustomerDeliveryNotePDF } = await import('./CustomerDeliveryNotePDF')
       await downloadCustomerDeliveryNotePDF(noteForPdf, pseudoProject, companySettings)
     } catch (e) {
       console.error('Error generating customer delivery note PDF:', e)

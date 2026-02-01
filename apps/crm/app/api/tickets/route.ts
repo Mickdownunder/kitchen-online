@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * Helper: Employee Session aus Request extrahieren (uses SSR client)
@@ -57,8 +58,11 @@ export async function GET(request: NextRequest) {
       .eq('is_active', true)
       .single()
 
-    console.log('[Tickets API] User:', session.user_id)
-    console.log('[Tickets API] Company member:', companyMember)
+    logger.debug('Tickets API request', {
+      component: 'api/tickets',
+      userId: session.user_id,
+      companyId: companyMember?.company_id,
+    })
 
     if (!companyMember?.company_id) {
       return NextResponse.json(
@@ -95,11 +99,14 @@ export async function GET(request: NextRequest) {
 
     const { data: tickets, error: ticketsError } = await query
 
-    console.log('[Tickets API] Query company_id:', companyMember.company_id)
-    console.log('[Tickets API] Found tickets:', tickets?.length, tickets?.map(t => ({ id: t.id, subject: t.subject, company_id: t.company_id })))
+    logger.debug('Tickets query result', {
+      component: 'api/tickets',
+      companyId: companyMember.company_id,
+      ticketCount: tickets?.length || 0,
+    })
 
     if (ticketsError) {
-      console.error('Tickets fetch error:', ticketsError)
+      logger.error('Tickets fetch error', { component: 'api/tickets' }, ticketsError)
       return NextResponse.json(
         { success: false, error: 'FETCH_ERROR' },
         { status: 500 }
@@ -159,7 +166,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Get tickets error:', error)
+    logger.error('Get tickets error', { component: 'api/tickets' }, error as Error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

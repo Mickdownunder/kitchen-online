@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react'
 import { Ruler, Truck, ChefHat, Package } from 'lucide-react'
 import type { CustomerProject, PlanningAppointment } from '@/types'
 import { ProjectStatus } from '@/types'
+import { formatDate as formatDateUtil, getStatusColor as getStatusColorUtil } from '@/lib/utils'
 
 export type CalendarEvent = {
   id: string
@@ -178,29 +179,13 @@ export function useCalendarEvents(options: UseCalendarEventsOptions) {
       })
   }, [projects, debouncedSearchQuery, sortBy])
 
+  // Re-export centralized utilities for backward compatibility
   const getStatusColor = useCallback((status: ProjectStatus): string => {
-    switch (status) {
-      case ProjectStatus.PLANNING:
-        return 'bg-blue-100 text-blue-700 border-blue-200'
-      case ProjectStatus.MEASURING:
-        return 'bg-indigo-100 text-indigo-700 border-indigo-200'
-      case ProjectStatus.ORDERED:
-        return 'bg-purple-100 text-purple-700 border-purple-200'
-      case ProjectStatus.DELIVERY:
-        return 'bg-orange-100 text-orange-700 border-orange-200'
-      case ProjectStatus.INSTALLATION:
-        return 'bg-amber-100 text-amber-700 border-amber-200'
-      case ProjectStatus.COMPLAINT:
-        return 'bg-red-100 text-red-700 border-red-200'
-      default:
-        return 'bg-slate-100 text-slate-700 border-slate-200'
-    }
+    return getStatusColorUtil(status)
   }, [])
 
   const formatDate = useCallback((dateStr?: string): string => {
-    if (!dateStr) return '—'
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return formatDateUtil(dateStr)
   }, [])
 
   return {

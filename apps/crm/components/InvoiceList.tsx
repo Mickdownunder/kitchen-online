@@ -13,6 +13,7 @@ import { getCompanySettings } from '@/lib/supabase/services/company'
 import { InvoiceFilters } from './invoices/InvoiceFilters'
 import { InvoiceStatsCards } from './invoices/InvoiceStatsCards'
 import { InvoiceTable } from './invoices/InvoiceTable'
+import { useToast } from '@/components/providers/ToastProvider'
 
 interface InvoiceListProps {
   projects: CustomerProject[]
@@ -20,6 +21,7 @@ interface InvoiceListProps {
 }
 
 const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) => {
+  const { success, error: showError } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'deposit' | 'final'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'sent'>('all')
@@ -112,7 +114,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       if (onProjectUpdate) onProjectUpdate()
     } catch (error) {
       console.error('Error marking as paid:', error)
-      alert('Fehler beim Speichern')
+      showError('Fehler beim Speichern')
     } finally {
       setSaving(false)
     }
@@ -127,7 +129,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       if (onProjectUpdate) onProjectUpdate()
     } catch (error) {
       console.error('Error unmarking as paid:', error)
-      alert('Fehler beim Speichern')
+      showError('Fehler beim Speichern')
     } finally {
       setSaving(false)
     }
@@ -208,13 +210,13 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
         throw new Error(data.error || 'Fehler beim Senden der Mahnung')
       }
 
-      alert(
-        `✅ ${reminderType === 'first' ? '1.' : reminderType === 'second' ? '2.' : 'Letzte'} Mahnung erfolgreich gesendet!`
+      success(
+        `${reminderType === 'first' ? '1.' : reminderType === 'second' ? '2.' : 'Letzte'} Mahnung erfolgreich gesendet!`
       )
       if (onProjectUpdate) onProjectUpdate()
     } catch (error: unknown) {
       console.error('Error sending reminder:', error)
-      alert(
+      showError(
         `Fehler beim Senden der Mahnung: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
       )
     } finally {

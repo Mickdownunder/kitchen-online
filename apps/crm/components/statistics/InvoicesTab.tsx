@@ -220,8 +220,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
                     border: 'none',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
                   }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any) => [`${formatCurrency(value)} €`, 'Fakturiert']}
+                  formatter={(value: number) => [`${formatCurrency(value)} €`, 'Fakturiert']}
                 />
                 <Bar dataKey="invoiced" fill="#8b5cf6" radius={[8, 8, 0, 0]} name="Fakturiert" />
               </BarChart>
@@ -260,8 +259,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
                     border: 'none',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
                   }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any) => [`${formatCurrency(value)} €`, 'Anzahlungen']}
+                  formatter={(value: number) => [`${formatCurrency(value)} €`, 'Anzahlungen']}
                 />
                 <Bar dataKey="deposit" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Anzahlungen" />
               </BarChart>
@@ -306,13 +304,12 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
                     border: 'none',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
                   }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any, name: any) => {
+                  formatter={(value: number, name: string) => {
                     const labels: { [key: string]: string } = {
                       paid: 'Eingegangen',
                       outstanding: 'Offen',
                     }
-                    return [`${formatCurrency(value)} €`, labels[String(name) || ''] || name]
+                    return [`${formatCurrency(value)} €`, labels[name] || name]
                   }}
                 />
                 <Legend />

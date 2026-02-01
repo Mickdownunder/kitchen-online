@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import dynamic from 'next/dynamic'
 import {
   Clock,
   AlertTriangle,
@@ -12,10 +12,24 @@ import {
   ShoppingCart,
   CalendarClock,
   ArrowRight,
+  Loader2,
 } from 'lucide-react'
 import { CustomerProject, ProjectStatus } from '@/types'
 import { useAuth } from '@/hooks/useAuth'
 import { logger } from '@/lib/utils/logger'
+
+// ==========================================================================
+// Dynamic import for the chart component (recharts is ~300KB gzipped)
+// Only loaded when the dashboard is rendered and mounted
+// ==========================================================================
+const RevenueChart = dynamic(() => import('./charts/RevenueChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-80 items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+    </div>
+  ),
+})
 
 interface DashboardProps {
   projects: CustomerProject[]
@@ -43,48 +57,75 @@ const Dashboard: React.FC<DashboardProps> = ({ projects }) => {
     setMounted(true)
   }, [projects])
 
-  // Logik für ausstehende Aufgaben
-  const pendingMeasurements = projects.filter(p => !p.isMeasured).length
-  const pendingOrders = projects.filter(p => p.isMeasured && !p.isOrdered).length
-  const pendingInstallations = projects.filter(p => p.isOrdered && !p.installationDate).length
-
-  const totalRevenue = projects.reduce((acc, p) => acc + p.totalAmount, 0)
-
   // Format currency with consistent locale to avoid hydration mismatch
   const formatCurrency = (value: number) => {
     return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  const stats = [
+  // ==========================================================================
+  // Memoized calculations for pending tasks and stats (performance optimization)
+  // ==========================================================================
+  const dashboardStats = useMemo(() => {
+    let pendingMeasurements = 0
+    let pendingOrders = 0
+    let pendingInstallations = 0
+    let activeProjects = 0
+    let openComplaints = 0
+    let pendingMontagen = 0
+    let totalRevenue = 0
+
+    projects.forEach(p => {
+      // Pending counts
+      if (!p.isMeasured) pendingMeasurements++
+      if (p.isMeasured && !p.isOrdered) pendingOrders++
+      if (p.isOrdered && !p.installationDate) pendingInstallations++
+
+      // Stats counts
+      if (p.status !== ProjectStatus.COMPLETED) activeProjects++
+      if (p.installationDate && !p.isInstallationAssigned) pendingMontagen++
+      openComplaints += p.complaints?.filter(c => c.status !== 'resolved').length || 0
+      totalRevenue += p.totalAmount || 0
+    })
+
+    return {
+      pendingMeasurements,
+      pendingOrders,
+      pendingInstallations,
+      activeProjects,
+      openComplaints,
+      pendingMontagen,
+      totalRevenue,
+    }
+  }, [projects])
+
+  // Memoized stats array to prevent recreation on every render
+  const stats = useMemo(() => [
     {
       label: 'Aktive Projekte',
-      value: projects.filter(p => p.status !== ProjectStatus.COMPLETED).length,
+      value: dashboardStats.activeProjects,
       icon: Clock,
       color: 'text-blue-600',
     },
     {
       label: 'Offene Reklamationen',
-      value: projects.reduce(
-        (acc, p) => acc + (p.complaints?.filter(c => c.status !== 'resolved').length || 0),
-        0
-      ),
+      value: dashboardStats.openComplaints,
       icon: AlertTriangle,
       color: 'text-red-600',
     },
     {
       label: 'Anstehende Montagen',
-      value: projects.filter(p => p.installationDate && !p.isInstallationAssigned).length,
+      value: dashboardStats.pendingMontagen,
       icon: Truck,
       color: 'text-amber-600',
     },
     {
       label: 'Umsatz Gesamt',
-      value: totalRevenue,
+      value: dashboardStats.totalRevenue,
       icon: TrendingUp,
       color: 'text-green-600',
       formatCurrency: true,
     },
-  ]
+  ], [dashboardStats])
 
   // Calculate monthly revenue from real project data - ALLE 12 MONATE
   const monthlyRevenueData = React.useMemo(() => {
@@ -180,7 +221,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects }) => {
                 <Ruler className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <span className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-4xl font-black text-transparent sm:text-5xl">
-                {mounted ? pendingMeasurements : '...'}
+                {mounted ? dashboardStats.pendingMeasurements : '...'}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -201,7 +242,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects }) => {
                 <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <span className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-4xl font-black text-transparent sm:text-5xl">
-                {mounted ? pendingOrders : '...'}
+                {mounted ? dashboardStats.pendingOrders : '...'}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -224,7 +265,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects }) => {
                 <CalendarClock className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <span className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-4xl font-black text-transparent sm:text-5xl">
-                {mounted ? pendingInstallations : '...'}
+                {mounted ? dashboardStats.pendingInstallations : '...'}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -321,39 +362,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects }) => {
           <div className="h-80 min-h-[320px] w-full" style={{ minHeight: '320px', width: '100%' }}>
             {mounted &&
               (monthlyRevenueData.length > 0 && monthlyRevenueData.some(m => m.revenue > 0) ? (
-                <div style={{ width: '100%', height: '320px', minHeight: '320px' }}>
-                  <ResponsiveContainer width="100%" height={320} minHeight={320}>
-                    <BarChart
-                      data={monthlyRevenueData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis
-                        dataKey="month"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fontWeight: 'bold', fill: '#64748b' }}
-                        interval={0}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fontWeight: 'bold', fill: '#64748b' }}
-                        tickFormatter={value => `${(value / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{
-                          borderRadius: '15px',
-                          border: 'none',
-                          boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
-                        }}
-                        formatter={value => [`${formatCurrency(value as number)} €`, 'Umsatz']}
-                      />
-                      <Bar dataKey="revenue" fill="#f59e0b" radius={[8, 8, 0, 0]} barSize={30} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center text-slate-400">
                   <TrendingUp className="mb-4 h-12 w-12 opacity-30" />
