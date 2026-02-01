@@ -7,6 +7,7 @@ import { useApp } from '../providers'
 import AIAgentButton from '@/components/AIAgentButton'
 import { createProject, updateProject, deleteProject } from '@/lib/supabase/services'
 import { CustomerProject } from '@/types'
+import { logger } from '@/lib/utils/logger'
 
 function ProjectsPageContent() {
   const { projects, setProjects, isLoading } = useApp()
@@ -31,7 +32,7 @@ function ProjectsPageContent() {
       const newProject = await createProject(project)
       setProjects(prev => [newProject, ...prev])
     } catch (error) {
-      console.error('Error creating project:', error)
+      logger.error('Error creating project', { component: 'ProjectsPageContent' }, error as Error)
       alert('Fehler beim Erstellen des Auftrags')
     }
   }
@@ -39,7 +40,7 @@ function ProjectsPageContent() {
   const handleUpdateProject = async (updatedProject: CustomerProject) => {
     try {
       if (!updatedProject.id) {
-        console.error('Error updating project: No ID provided')
+        logger.error('Error updating project: No ID provided', { component: 'ProjectsPageContent' })
         alert('Fehler: Keine Projekt-ID vorhanden')
         return updatedProject
       }
@@ -48,15 +49,15 @@ function ProjectsPageContent() {
       return result
     } catch (error: unknown) {
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      console.error('Error updating project:', error)
-      console.error('Error details:', {
+      logger.error('Error updating project', {
+        component: 'ProjectsPageContent',
         message: errObj?.message,
         code: errObj?.code,
         details: errObj?.details,
         hint: errObj?.hint,
-      })
+      }, error as Error)
       if (errObj?.code !== 'PGRST116') {
-        console.error('Critical error updating project:', error)
+        logger.error('Critical error updating project', { component: 'ProjectsPageContent' }, error as Error)
       }
       throw error
     }
@@ -81,7 +82,7 @@ function ProjectsPageContent() {
       }
       
       // Bei echtem Fehler: State zurücksetzen
-      console.error('Error deleting project:', error)
+      logger.error('Error deleting project', { component: 'ProjectsPageContent' }, error as Error)
       setProjects(previousProjects)
       alert('Fehler beim Löschen des Auftrags')
     }

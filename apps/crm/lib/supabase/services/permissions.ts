@@ -302,25 +302,16 @@ export async function getCompanyMembers(companyId: string): Promise<CompanyMembe
     .eq('company_id', companyId)
     .order('created_at', { ascending: true })
   if (error) throw error
-  return (data || []).map(
-    (m: {
-      id: string
-      company_id: string
-      role: string
-      user_id: string
-      is_active: boolean
-      created_at: string
-      updated_at: string
-    }) => ({
-      id: m.id,
-      companyId: m.company_id,
-      userId: m.user_id,
-      role: m.role as CompanyMemberRole,
-      isActive: m.is_active,
-      createdAt: m.created_at,
-      updatedAt: m.updated_at,
-    })
-  )
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((m: any) => ({
+    id: m.id,
+    companyId: m.company_id,
+    userId: m.user_id,
+    role: m.role as CompanyMemberRole,
+    isActive: m.is_active,
+    createdAt: m.created_at,
+    updatedAt: m.updated_at,
+  }))
 }
 
 export async function upsertRolePermission(
@@ -345,7 +336,8 @@ export async function upsertUserPermission(
   code: PermissionCode,
   allowed: boolean
 ) {
-  const { error } = await supabase.rpc('upsert_user_permission', {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await supabase.rpc('upsert_user_permission' as any, {
     p_company_id: companyId,
     p_user_id: userId,
     p_permission_code: code,

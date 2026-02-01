@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { DeliveryNote, CustomerProject } from '@/types'
 import { getDeliveryNotes, getProjects } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 import { Package, Search, Upload, CheckCircle2, AlertCircle, Clock, FileText } from 'lucide-react'
 import DeliveryNoteDetail from './DeliveryNoteDetail'
 import DeliveryNoteUpload from './DeliveryNoteUpload'
@@ -27,7 +28,7 @@ export default function DeliveryNoteList() {
       setDeliveryNotes(notes)
       setProjects(projs)
     } catch (error) {
-      console.error('Error loading delivery notes:', error)
+      logger.error('Error loading delivery notes', { component: 'DeliveryNoteList' }, error as Error)
     } finally {
       setLoading(false)
     }

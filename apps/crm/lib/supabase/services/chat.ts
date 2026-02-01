@@ -36,12 +36,13 @@ export async function createChatSession(title?: string): Promise<ChatSession> {
     .single()
 
   if (error) throw error
+  const d = data as { id: string; user_id: string; title: string | null; created_at: string; updated_at: string }
   return {
-    id: data.id,
-    userId: data.user_id,
-    title: data.title,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
+    id: d.id,
+    userId: d.user_id,
+    title: d.title,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
   }
 }
 
@@ -56,7 +57,8 @@ export async function getChatSessions(): Promise<ChatSession[]> {
     .order('updated_at', { ascending: false })
 
   if (error) throw error
-  return (data || []).map(s => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((s: any) => ({
     id: s.id,
     userId: s.user_id,
     title: s.title,
@@ -86,7 +88,8 @@ export async function getChatMessages(sessionId: string): Promise<ChatMessage[]>
     .order('created_at', { ascending: true })
 
   if (error) throw error
-  return (data || []).map(m => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((m: any) => ({
     id: m.id,
     sessionId: m.session_id,
     role: m.role,
@@ -139,14 +142,16 @@ export async function saveChatMessage(
     .update({ updated_at: new Date().toISOString() })
     .eq('id', sessionId)
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = data as any
   return {
-    id: data.id,
-    sessionId: data.session_id,
-    role: data.role,
-    content: data.content,
-    functionCalls: data.function_calls,
-    metadata: data.metadata,
-    createdAt: data.created_at,
+    id: d.id,
+    sessionId: d.session_id,
+    role: d.role,
+    content: d.content,
+    functionCalls: d.function_calls,
+    metadata: d.metadata,
+    createdAt: d.created_at,
   }
 }
 

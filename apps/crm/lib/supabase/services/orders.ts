@@ -138,16 +138,17 @@ export async function getOrdersWithProject(status?: OrderStatus): Promise<Order[
     return []
   }
 
-  return (data || []).map(row => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).map((row: any) => {
     const order = mapOrderFromDB(row)
     if (row.projects) {
       order.project = {
         id: row.projects.id,
         customerName: row.projects.customer_name,
         totalAmount: row.projects.total_amount,
-        address: row.projects.address,
-        phone: row.projects.phone,
-        email: row.projects.email,
+        address: row.projects.customer_address || row.projects.address,
+        phone: row.projects.customer_phone || row.projects.phone,
+        email: row.projects.customer_email || row.projects.email,
       } as CustomerProject
     }
     return order

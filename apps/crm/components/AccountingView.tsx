@@ -28,6 +28,7 @@ import {
   getInputTaxForUVA,
 } from '@/lib/supabase/services'
 import { calculateNetFromGross } from '@/lib/utils/priceCalculations'
+import { logger } from '@/lib/utils/logger'
 import {
   exportUVAExcel,
   exportInvoicesExcel,
@@ -100,7 +101,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
       const invoices = await getInvoicesWithProject()
       setDbInvoices(invoices)
     } catch (error) {
-      console.error('Fehler beim Laden der Rechnungen:', error)
+      logger.error('Fehler beim Laden der Rechnungen', { component: 'AccountingView' }, error as Error)
     }
   }, [])
 
@@ -156,7 +157,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
       setSupplierInvoices(invoices)
       setInputTaxData(inputTax)
     } catch (error) {
-      console.error('Fehler beim Laden der Eingangsrechnungen:', error)
+      logger.error('Fehler beim Laden der Eingangsrechnungen', { component: 'AccountingView' }, error as Error)
     }
   }, [getDateRange])
 
@@ -387,7 +388,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
         })
       }
     } catch (error) {
-      console.error('Export error:', error)
+      logger.error('Export error', { component: 'AccountingView' }, error as Error)
       alert('Fehler beim Export. Bitte versuchen Sie es erneut.')
     } finally {
       setIsExporting(false)

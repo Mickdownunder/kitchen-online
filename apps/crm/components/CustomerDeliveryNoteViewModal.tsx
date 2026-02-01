@@ -4,6 +4,7 @@ import React from 'react'
 import { X, Download, ExternalLink, Truck, Trash2 } from 'lucide-react'
 import { CustomerDeliveryNote, CustomerProject, CompanySettings, ProjectStatus } from '@/types'
 import { getCompanySettings } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 // PDF function is dynamically imported when needed to reduce initial bundle size
 import { useRouter } from 'next/navigation'
 
@@ -33,7 +34,7 @@ export default function CustomerDeliveryNoteViewModal({
         const settings = await getCompanySettings()
         setCompanySettings(settings)
       } catch (e) {
-        console.error('Error loading company settings:', e)
+        logger.error('Error loading company settings', { component: 'CustomerDeliveryNoteViewModal' }, e as Error)
       }
     })()
   }, [])
@@ -67,7 +68,7 @@ export default function CustomerDeliveryNoteViewModal({
         router.refresh()
       }
     } catch (error: unknown) {
-      console.error('Error deleting customer delivery note:', error)
+      logger.error('Error deleting customer delivery note', { component: 'CustomerDeliveryNoteViewModal' }, error as Error)
       alert(`Fehler beim Löschen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)
     } finally {
       setDeleting(false)
@@ -129,7 +130,7 @@ export default function CustomerDeliveryNoteViewModal({
       const { downloadCustomerDeliveryNotePDF } = await import('./CustomerDeliveryNotePDF')
       await downloadCustomerDeliveryNotePDF(noteForPdf, pseudoProject, companySettings)
     } catch (e) {
-      console.error('Error generating customer delivery note PDF:', e)
+      logger.error('Error generating customer delivery note PDF', { component: 'CustomerDeliveryNoteViewModal' }, e as Error)
       alert('Fehler beim Generieren des PDFs')
     } finally {
       setLoadingPdf(false)

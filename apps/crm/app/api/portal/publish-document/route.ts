@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       .from('company_members')
       .select('id')
       .eq('company_id', companyId)
-      .eq('user_id', projectRow.user_id)
+      .eq('user_id', projectRow.user_id || '')
       .eq('is_active', true)
       .single()
 
@@ -303,11 +303,12 @@ export async function POST(request: NextRequest) {
     // Extract base name without timestamp for duplicate check
     const baseFileName = fileName.replace('.pdf', '')
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingDocs } = await serviceClient
       .from('documents')
       .select('id, name')
       .eq('project_id', projectId)
-      .eq('type', portalType)
+      .eq('type', portalType as any)
       .ilike('name', `${baseFileName}%`)
     
     if (existingDocs && existingDocs.length > 0) {
@@ -343,6 +344,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create document record
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: document, error: dbError } = await serviceClient
       .from('documents')
       .insert({
@@ -355,7 +357,7 @@ export async function POST(request: NextRequest) {
         mime_type: 'application/pdf',
         uploaded_at: new Date().toISOString(),
         uploaded_by: user.id,
-      })
+      } as any)
       .select('id')
       .single()
 

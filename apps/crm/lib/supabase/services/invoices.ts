@@ -387,9 +387,10 @@ export async function getInvoiceStats(year: number): Promise<{
   const endDate = `${year}-12-31`
   const today = new Date().toISOString().split('T')[0]
 
+  // Nur Spalten für Statistik-Aggregation laden (Performance)
   const { data, error } = await supabase
     .from('invoices')
-    .select('*')
+    .select('id, amount, is_paid, type, due_date, invoice_date')
     .eq('user_id', user.id)
     .gte('invoice_date', startDate)
     .lte('invoice_date', endDate)

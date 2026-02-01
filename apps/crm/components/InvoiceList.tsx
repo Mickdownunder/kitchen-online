@@ -14,6 +14,7 @@ import { InvoiceFilters } from './invoices/InvoiceFilters'
 import { InvoiceStatsCards } from './invoices/InvoiceStatsCards'
 import { InvoiceTable } from './invoices/InvoiceTable'
 import { useToast } from '@/components/providers/ToastProvider'
+import { logger } from '@/lib/utils/logger'
 
 interface InvoiceListProps {
   projects: CustomerProject[]
@@ -48,7 +49,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       const invoices = await getInvoicesWithProject()
       setDbInvoices(invoices)
     } catch (error) {
-      console.error('Error loading invoices:', error)
+      logger.error('Error loading invoices', { component: 'InvoiceList' }, error as Error)
     } finally {
       setLoadingInvoices(false)
     }
@@ -113,7 +114,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       await loadInvoices()
       if (onProjectUpdate) onProjectUpdate()
     } catch (error) {
-      console.error('Error marking as paid:', error)
+      logger.error('Error marking as paid', { component: 'InvoiceList' }, error as Error)
       showError('Fehler beim Speichern')
     } finally {
       setSaving(false)
@@ -128,7 +129,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       await loadInvoices()
       if (onProjectUpdate) onProjectUpdate()
     } catch (error) {
-      console.error('Error unmarking as paid:', error)
+      logger.error('Error unmarking as paid', { component: 'InvoiceList' }, error as Error)
       showError('Fehler beim Speichern')
     } finally {
       setSaving(false)
@@ -215,7 +216,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       )
       if (onProjectUpdate) onProjectUpdate()
     } catch (error: unknown) {
-      console.error('Error sending reminder:', error)
+      logger.error('Error sending reminder', { component: 'InvoiceList' }, error as Error)
       showError(
         `Fehler beim Senden der Mahnung: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
       )

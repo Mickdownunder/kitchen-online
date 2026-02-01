@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { CustomerProject, CustomerDeliveryNote } from '@/types'
 import { getCustomerDeliveryNotes } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 
 // =============================================================================
 // Types
@@ -130,7 +131,7 @@ export function useProjectModals(): ProjectModalsState & ProjectModalsActions {
       if (errMessage.includes('aborted') || errName === 'AbortError') {
         return
       }
-      console.error('Error loading delivery notes:', error)
+      logger.error('Error loading delivery notes', { component: 'useProjectModals' }, error as Error)
       // Still open modal even if loading fails
       setDeliveryNoteModal({
         isOpen: true,

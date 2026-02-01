@@ -66,7 +66,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
       }
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('[Speech] Recognition error:', event.error)
+        logger.error('[Speech] Recognition error', { component: 'useAISpeech', error: event.error })
         setIsListening(false)
         setInterimTranscript('')
 
@@ -104,7 +104,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
 
       recognitionRef.current = recognition
     } else {
-      console.warn('[Speech] Speech Recognition nicht unterstützt')
+      logger.warn('[Speech] Speech Recognition nicht unterstützt', { component: 'useAISpeech' })
       setIsSpeechSupported(false)
     }
 
@@ -142,7 +142,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
         setIsListening(false)
         setInterimTranscript('')
       } catch (error) {
-        console.error('[Speech] Error stopping recognition:', error)
+        logger.error('[Speech] Error stopping recognition', { component: 'useAISpeech' }, error as Error)
         setIsListening(false)
       }
     } else {
@@ -164,7 +164,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
         setIsListening(true)
         setSpeechError(null)
       } catch (error: unknown) {
-        console.error('[Speech] Error starting recognition:', error)
+        logger.error('[Speech] Error starting recognition', { component: 'useAISpeech' }, error as Error)
         setIsListening(false)
         const err = error as { name?: string; message?: string }
 
@@ -200,7 +200,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
         speechSynthesisRef.current = null
       }
       utterance.onerror = error => {
-        console.error('Speech synthesis error:', error)
+        logger.error('Speech synthesis error', { component: 'useAISpeech' }, error as unknown as Error)
         setIsSpeaking(false)
         speechSynthesisRef.current = null
       }

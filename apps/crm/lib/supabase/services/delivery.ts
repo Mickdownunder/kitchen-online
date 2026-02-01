@@ -260,8 +260,8 @@ async function updateInvoiceItemDeliveryStatus(
 
   if (!item) return
 
-  const newQuantityDelivered = parseFloat(item.quantity_delivered || 0) + quantityReceived
-  const totalQuantity = parseFloat(item.quantity || 0)
+  const newQuantityDelivered = parseFloat(String(item.quantity_delivered || 0)) + quantityReceived
+  const totalQuantity = parseFloat(String(item.quantity || 0))
 
   let deliveryStatus: string
   if (newQuantityDelivered >= totalQuantity) {
@@ -291,25 +291,22 @@ async function updateProjectDeliveryStatus(projectId: string): Promise<void> {
 
   if (!items || items.length === 0) return
 
-  type DeliveryItem = {
-    delivery_status: string
-    quantity_delivered?: string | number
-    quantity?: string | number
-  }
-  const allDelivered = items.every(
-    (item: DeliveryItem) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const typedItems = items as any[]
+  const allDelivered = typedItems.every(
+    (item) =>
       item.delivery_status === 'delivered' &&
       parseFloat(String(item.quantity_delivered || 0)) >= parseFloat(String(item.quantity || 0))
   )
 
-  const partiallyDelivered = items.some(
-    (item: DeliveryItem) =>
+  const partiallyDelivered = typedItems.some(
+    (item) =>
       item.delivery_status === 'partially_delivered' ||
       (parseFloat(String(item.quantity_delivered || 0)) > 0 &&
         parseFloat(String(item.quantity_delivered || 0)) < parseFloat(String(item.quantity || 0)))
   )
 
-  const allOrdered = items.every((item: DeliveryItem) => item.delivery_status !== 'not_ordered')
+  const allOrdered = typedItems.every((item) => item.delivery_status !== 'not_ordered')
 
   let deliveryStatus: string
   if (allDelivered) {

@@ -24,6 +24,7 @@ import {
 import dynamic from 'next/dynamic'
 import StatisticsTabs, { StatisticsTab } from '@/components/statistics/StatisticsTabs'
 import { useApp } from '@/app/providers'
+import { logger } from '@/lib/utils/logger'
 
 // ==========================================================================
 // Dynamic imports for Statistics Tabs (each includes recharts ~300KB)
@@ -82,7 +83,7 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
       const data = await getInvoices()
       setInvoices(data)
     } catch (error) {
-      console.error('Error loading invoices for statistics:', error)
+      logger.error('Error loading invoices for statistics', { component: 'StatisticsView' }, error as Error)
     } finally {
       setLoadingInvoices(false)
     }
@@ -361,7 +362,7 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
         })
       }
     } catch (error) {
-      console.error('Error generating PDF:', error)
+      logger.error('Error generating PDF', { component: 'StatisticsView' }, error as Error)
       alert('Fehler beim Erstellen der PDF. Bitte versuchen Sie es erneut.')
     }
   }
@@ -384,7 +385,7 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
         exportStatisticsToExcel(exportData)
       }
     } catch (error) {
-      console.error('Error exporting Excel:', error)
+      logger.error('Error exporting Excel', { component: 'StatisticsView' }, error as Error)
       alert('Fehler beim Exportieren nach Excel. Bitte versuchen Sie es erneut.')
     }
   }

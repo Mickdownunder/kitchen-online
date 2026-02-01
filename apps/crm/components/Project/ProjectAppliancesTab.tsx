@@ -16,6 +16,7 @@ import {
   ExternalLink
 } from 'lucide-react'
 import { useToast } from '@/components/providers/ToastProvider'
+import { logger } from '@/lib/utils/logger'
 
 interface Appliance {
   id: string
@@ -126,7 +127,7 @@ export default function ProjectAppliancesTab({ projectId }: ProjectAppliancesTab
         showError('Fehler beim Laden der Geräte')
       }
     } catch (err) {
-      console.error('Error loading appliances:', err)
+      logger.error('Error loading appliances', { component: 'ProjectAppliancesTab' }, err as Error)
       showError('Fehler beim Laden der Geräte')
     } finally {
       setLoading(false)
@@ -183,7 +184,7 @@ export default function ProjectAppliancesTab({ projectId }: ProjectAppliancesTab
         showError(data.error || 'Fehler beim Hinzufügen')
       }
     } catch (err) {
-      console.error('Error adding appliance:', err)
+      logger.error('Error adding appliance', { component: 'ProjectAppliancesTab' }, err as Error)
       showError('Fehler beim Hinzufügen')
     } finally {
       setSaving(false)
@@ -210,7 +211,7 @@ export default function ProjectAppliancesTab({ projectId }: ProjectAppliancesTab
         showError(data.error || 'Fehler beim Aktualisieren')
       }
     } catch (err) {
-      console.error('Error updating appliance:', err)
+      logger.error('Error updating appliance', { component: 'ProjectAppliancesTab' }, err as Error)
       showError('Fehler beim Aktualisieren')
     } finally {
       setSaving(false)
@@ -234,7 +235,7 @@ export default function ProjectAppliancesTab({ projectId }: ProjectAppliancesTab
         showError(data.error || 'Fehler beim Löschen')
       }
     } catch (err) {
-      console.error('Error deleting appliance:', err)
+      logger.error('Error deleting appliance', { component: 'ProjectAppliancesTab' }, err as Error)
       showError('Fehler beim Löschen')
     }
   }

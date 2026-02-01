@@ -463,12 +463,12 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         }
 
         if (!currentInvoice) {
-          console.error('[ProjectDocumentsTab] No invoice data available for PDF')
+          logger.error('[ProjectDocumentsTab] No invoice data available for PDF', { component: 'ProjectDocumentsTab' })
           return
         }
 
         // Debug logging before creating invoice data for download
-        console.log('[ProjectDocumentsTab] handleDownload - Creating PDF data:', {
+        logger.debug('[ProjectDocumentsTab] handleDownload - Creating PDF data', {
           docDataType: doc.data.type,
           currentInvoiceIsPaid: currentInvoice?.isPaid,
           currentInvoicePaidDate: currentInvoice?.paidDate,
@@ -594,7 +594,7 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         }
 
         if (!currentInvoice) {
-          console.error('[ProjectDocumentsTab] No invoice data available for PDF preview')
+          logger.error('[ProjectDocumentsTab] No invoice data available for PDF preview', { component: 'ProjectDocumentsTab' })
           return
         }
 

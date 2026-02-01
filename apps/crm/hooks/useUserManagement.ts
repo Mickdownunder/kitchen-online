@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { getErrorMessage } from '@/lib/utils/errorHandling'
+import { logger } from '@/lib/utils/logger'
 
 /** Role keys for company members */
 export type RoleKey = 'geschaeftsfuehrer' | 'administration' | 'buchhaltung' | 'verkaeufer' | 'monteur'
@@ -80,7 +81,7 @@ export function useUserManagement(opts: { companyId?: string }) {
         setRolePermissions(data.rolePermissions || [])
       }
     } catch (error) {
-      console.error('Error loading members/permissions:', error)
+      logger.error('Error loading members/permissions', { component: 'useUserManagement' }, error as Error)
     }
   }, [opts.companyId])
 
@@ -132,7 +133,7 @@ export function useUserManagement(opts: { companyId?: string }) {
         // Reload permissions after successful save to ensure UI is in sync with database
         await loadMembersAndPermissions()
       } catch (error: unknown) {
-        console.error('Error saving permission:', error)
+        logger.error('Error saving permission', { component: 'useUserManagement' }, error as Error)
         alert(`Fehler beim Speichern: ${getErrorMessage(error)}`)
         setRolePermissions(prev =>
           prev.map(r =>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Employee } from '@/types'
 import { getEmployees } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * Hook für das Laden von Employee-Daten
@@ -26,7 +27,7 @@ export function useEmployees() {
       if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
         return
       }
-      console.error('Error loading employees:', error)
+      logger.error('Error loading employees', { component: 'useEmployees' }, error as Error)
     }
   }
 

@@ -7,6 +7,7 @@ import { ListInvoice } from '@/hooks/useInvoiceFilters'
 // PDF function is dynamically imported when needed to reduce initial bundle size
 import type { InvoiceData } from './InvoicePDF'
 import { getCompanySettings, getBankAccounts, getInvoices, getProject, getInvoice } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 
 interface InvoiceViewProps {
   invoice: ListInvoice
@@ -49,7 +50,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
           } as ListInvoice)
         }
       } catch (error) {
-        console.error('Error loading fresh invoice:', error)
+        logger.error('Error loading fresh invoice', { component: 'InvoiceView' }, error as Error)
       }
     }
     loadFreshInvoice()
@@ -68,7 +69,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
           setProjectData(fullProject)
         }
       } catch (error) {
-        console.error('Error loading project details:', error)
+        logger.error('Error loading project details', { component: 'InvoiceView' }, error as Error)
       }
     }
     loadProjectWithItems()
@@ -132,7 +133,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
         if (errMessage.includes('aborted') || errName === 'AbortError') {
           return
         }
-        console.error('Error loading company settings:', error)
+        logger.error('Error loading company settings', { component: 'InvoiceView' }, error as Error)
       } finally {
         setLoadingSettings(false)
       }
@@ -167,7 +168,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
       }))
 
       // Debug logging before creating invoice data
-      console.log('[InvoiceView] Creating PDF data:', {
+      logger.debug('[InvoiceView] Creating PDF data', {
         'currentInvoice.isPaid': currentInvoice.isPaid,
         'currentInvoice.paidDate': currentInvoice.paidDate,
         invoiceNumber: currentInvoice.invoiceNumber,
@@ -200,7 +201,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
       const { downloadInvoicePDF } = await import('./InvoicePDF')
       await downloadInvoicePDF(invoiceData)
     } catch (error) {
-      console.error('Error generating PDF:', error)
+      logger.error('Error generating PDF', { component: 'InvoiceView' }, error as Error)
       alert('Fehler beim Erstellen der PDF. Bitte versuchen Sie es erneut.')
     } finally {
       setIsGenerating(false)

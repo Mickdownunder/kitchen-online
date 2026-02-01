@@ -37,7 +37,7 @@ export function useAuth() {
         if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
           return
         }
-        console.error('Error getting session:', error)
+        logger.error('Error getting session', { component: 'useAuth' }, error as Error)
         setLoading(false)
       })
 
@@ -67,7 +67,7 @@ export function useAuth() {
         if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
           return
         }
-        console.error('Error in auth state change:', error)
+        logger.error('Error in auth state change', { component: 'useAuth' }, error as Error)
       }
     })
 
@@ -95,7 +95,7 @@ export function useAuth() {
           const errorData = await response.json()
           // Only log if there's actual error content
           if (errorData && Object.keys(errorData).length > 0) {
-            console.warn('[useAuth] Process invite issue:', errorData)
+            logger.warn('[useAuth] Process invite issue', { component: 'useAuth', errorData })
           }
         }
         return
@@ -111,15 +111,15 @@ export function useAuth() {
           })
         }
       } else {
-        console.warn('[useAuth] Process invite returned non-JSON response')
+        logger.warn('[useAuth] Process invite returned non-JSON response', { component: 'useAuth' })
       }
     } catch (error: unknown) {
       // Ignore network errors or JSON parse errors
       const err = error as { message?: string; name?: string }
       if (err?.message?.includes('JSON') || err?.name === 'SyntaxError') {
-        console.warn('[useAuth] Failed to parse invite response (likely HTML error page)')
+        logger.warn('[useAuth] Failed to parse invite response (likely HTML error page)', { component: 'useAuth' })
       } else {
-        console.error('[useAuth] Error processing invite:', error)
+        logger.error('[useAuth] Error processing invite', { component: 'useAuth' }, error as Error)
       }
     }
   }
@@ -159,7 +159,7 @@ export function useAuth() {
       if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
         return
       }
-      console.error('Unexpected error loading profile:', err?.message || error)
+      logger.error('Unexpected error loading profile', { component: 'useAuth', message: err?.message || String(error) })
 
       // Fallback to basic permissions
       setPermissions(null)

@@ -199,6 +199,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
         email: user.email,
       })
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: newProfile, error: createError } = await supabase
         .from('user_profiles')
         .insert({
@@ -206,7 +207,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
           email: user.email || '',
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
           role: (user.user_metadata?.role as UserRole) || 'verkaeufer',
-        })
+        } as any)
         .select()
         .single()
 
@@ -216,7 +217,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
       }
 
       logger.info('Profile created successfully', { component: 'auth', userId: newProfile.id })
-      return newProfile as UserProfile
+      return newProfile as unknown as UserProfile
     }
 
     // For other errors, log details
@@ -229,7 +230,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     return null
   }
 
-  return data as UserProfile
+  return data as unknown as UserProfile
 }
 
 /**

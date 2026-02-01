@@ -12,6 +12,7 @@ import {
   saveCompanySettings,
   saveEmployee,
 } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 
 export function useCompanySettingsData() {
   const [loading, setLoading] = useState(true)
@@ -57,7 +58,7 @@ export function useCompanySettingsData() {
       if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
         return
       }
-      console.error('Error loading settings:', error)
+      logger.error('Error loading settings', { component: 'useCompanySettingsData' }, error as Error)
     } finally {
       setLoading(false)
     }

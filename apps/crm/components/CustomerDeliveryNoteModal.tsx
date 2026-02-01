@@ -8,6 +8,7 @@ import {
   updateCustomerDeliveryNote,
   getCompanySettings,
 } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 // PDF function is dynamically imported when needed to reduce initial bundle size
 
 interface CustomerDeliveryNoteModalProps {
@@ -45,7 +46,7 @@ export default function CustomerDeliveryNoteModal({
       const settings = await getCompanySettings()
       setCompanySettings(settings)
     } catch (error) {
-      console.error('Error loading company settings:', error)
+      logger.error('Error loading company settings', { component: 'CustomerDeliveryNoteModal' }, error as Error)
     }
   }
 
@@ -86,7 +87,7 @@ export default function CustomerDeliveryNoteModal({
       if (onSuccess) onSuccess()
       onClose()
     } catch (error: unknown) {
-      console.error('Error saving delivery note:', error)
+      logger.error('Error saving delivery note', { component: 'CustomerDeliveryNoteModal' }, error as Error)
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler'
       alert(`Fehler beim Speichern des Lieferscheins: ${errorMessage}`)
     } finally {
@@ -117,7 +118,7 @@ export default function CustomerDeliveryNoteModal({
         companySettings
       )
     } catch (error) {
-      console.error('Error generating PDF:', error)
+      logger.error('Error generating PDF', { component: 'CustomerDeliveryNoteModal' }, error as Error)
       alert('Fehler beim Generieren des PDFs')
     }
   }

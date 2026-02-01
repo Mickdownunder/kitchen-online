@@ -18,7 +18,8 @@ export async function getArticles(category?: string): Promise<Article[]> {
       .order('created_at', { ascending: false })
 
     if (category && category !== 'all') {
-      query = query.eq('category', category)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query = query.eq('category', category as any)
     }
 
     const { data, error } = await query
@@ -72,6 +73,7 @@ export async function createArticle(
 
   const { data, error } = await supabase
     .from('articles')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       user_id: user.id,
       sku: article.sku,
@@ -88,7 +90,7 @@ export async function createArticle(
       in_stock: article.inStock ?? true,
       stock_quantity: article.stockQuantity || 0,
       is_active: article.isActive ?? true,
-    })
+    } as any)
     .select()
     .single()
 
@@ -99,6 +101,7 @@ export async function createArticle(
 export async function updateArticle(id: string, article: Partial<Article>): Promise<Article> {
   const { data, error } = await supabase
     .from('articles')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .update({
       sku: article.sku,
       manufacturer: article.manufacturer,
@@ -114,7 +117,7 @@ export async function updateArticle(id: string, article: Partial<Article>): Prom
       in_stock: article.inStock,
       stock_quantity: article.stockQuantity,
       is_active: article.isActive,
-    })
+    } as any)
     .eq('id', id)
     .select()
     .single()

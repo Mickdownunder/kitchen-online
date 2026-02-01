@@ -71,7 +71,11 @@ function ArticlePriceInput({
   )
 }
 
-export const ArticleRow: React.FC<ArticleRowProps> = ({
+/**
+ * ArticleRow component - memoized to prevent unnecessary re-renders
+ * when other articles in the list change
+ */
+export const ArticleRow = React.memo(function ArticleRow({
   article,
   isEditing,
   canViewPurchasePrices,
@@ -82,7 +86,7 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({
   onDelete,
   onSave,
   onCancelEdit,
-}) => {
+}: ArticleRowProps) {
   // Lokaler State für die Bearbeitung - wird erst beim Speichern übertragen
   const [editData, setEditData] = useState<Article>(article)
   
@@ -313,4 +317,4 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({
       </td>
     </tr>
   )
-}
+})

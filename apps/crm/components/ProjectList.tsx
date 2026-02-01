@@ -27,6 +27,7 @@ import {
   Customer,
 } from '@/types'
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
+import { logger } from '@/lib/utils/logger'
 import ProjectModal from './ProjectModal'
 import { getCustomers, getComplaints } from '@/lib/supabase/services'
 import CustomerDeliveryNoteModal from './CustomerDeliveryNoteModal'
@@ -109,7 +110,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
       if (errMessage.includes('aborted') || errName === 'AbortError') {
         return
       }
-      console.error('Error loading complaints:', error)
+      logger.error('Error loading complaints', { component: 'ProjectList' }, error as Error)
     }
   }
 
@@ -140,7 +141,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
       if (errMessage.includes('aborted') || errName === 'AbortError') {
         return
       }
-      console.error('Error loading customers:', error)
+      logger.error('Error loading customers', { component: 'ProjectList' }, error as Error)
     }
   }
 
@@ -436,7 +437,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
           modals.openProjectModal(newProject as CustomerProject)
           success('Dokument erfolgreich gescannt')
         } catch (fetchError: unknown) {
-          console.error('KI-Scan Fehler:', fetchError)
+          logger.error('KI-Scan Fehler', { component: 'ProjectList' }, fetchError as Error)
           error(
             `KI-Scan fehlgeschlagen: ${fetchError instanceof Error ? fetchError.message : 'Unbekannter Fehler'}`
           )
@@ -449,7 +450,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
         event.target.value = ''
       }
     } catch (uploadError: unknown) {
-      console.error('File upload error:', uploadError)
+      logger.error('File upload error', { component: 'ProjectList' }, uploadError as Error)
       error(
         `Fehler beim Hochladen: ${uploadError instanceof Error ? uploadError.message : 'Unbekannter Fehler'}`
       )

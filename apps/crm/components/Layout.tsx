@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { signOut, getCompanySettings } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 
 // Weißes Logo für dunklen Hintergrund
 const LOGO_URL_WHITE = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-03%20weis.png'
@@ -45,7 +46,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           setDisplayName(settings.companyName)
         }
       } catch (error) {
-        console.error('Error loading company display name:', error)
+        logger.error('Error loading company display name', { component: 'Layout' }, error as Error)
       }
     }
     if (user) {

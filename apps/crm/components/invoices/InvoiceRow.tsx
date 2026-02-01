@@ -30,7 +30,11 @@ interface InvoiceRowProps {
   onSendReminder: (type: 'first' | 'second' | 'final') => void
 }
 
-export const InvoiceRow: React.FC<InvoiceRowProps> = ({
+/**
+ * InvoiceRow component - memoized to prevent unnecessary re-renders
+ * when other invoices in the list change
+ */
+export const InvoiceRow = React.memo(function InvoiceRow({
   invoice,
   companySettings,
   markingPaidId,
@@ -46,7 +50,7 @@ export const InvoiceRow: React.FC<InvoiceRowProps> = ({
   onSetPaidDateInput,
   onSetReminderDropdownOpen,
   onSendReminder,
-}) => {
+}: InvoiceRowProps) {
   // Neue Struktur: Daten direkt aus der Invoice
   const invoiceDate = invoice.invoiceDate || invoice.date
   const dueDate = invoice.dueDate
@@ -288,4 +292,4 @@ export const InvoiceRow: React.FC<InvoiceRowProps> = ({
       </td>
     </tr>
   )
-}
+})

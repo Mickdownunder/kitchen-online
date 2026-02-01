@@ -51,6 +51,7 @@ export async function logAuditEvent(input: AuditLogInput, userId?: string): Prom
     const userAgent = input.userAgent || 'unknown'
 
     // Call RPC function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase.rpc('log_audit_event', {
       p_user_id: userId,
       p_action: input.action,
@@ -66,7 +67,7 @@ export async function logAuditEvent(input: AuditLogInput, userId?: string): Prom
       p_user_agent: userAgent,
       p_request_id: input.requestId || null,
       p_metadata: input.metadata || null,
-    })
+    } as any)
 
     if (error) {
       logger.error(
@@ -134,6 +135,7 @@ export async function getAuditLogs(options: GetAuditLogsOptions = {}): Promise<A
   try {
     const supabase = await createClient()
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase.rpc('get_audit_logs', {
       p_limit: options.limit || 100,
       p_offset: options.offset || 0,
@@ -142,7 +144,7 @@ export async function getAuditLogs(options: GetAuditLogsOptions = {}): Promise<A
       p_entity_id: options.entityId || null,
       p_start_date: options.startDate?.toISOString() || null,
       p_end_date: options.endDate?.toISOString() || null,
-    })
+    } as any)
 
     if (error) {
       logger.error(
@@ -155,7 +157,7 @@ export async function getAuditLogs(options: GetAuditLogsOptions = {}): Promise<A
       return []
     }
 
-    return (data || []) as AuditLog[]
+    return (data || []) as unknown as AuditLog[]
   } catch (error) {
     logger.error(
       'Error getting audit logs',
