@@ -106,7 +106,7 @@ export async function middleware(request: NextRequest) {
   // Portal route if: path starts with /portal OR request is from portal subdomain
   const isPortalRoute = pathname.startsWith('/portal')
   
-  // Public portal routes (no auth required)
+  // Public portal routes (no auth required) - SKIP AUTH CHECK for these!
   const publicPortalRoutes = [
     '/portal/login',
     '/portal/forgot-password',
@@ -114,6 +114,11 @@ export async function middleware(request: NextRequest) {
     '/portal/setup-password',
   ]
   const isPublicPortalRoute = publicPortalRoutes.includes(pathname)
+
+  // For public portal routes, skip auth check entirely (faster!)
+  if (isPublicPortalRoute) {
+    return response
+  }
 
   if (isPortalRoute) {
     let portalUser = null
@@ -124,16 +129,6 @@ export async function middleware(request: NextRequest) {
       portalUser = user
     } catch (error) {
       console.error('[Middleware] Portal auth error:', error)
-    }
-
-    // Public portal pages are always accessible
-    if (isPublicPortalRoute) {
-      // If customer is already logged in and on login page, redirect to portal dashboard
-      const userRole = portalUser?.app_metadata?.role
-      if (portalUser && userRole === 'customer' && pathname === '/portal/login') {
-        return NextResponse.redirect(new URL('/portal', request.url))
-      }
-      return response
     }
 
     // For all other portal routes, require customer session
