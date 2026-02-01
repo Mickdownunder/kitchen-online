@@ -1,8 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Customer } from '@/types'
-import { UserPlus, Search, Building2, Mail, Phone, MapPin } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
+import { CustomerFilters } from './customers/CustomerFilters'
+import { CustomerTable, type CustomerSortField } from './customers/CustomerTable'
 
 interface CustomerDatabaseProps {
   customers: Customer[]
@@ -10,6 +12,8 @@ interface CustomerDatabaseProps {
   onSaveCustomer: (customer: Customer) => void
   onDeleteCustomer: (id: string) => void
 }
+
+type SortDirection = 'asc' | 'desc'
 
 const CustomerDatabase: React.FC<CustomerDatabaseProps> = ({
   customers,
@@ -20,108 +24,105 @@ const CustomerDatabase: React.FC<CustomerDatabaseProps> = ({
   const [searchTerm, setSearchTerm] = useState('')
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [sortField, setSortField] = useState<CustomerSortField>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
-  const filteredCustomers = customers.filter(
-    c =>
-      `${c.firstName} ${c.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.contact.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredAndSortedCustomers = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim()
+    const filtered = customers.filter(c => {
+      const fullName = `${c.firstName} ${c.lastName}`.toLowerCase()
+      const company = (c.companyName || '').toLowerCase()
+      const email = (c.contact?.email || '').toLowerCase()
+      const city = (c.address?.city || '').toLowerCase()
+      const postalCode = (c.address?.postalCode || '').toLowerCase()
+      if (!term) return true
+      return (
+        fullName.includes(term) ||
+        company.includes(term) ||
+        email.includes(term) ||
+        city.includes(term) ||
+        postalCode.includes(term)
+      )
+    })
+
+    filtered.sort((a, b) => {
+      let aVal: string
+      let bVal: string
+      switch (sortField) {
+        case 'name':
+          aVal = `${a.firstName} ${a.lastName}`.toLowerCase()
+          bVal = `${b.firstName} ${b.lastName}`.toLowerCase()
+          break
+        case 'company':
+          aVal = (a.companyName || '').toLowerCase()
+          bVal = (b.companyName || '').toLowerCase()
+          break
+        case 'city':
+          aVal = (a.address?.city || '').toLowerCase()
+          bVal = (b.address?.city || '').toLowerCase()
+          break
+        case 'email':
+          aVal = (a.contact?.email || '').toLowerCase()
+          bVal = (b.contact?.email || '').toLowerCase()
+          break
+        default:
+          return 0
+      }
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+    return filtered
+  }, [customers, searchTerm, sortField, sortDirection])
+
+  const handleSort = (field: CustomerSortField) => {
+    if (sortField === field) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-4">
+      {/* Header – gleiche Optik wie Artikelstamm */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-black text-slate-900">Kundenstamm</h2>
-          <p className="mt-1 text-sm text-slate-500">Professionelle Kundenverwaltung</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {filteredAndSortedCustomers.length}{' '}
+            {filteredAndSortedCustomers.length === 1 ? 'Kunde' : 'Kunden'}
+          </p>
         </div>
         <button
           onClick={() => {
             setEditingCustomer(null)
             setShowForm(true)
           }}
-          className="flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-900 transition-all hover:bg-amber-600"
+          className="flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-900 shadow-sm transition-all hover:bg-amber-600"
         >
           <UserPlus className="h-4 w-4" /> Neuer Kunde
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 transform text-slate-400" />
-        <input
-          type="text"
-          placeholder="Kunde suchen (Name, Firma, E-Mail)..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          className="w-full rounded-2xl border border-slate-200 bg-white py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-500"
-        />
-      </div>
+      {/* Filter – gleiche Optik wie Artikelstamm */}
+      <CustomerFilters searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
 
-      {/* Customer List */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredCustomers.map(customer => (
-          <div
-            key={customer.id}
-            onClick={() => onSelectCustomer(customer)}
-            className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-6 transition-all hover:border-amber-500 hover:shadow-lg"
-          >
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <h3 className="text-lg font-black text-slate-900">
-                  {customer.salutation} {customer.firstName} {customer.lastName}
-                </h3>
-                {customer.companyName && (
-                  <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
-                    <Building2 className="h-3 w-3" /> {customer.companyName}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <p className="flex items-center gap-2 text-slate-600">
-                <MapPin className="h-4 w-4 text-slate-400" />
-                {customer.address.street} {customer.address.houseNumber},{' '}
-                {customer.address.postalCode} {customer.address.city}
-              </p>
-              <p className="flex items-center gap-2 text-slate-600">
-                <Phone className="h-4 w-4 text-slate-400" />
-                {customer.contact.phone}
-              </p>
-              <p className="flex items-center gap-2 text-slate-600">
-                <Mail className="h-4 w-4 text-slate-400" />
-                {customer.contact.email}
-              </p>
-            </div>
-
-            <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
-              <button
-                onClick={e => {
-                  e.stopPropagation()
-                  setEditingCustomer(customer)
-                  setShowForm(true)
-                }}
-                className="flex-1 rounded-lg bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-200"
-              >
-                Bearbeiten
-              </button>
-              <button
-                onClick={e => {
-                  e.stopPropagation()
-                  if (confirm('Kunde wirklich löschen?')) {
-                    onDeleteCustomer(customer.id)
-                  }
-                }}
-                className="rounded-lg bg-red-50 px-4 py-2 text-xs font-bold text-red-600 transition-all hover:bg-red-100"
-              >
-                Löschen
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Tabelle – gleiche Optik wie Artikelstamm */}
+      <CustomerTable
+        customers={filteredAndSortedCustomers}
+        searchTerm={searchTerm}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSelectCustomer={onSelectCustomer}
+        onEditCustomer={customer => {
+          setEditingCustomer(customer)
+          setShowForm(true)
+        }}
+        onDeleteCustomer={customer => onDeleteCustomer(customer.id)}
+        onSort={handleSort}
+      />
 
       {/* Customer Form Modal */}
       {showForm && (

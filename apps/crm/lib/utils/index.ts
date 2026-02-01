@@ -17,9 +17,6 @@ export * from './errorHandling'
 // Logger
 export * from './logger'
 
-// Cache
-export * from './cache'
-
 // Performance
 export * from './performance'
 
