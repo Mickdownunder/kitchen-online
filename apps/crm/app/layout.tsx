@@ -16,11 +16,16 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Management System',
-  description: 'Unternehmens Management System',
+  title: 'KüchenOnline',
+  description: 'KüchenOnline - Ihr Küchen-Partner',
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
   openGraph: {
-    title: 'Management System',
-    description: 'Unternehmens Management System',
+    title: 'KüchenOnline',
+    description: 'KüchenOnline - Ihr Küchen-Partner',
     type: 'website',
   },
 }
