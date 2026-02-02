@@ -18,6 +18,7 @@ export default function OrderSignPage() {
     customerName: string
   } | null>(null)
   const [withdrawalWaived, setWithdrawalWaived] = useState(false)
+  const [shareLocation, setShareLocation] = useState(false)
   const [signedByName, setSignedByName] = useState('')
   const [isDrawing, setIsDrawing] = useState(false)
   const hasDrawn = useRef(false)
@@ -125,6 +126,19 @@ export default function OrderSignPage() {
     setSubmitting(true)
     setError(null)
 
+    // Optional: Geodaten für Audit (nur wenn Nutzer explizit zustimmt)
+    let geodata: { lat?: number; lon?: number } | null = null
+    if (shareLocation && navigator.geolocation) {
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, maximumAge: 60000 })
+        })
+        if (pos?.coords) geodata = { lat: pos.coords.latitude, lon: pos.coords.longitude }
+      } catch {
+        // Geodaten optional – weiter ohne
+      }
+    }
+
     try {
       const res = await fetch('/api/customer/order/sign', {
         method: 'POST',
@@ -134,6 +148,7 @@ export default function OrderSignPage() {
           signature,
           signedBy: signedByName.trim(),
           withdrawalWaived: true,
+          ...(geodata && { geodata }),
         }),
       })
       const data = await res.json()
@@ -269,6 +284,21 @@ export default function OrderSignPage() {
                 Ich bestätige den Auftrag und <strong>verzichte ausdrücklich</strong> auf mein
                 14-tägiges Widerrufsrecht gemäß § 18 Abs 1 Z 3 FAGG (Maßanfertigung nach
                 Kundenspezifikation).
+              </span>
+            </label>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={shareLocation}
+                onChange={e => setShareLocation(e.target.checked)}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-slate-700">
+                Standort für den Nachweis der Unterschrift übermitteln (optional, erhöht die
+                Rechtssicherheit)
               </span>
             </label>
           </div>

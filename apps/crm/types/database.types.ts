@@ -1311,6 +1311,47 @@ export type Database = {
           },
         ]
       }
+      order_sign_audit: {
+        Row: {
+          id: string
+          project_id: string
+          signed_at: string
+          signed_by: string
+          ip_address: string | null
+          user_agent: string | null
+          geodata: Json | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          signed_at: string
+          signed_by: string
+          ip_address?: string | null
+          user_agent?: string | null
+          geodata?: Json | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          signed_at?: string
+          signed_by?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          geodata?: Json | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_sign_audit_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_invites: {
         Row: {
           company_id: string

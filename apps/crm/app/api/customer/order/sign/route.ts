@@ -3,14 +3,28 @@
  *
  * Kunde unterschreibt Auftrag online (token-basiert, kein Login nötig).
  * Validiert Token, speichert Unterschrift + Widerrufsverzicht.
+ * Audit: IP, User-Agent, Geodaten (falls vom Client übermittelt) für Nachweis.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
+function getClientIp(request: NextRequest): string | null {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    request.headers.get('cf-connecting-ip') ||
+    null
+  )
+}
+
+function getUserAgent(request: NextRequest): string | null {
+  return request.headers.get('user-agent') || null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { token, signature, signedBy, withdrawalWaived } = body
+    const { token, signature, signedBy, withdrawalWaived, geodata } = body
 
     if (!token || !signature || !signedBy) {
       return NextResponse.json(
@@ -44,17 +58,18 @@ export async function POST(request: NextRequest) {
     }
 
     const projectId = tokenRow.project_id
+    const signedAt = new Date().toISOString()
 
     // Projekt updaten
     const { error: updateError } = await supabase
       .from('projects')
       .update({
         customer_signature: signature,
-        customer_signature_date: new Date().toISOString().split('T')[0],
-        order_contract_signed_at: new Date().toISOString(),
+        customer_signature_date: signedAt.split('T')[0],
+        order_contract_signed_at: signedAt,
         order_contract_signed_by: signedBy,
-        withdrawal_waived_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        withdrawal_waived_at: signedAt,
+        updated_at: signedAt,
       })
       .eq('id', projectId)
 
@@ -64,6 +79,27 @@ export async function POST(request: NextRequest) {
         { error: 'Fehler beim Speichern der Unterschrift' },
         { status: 500 }
       )
+    }
+
+    // Audit-Unterlagen speichern (IP, User-Agent, Geodaten)
+    const ipAddress = getClientIp(request)
+    const userAgent = getUserAgent(request)
+    const geoPayload =
+      geodata && typeof geodata === 'object'
+        ? { country: geodata.country, city: geodata.city, region: geodata.region, lat: geodata.lat, lon: geodata.lon }
+        : null
+
+    const { error: auditError } = await supabase.from('order_sign_audit').insert({
+      project_id: projectId,
+      signed_at: signedAt,
+      signed_by: signedBy,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      geodata: geoPayload,
+    })
+    if (auditError) {
+      // Audit-Fehler nicht an Kunde weitergeben – Unterschrift ist bereits gespeichert
+      console.error('Order sign audit insert error:', auditError)
     }
 
     // Token löschen (Einmalnutzung)

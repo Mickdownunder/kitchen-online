@@ -89,6 +89,11 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
   const [showOrderDownloadModal, setShowOrderDownloadModal] = useState(false)
   const [orderDownloadAppendAgb, setOrderDownloadAppendAgb] = useState(false)
   const [showSignatureModal, setShowSignatureModal] = useState(false)
+  const [signatureAudit, setSignatureAudit] = useState<{
+    ip_address: string | null
+    user_agent: string | null
+    geodata: { country?: string; city?: string; lat?: number; lon?: number } | null
+  } | null>(null)
   
   // Portal publishing state
   const [publishedDocs, setPublishedDocs] = useState<Set<string>>(new Set())
@@ -883,7 +888,24 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                 <div className="flex items-center gap-2">
                   {doc.type === 'order' && project.orderContractSignedAt && project.customerSignature && (
                     <button
-                      onClick={() => setShowSignatureModal(true)}
+                      onClick={async () => {
+                        setShowSignatureModal(true)
+                        try {
+                          const res = await fetch(`/api/projects/${project.id}/order-sign-audit`)
+                          const data = await res.json()
+                          setSignatureAudit(
+                            res.ok && data
+                              ? {
+                                  ip_address: data.ip_address ?? null,
+                                  user_agent: data.user_agent ?? null,
+                                  geodata: data.geodata ?? null,
+                                }
+                              : null
+                          )
+                        } catch {
+                          setSignatureAudit(null)
+                        }
+                      }}
                       className="flex items-center gap-2 rounded-lg border-2 border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-100"
                       title="Unterschrift als Nachweis anzeigen"
                     >
@@ -1001,6 +1023,36 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                   : '–'}
               </p>
             </div>
+            {signatureAudit && (signatureAudit.ip_address || signatureAudit.user_agent || signatureAudit.geodata) && (
+              <div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <p className="font-bold text-slate-700">Audit-Unterlagen</p>
+                {signatureAudit.ip_address && (
+                  <p>
+                    <span className="text-slate-600">IP-Adresse:</span> {signatureAudit.ip_address}
+                  </p>
+                )}
+                {signatureAudit.user_agent && (
+                  <p>
+                    <span className="text-slate-600">User-Agent:</span>{' '}
+                    <span className="break-all text-xs">{signatureAudit.user_agent}</span>
+                  </p>
+                )}
+                {signatureAudit.geodata && (signatureAudit.geodata.lat || signatureAudit.geodata.city) && (
+                  <p>
+                    <span className="text-slate-600">Standort:</span>{' '}
+                    {[
+                      signatureAudit.geodata.city,
+                      signatureAudit.geodata.country,
+                      signatureAudit.geodata.lat != null && signatureAudit.geodata.lon != null
+                        ? `(${signatureAudit.geodata.lat.toFixed(4)}, ${signatureAudit.geodata.lon.toFixed(4)})`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || '–'}
+                  </p>
+                )}
+              </div>
+            )}
             <p className="mt-4 text-xs text-slate-500">
               Dieses Dokument dient als Nachweis der Online-Unterschrift des Auftrags.
             </p>
@@ -1019,7 +1071,10 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                 Als Bild speichern
               </button>
               <button
-                onClick={() => setShowSignatureModal(false)}
+                onClick={() => {
+                  setShowSignatureModal(false)
+                  setSignatureAudit(null)
+                }}
                 className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-bold text-white hover:bg-teal-700"
               >
                 Schließen
