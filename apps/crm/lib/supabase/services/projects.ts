@@ -17,6 +17,8 @@
  * @see supabase/migrations/20260127160001_create_orders_table.sql
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
 import { supabase } from '../client'
 import { CustomerProject, InvoiceItem, ProjectDocument } from '@/types'
 
@@ -73,8 +75,12 @@ export async function getProjects(): Promise<CustomerProject[]> {
   }
 }
 
-export async function getProject(id: string): Promise<CustomerProject | null> {
-  const { data, error } = await supabase
+export async function getProject(
+  id: string,
+  client?: SupabaseClient<Database>
+): Promise<CustomerProject | null> {
+  const sb = client ?? supabase
+  const { data, error } = await sb
     .from('projects')
     .select(
       `

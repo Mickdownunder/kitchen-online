@@ -81,10 +81,11 @@ export async function POST(request: NextRequest) {
     }
 
     // KRITISCH: Lade Projekt FRISCH aus der Datenbank (nicht aus Cache!)
+    // Server-Client verwenden, damit Session/Cookies in API-Route korrekt sind
     let project = null
     if (projectId) {
       try {
-        project = await getProject(projectId)
+        project = await getProject(projectId, supabase)
         if (!project) {
           return NextResponse.json(
             { error: `Projekt ${projectId} nicht gefunden` },
@@ -214,12 +215,46 @@ export async function POST(request: NextRequest) {
           const expiresAt = new Date()
           expiresAt.setDate(expiresAt.getDate() + 7)
 
-          const supabaseAdmin = await createServiceClient()
-          await supabaseAdmin.from('order_sign_tokens').insert({
-            project_id: project.id,
-            token,
-            expires_at: expiresAt.toISOString(),
-          })
+          let supabaseAdmin
+          try {
+            supabaseAdmin = await createServiceClient()
+          } catch (svcErr) {
+            const msg = svcErr instanceof Error ? svcErr.message : 'Service-Client fehlgeschlagen'
+            logger.error('createServiceClient failed', { component: 'api/email/send-with-pdf' }, svcErr as Error)
+            return NextResponse.json(
+              { error: `Konfiguration: ${msg}. SUPABASE_SERVICE_ROLE_KEY prüfen.` },
+              { status: 500 }
+            )
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error: tokenError } = await (supabaseAdmin as any)
+            .from('order_sign_tokens')
+            .insert({
+              project_id: project.id,
+              token,
+              expires_at: expiresAt.toISOString(),
+            })
+
+          if (tokenError) {
+            logger.error('order_sign_tokens insert failed', {
+              component: 'api/email/send-with-pdf',
+              code: tokenError.code,
+              message: tokenError.message,
+            })
+            const isMissingTable =
+              tokenError.message?.includes('does not exist') ||
+              tokenError.code === '42P01' ||
+              tokenError.code === 'PGRST204'
+            return NextResponse.json(
+              {
+                error: isMissingTable
+                  ? 'Tabelle order_sign_tokens fehlt. Bitte Migration 20260202180000_order_contract_sign ausführen.'
+                  : `Token konnte nicht erstellt werden: ${tokenError.message}`,
+              },
+              { status: 500 }
+            )
+          }
 
           const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
           const signUrl = `${baseUrl}/portal/auftrag/${token}/unterschreiben`
