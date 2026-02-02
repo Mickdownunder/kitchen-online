@@ -171,9 +171,6 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: 'flex-start',
   },
-  tableRowAlt: {
-    backgroundColor: '#f8fafc',
-  },
   tableRowLast: {
     borderBottomWidth: 0,
   },
@@ -213,14 +210,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: D.colors.border,
   },
-  signatureRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 30,
-  },
   signatureBox: {
-    width: '45%',
-    paddingTop: 50,
+    width: '100%',
+    maxWidth: 280,
+    paddingTop: 28,
     borderTopWidth: 1,
     borderTopColor: D.colors.text,
   },
@@ -244,6 +237,13 @@ const styles = StyleSheet.create({
     fontSize: D.fontSize.micro,
     color: D.colors.muted,
     marginBottom: 2,
+  },
+  pageInfo: {
+    position: 'absolute' as const,
+    bottom: 12,
+    right: D.spacing.pagePadding,
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
   },
   agbTitle: {
     fontSize: 18,
@@ -384,15 +384,10 @@ export const OrderPDFDocument: React.FC<OrderPDFProps> = ({
             </View>
             {items.map((item, index) => {
               const isLast = index === items.length - 1
-              const isAlt = index % 2 === 1
               return (
                 <View
                   key={item.id || index}
-                  style={[
-                    styles.tableRow,
-                    isAlt ? styles.tableRowAlt : {},
-                    isLast ? styles.tableRowLast : {},
-                  ]}
+                  style={[styles.tableRow, isLast ? styles.tableRowLast : {}]}
                 >
                   <Text style={[styles.tableCell, styles.colQty]}>
                     {item.quantity} {item.unit}
@@ -452,13 +447,8 @@ export const OrderPDFDocument: React.FC<OrderPDFProps> = ({
 
         {/* Signature */}
         <View style={styles.signatureSection}>
-          <View style={styles.signatureRow}>
-            <View style={styles.signatureBox}>
-              <Text style={styles.signatureLabel}>Ort, Datum</Text>
-            </View>
-            <View style={styles.signatureBox}>
-              <Text style={styles.signatureLabel}>Unterschrift Auftraggeber</Text>
-            </View>
+          <View style={styles.signatureBox}>
+            <Text style={styles.signatureLabel}>Unterschrift Auftraggeber</Text>
           </View>
         </View>
 
@@ -471,6 +461,13 @@ export const OrderPDFDocument: React.FC<OrderPDFProps> = ({
             {company.uid ? <Text style={styles.footerText}>UID: {company.uid}</Text> : null}
           </View>
         ) : null}
+        <Text
+          style={styles.pageInfo}
+          fixed
+          render={({ pageNumber, totalPages }) =>
+            `Auftragsnr. ${project.orderNumber} · Seite ${pageNumber} von ${totalPages}`
+          }
+        />
       </Page>
 
       {/* AGB als letzte Seite (nur wenn appendAgb und company.agbText) */}
@@ -489,6 +486,13 @@ export const OrderPDFDocument: React.FC<OrderPDFProps> = ({
                 ))}
               </View>
             ))}
+          <Text
+            style={styles.pageInfo}
+            fixed
+            render={({ pageNumber, totalPages }) =>
+              `Auftragsnr. ${project.orderNumber} · Seite ${pageNumber} von ${totalPages}`
+            }
+          />
         </Page>
       ) : null}
     </Document>

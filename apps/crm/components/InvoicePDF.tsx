@@ -297,6 +297,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'right',
   },
+  pageInfo: {
+    position: 'absolute' as const,
+    bottom: 12,
+    right: D.spacing.pagePadding,
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
+  },
 })
 
 const formatCurrency = (amount: number): string => {
@@ -701,6 +708,13 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
             {company.invoiceFooterText || 'Vielen Dank für Ihren Auftrag!'}
           </Text>
         </View>
+        <Text
+          style={styles.pageInfo}
+          fixed
+          render={({ pageNumber, totalPages }) =>
+            `Rechnungsnr. ${invoice.invoiceNumber} · Seite ${pageNumber} von ${totalPages}`
+          }
+        />
       </Page>
     </Document>
   )

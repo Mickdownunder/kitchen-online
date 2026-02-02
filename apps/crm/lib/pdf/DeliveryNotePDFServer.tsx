@@ -153,9 +153,6 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: 'flex-start',
   },
-  tableRowAlt: {
-    backgroundColor: '#f8fafc',
-  },
   tableCell: {
     fontSize: D.fontSize.small,
     color: D.colors.secondary,
@@ -180,7 +177,7 @@ const styles = StyleSheet.create({
   },
   signatureBox: {
     width: '100%',
-    paddingTop: 50,
+    paddingTop: 28,
     borderTopWidth: 1,
     borderTopColor: D.colors.text,
   },
@@ -191,7 +188,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   receiptSection: {
-    marginBottom: 142,
+    marginBottom: 50,
   },
   receiptLabel: {
     fontSize: D.fontSize.micro,
@@ -225,6 +222,13 @@ const styles = StyleSheet.create({
     fontSize: D.fontSize.micro,
     color: D.colors.muted,
     textAlign: 'center',
+  },
+  pageInfo: {
+    position: 'absolute' as const,
+    bottom: 12,
+    right: D.spacing.pagePadding,
+    fontSize: D.fontSize.micro,
+    color: D.colors.muted,
   },
 })
 
@@ -332,7 +336,7 @@ export const CustomerDeliveryNotePDFDocumentServer: React.FC<CustomerDeliveryNot
                 <Text style={[styles.tableHeaderText, styles.colUnit]}>Einheit</Text>
               </View>
               {deliveryNote.items.map((item, idx) => (
-                <View key={idx} style={[styles.tableRow, idx % 2 === 1 ? styles.tableRowAlt : {}]}>
+                <View key={idx} style={styles.tableRow}>
                   <Text style={[styles.tableCell, styles.colPosition]}>{item.position}</Text>
                   <Text style={[styles.tableCell, styles.colDescription]}>{item.description}</Text>
                   <Text style={[styles.tableCell, styles.colQuantity]}>{item.quantity}</Text>
@@ -386,6 +390,13 @@ export const CustomerDeliveryNotePDFDocumentServer: React.FC<CustomerDeliveryNot
           <Text>Bitte prüfen Sie die Lieferung auf Vollständigkeit und Unversehrtheit.</Text>
           <Text style={{ marginTop: 4 }}>Bei Beanstandungen bitte sofort melden.</Text>
         </View>
+        <Text
+          style={styles.pageInfo}
+          fixed
+          render={({ pageNumber, totalPages }) =>
+            `Lieferschein-Nr. ${deliveryNote.deliveryNoteNumber} · Seite ${pageNumber} von ${totalPages}`
+          }
+        />
       </Page>
     </Document>
   )
