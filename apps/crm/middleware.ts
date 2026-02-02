@@ -113,7 +113,8 @@ export async function middleware(request: NextRequest) {
     '/portal/reset-password',
     '/portal/setup-password',
   ]
-  const isPublicPortalRoute = publicPortalRoutes.includes(pathname)
+  const isOrderSignRoute = pathname.match(/^\/portal\/auftrag\/[^/]+\/unterschreiben$/)
+  const isPublicPortalRoute = publicPortalRoutes.includes(pathname) || isOrderSignRoute
 
   // For public portal routes, skip auth check entirely (faster!)
   if (isPublicPortalRoute) {

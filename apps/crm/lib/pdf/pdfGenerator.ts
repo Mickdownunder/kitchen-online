@@ -8,13 +8,14 @@ import React from 'react'
 import { InvoicePDFDocumentServer } from '@/lib/pdf/InvoicePDFServer'
 import { CustomerDeliveryNotePDFDocumentServer } from '@/lib/pdf/DeliveryNotePDFServer'
 import { ReminderPDFDocumentServer, ReminderData } from '@/lib/pdf/ReminderPDFServer'
+import { OrderPDFDocumentServer } from '@/lib/pdf/OrderPDFServer'
 import { InvoiceData, invoiceToPriorInfo } from '@/components/InvoicePDF'
 import { CustomerProject, Invoice, CompanySettings, BankAccount, InvoiceItem } from '@/types'
 import { getCompanySettings, getBankAccounts } from '@/lib/supabase/services/company'
 import { getInvoices } from '@/lib/supabase/services/invoices'
 import { calculateOverdueDays } from '@/hooks/useInvoiceCalculations'
 
-export type PDFType = 'invoice' | 'deliveryNote' | 'offer' | 'statistics' | 'reminder'
+export type PDFType = 'invoice' | 'deliveryNote' | 'order' | 'offer' | 'statistics' | 'reminder'
 
 // Invoice input for PDF generation - can be from DB or passed directly
 export interface InvoiceInput {
@@ -38,6 +39,7 @@ export interface PDFGenerationOptions {
   dateRange?: { from: string; to: string }
   reminderType?: 'first' | 'second' | 'final'
   overdueDays?: number
+  appendAgb?: boolean
 }
 
 export interface GeneratedPDF {
@@ -83,6 +85,15 @@ export async function generatePDF(options: PDFGenerationOptions): Promise<Genera
         throw new Error('Firmeneinstellungen sind erforderlich für DeliveryNote-PDF')
       }
       return generateDeliveryNotePDF(project, deliveryNoteId, companySettings)
+
+    case 'order':
+      if (!project) {
+        throw new Error('Projekt ist erforderlich für Order-PDF')
+      }
+      if (!companySettings) {
+        throw new Error('Firmeneinstellungen sind erforderlich für Order-PDF')
+      }
+      return generateOrderPDF(project, companySettings, options.appendAgb ?? true)
 
     case 'reminder':
       if (!project || !invoice || !options.reminderType) {
@@ -226,6 +237,28 @@ async function generateDeliveryNotePDF(
     pdf: pdfBase64,
     filename,
   }
+}
+
+/**
+ * Generiert Order/Auftrag-PDF
+ */
+async function generateOrderPDF(
+  project: CustomerProject,
+  companySettings: CompanySettings,
+  appendAgb: boolean
+): Promise<GeneratedPDF> {
+  const pdfElement = React.createElement(OrderPDFDocumentServer, {
+    project,
+    company: companySettings,
+    showUnitPrices: false,
+    appendAgb,
+  })
+  const pdfBuffer = await renderToBuffer(pdfElement as React.ReactElement)
+  const pdfBase64 = pdfBuffer.toString('base64')
+  const safeOrder = (project.orderNumber || project.id?.slice(0, 8) || 'Auftrag').replace(/\//g, '-')
+  const safeName = (project.customerName || 'Kunde').replace(/\s/g, '_')
+  const filename = `Auftrag_${safeOrder}_${safeName}.pdf`
+  return { pdf: pdfBase64, filename }
 }
 
 /**

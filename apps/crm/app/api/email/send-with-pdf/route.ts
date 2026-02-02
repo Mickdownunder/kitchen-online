@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { generatePDF, PDFType } from '@/lib/pdf/pdfGenerator'
 import { getProject } from '@/lib/supabase/services/projects'
 import { getCompanySettings } from '@/lib/supabase/services/company'
-import { deliveryNoteTemplate, invoiceTemplate } from '@/lib/utils/emailTemplates'
+import { deliveryNoteTemplate, invoiceTemplate, orderTemplate } from '@/lib/utils/emailTemplates'
 import { logger } from '@/lib/utils/logger'
 
 /**
@@ -197,6 +197,43 @@ export async function POST(request: NextRequest) {
           )
           emailHtml = deliveryNoteTemplateData.html
           emailText = deliveryNoteTemplateData.text
+          break
+        }
+
+        case 'order': {
+          if (!project) {
+            return NextResponse.json(
+              { error: 'Projekt ist erforderlich für Order-PDF' },
+              { status: 400 }
+            )
+          }
+
+          // Token für Online-Unterschrift erstellen (7 Tage gültig)
+          const crypto = await import('crypto')
+          const token = crypto.randomBytes(32).toString('hex')
+          const expiresAt = new Date()
+          expiresAt.setDate(expiresAt.getDate() + 7)
+
+          const supabaseAdmin = await createServiceClient()
+          await supabaseAdmin.from('order_sign_tokens').insert({
+            project_id: project.id,
+            token,
+            expires_at: expiresAt.toISOString(),
+          })
+
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+          const signUrl = `${baseUrl}/portal/auftrag/${token}/unterschreiben`
+
+          // Generiere PDF (mit AGB)
+          generatedPDF = await generatePDF({
+            type: 'order',
+            project,
+            appendAgb: true,
+          })
+
+          const orderTemplateData = orderTemplate(project, signUrl, companyName)
+          emailHtml = orderTemplateData.html
+          emailText = orderTemplateData.text
           break
         }
 

@@ -8,6 +8,68 @@ import { CustomerProject, PartialPayment, Complaint } from '@/types'
 
 const DEFAULT_COMPANY_NAME = 'Ihr Unternehmen'
 
+export function orderTemplate(
+  project: CustomerProject,
+  signUrl: string,
+  companyName: string = DEFAULT_COMPANY_NAME
+): { subject: string; html: string; text: string } {
+  return {
+    subject: `Ihr Auftrag ${project.orderNumber} – bitte unterschreiben`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #0d9488; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+            .content { background: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
+            .cta { display: inline-block; background: #0d9488; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 20px 0; }
+            .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>${companyName}</h1>
+            </div>
+            <div class="content">
+              <h2>Auftrag ${project.orderNumber}</h2>
+              <p>Sehr geehrte/r ${project.customerName},</p>
+              <p>anbei erhalten Sie Ihren Auftrag <strong>${project.orderNumber}</strong> zur Bestätigung.</p>
+              <p>Bitte prüfen Sie den Auftrag und <strong>unterschreiben Sie ihn online</strong>, indem Sie auf den folgenden Link klicken:</p>
+              <p><a href="${signUrl}" class="cta">Jetzt online unterschreiben</a></p>
+              <p>Mit Ihrer Unterschrift bestätigen Sie den Auftrag und verzichten auf Ihr 14-tägiges Widerrufsrecht (§ 18 FAGG – Maßanfertigung).</p>
+              <p>Das Auftragsdokument ist dieser E-Mail als PDF angehängt.</p>
+              <p>Mit freundlichen Grüßen<br>${companyName}</p>
+            </div>
+            <div class="footer">
+              <p>Diese E-Mail wurde automatisch generiert. Bitte antworten Sie nicht direkt auf diese E-Mail.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `
+Auftrag ${project.orderNumber}
+
+Sehr geehrte/r ${project.customerName},
+
+anbei erhalten Sie Ihren Auftrag ${project.orderNumber} zur Bestätigung.
+
+Bitte unterschreiben Sie den Auftrag online: ${signUrl}
+
+Mit Ihrer Unterschrift bestätigen Sie den Auftrag und verzichten auf Ihr 14-tägiges Widerrufsrecht (§ 18 FAGG – Maßanfertigung).
+
+Das Auftragsdokument ist dieser E-Mail als PDF angehängt.
+
+Mit freundlichen Grüßen
+${companyName}
+    `.trim(),
+  }
+}
+
 export function deliveryNoteTemplate(
   project: CustomerProject,
   _deliveryNoteId: string,

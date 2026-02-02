@@ -36,6 +36,7 @@ import {
   Share2,
   CheckCircle2,
   Loader2,
+  Mail,
 } from 'lucide-react'
 // PDF functions are dynamically imported when needed to reduce initial bundle size (~300KB saving)
 // The InvoiceData type is imported separately for type checking
@@ -89,6 +90,7 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
   // Portal publishing state
   const [publishedDocs, setPublishedDocs] = useState<Set<string>>(new Set())
   const [publishingDoc, setPublishingDoc] = useState<string | null>(null)
+  const [sendingOrderEmail, setSendingOrderEmail] = useState(false)
 
   const loadCompanySettings = useCallback(async () => {
     try {
@@ -204,6 +206,44 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
       alert(`Fehler beim Veröffentlichen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)
     } finally {
       setPublishingDoc(null)
+    }
+  }
+
+  // Auftrag per E-Mail senden (mit Unterschriften-Link)
+  const handleSendOrderEmail = async () => {
+    if (!project.email?.trim()) {
+      alert('Bitte E-Mail-Adresse des Kunden im Projekt hinterlegen.')
+      return
+    }
+    if (!companySettings) {
+      alert('Bitte Firmenstammdaten hinterlegen.')
+      return
+    }
+
+    setSendingOrderEmail(true)
+    try {
+      const res = await fetch('/api/email/send-with-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: project.email.trim(),
+          subject: `Auftrag ${project.orderNumber} zur Unterschrift`,
+          pdfType: 'order',
+          projectId: project.id,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Fehler beim Senden')
+      }
+      alert('Auftrag wurde per E-Mail versendet. Der Kunde erhält den Link zur Online-Unterschrift.')
+    } catch (error) {
+      logger.error('Error sending order email', { component: 'ProjectDocumentsTab' }, error as Error)
+      alert(
+        `Fehler beim Senden: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
+      )
+    } finally {
+      setSendingOrderEmail(false)
     }
   }
 
@@ -826,6 +866,25 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {doc.type === 'order' && (
+                    <button
+                      onClick={handleSendOrderEmail}
+                      disabled={sendingOrderEmail || !project.email?.trim()}
+                      className="flex items-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-bold text-white transition-all hover:bg-teal-700 disabled:bg-slate-300 disabled:text-slate-500"
+                      title={
+                        !project.email?.trim()
+                          ? 'E-Mail-Adresse fehlt'
+                          : 'Auftrag per E-Mail senden (mit Link zur Online-Unterschrift)'
+                      }
+                    >
+                      {sendingOrderEmail ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Mail className="h-4 w-4" />
+                      )}
+                      Auftrag per E-Mail senden
+                    </button>
+                  )}
                   <button
                     onClick={() => handleView(doc)}
                     className="rounded-lg bg-slate-100 p-2 text-slate-700 transition-all hover:bg-slate-200 group-hover:bg-emerald-100 group-hover:text-emerald-700"
