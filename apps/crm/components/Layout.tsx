@@ -25,12 +25,14 @@ import { useAuth } from '@/hooks/useAuth'
 import { signOut, getCompanySettings } from '@/lib/supabase/services'
 import { logger } from '@/lib/utils/logger'
 
-// Weißes Logo für dunklen Hintergrund
-const LOGO_URL_WHITE = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-03%20weis.png'
+// Fallback-Logo (Küchenonline) für dunklen Hintergrund
+const LOGO_URL_FALLBACK =
+  'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-03%20weis.png'
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const [displayName, setDisplayName] = React.useState<string>('')
+  const [logoUrl, setLogoUrl] = React.useState<string>(LOGO_URL_FALLBACK)
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile, companyRole, loading, hasPermission } = useAuth()
@@ -40,22 +42,31 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (user) hasRedirectedToLogin.current = false
   }, [user])
 
-  // Load company display name
+  // Load company display name + Logo (firmenspezifisch)
   React.useEffect(() => {
-    const loadDisplayName = async () => {
+    const loadCompanyBranding = async () => {
       try {
         const settings = await getCompanySettings()
-        if (settings?.displayName) {
-          setDisplayName(settings.displayName)
-        } else if (settings?.companyName) {
-          setDisplayName(settings.companyName)
+        if (settings) {
+          if (settings.displayName) setDisplayName(settings.displayName)
+          else if (settings.companyName) setDisplayName(settings.companyName)
+          // Logo: logo_url > logo_base64 > Fallback (Küchenonline)
+          if (settings.logoUrl) {
+            setLogoUrl(settings.logoUrl)
+          } else if (settings.logoBase64) {
+            setLogoUrl(`data:image/png;base64,${settings.logoBase64}`)
+          } else {
+            setLogoUrl(LOGO_URL_FALLBACK)
+          }
         }
       } catch (error) {
-        logger.error('Error loading company display name', { component: 'Layout' }, error as Error)
+        logger.error('Error loading company branding', { component: 'Layout' }, error as Error)
       }
     }
     if (user) {
-      loadDisplayName()
+      loadCompanyBranding()
+    } else {
+      setLogoUrl(LOGO_URL_FALLBACK)
     }
   }, [user])
 
@@ -231,7 +242,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           aria-label="Zur Startseite"
         >
           <Image
-            src={LOGO_URL_WHITE}
+            src={logoUrl}
             alt={displayName || 'KüchenOnline'}
             width={160}
             height={50}
@@ -292,7 +303,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b border-blue-950 bg-blue-900 p-4 text-white md:hidden print:!hidden">
         <Link href="/dashboard" className="flex items-center" aria-label="Zur Startseite">
           <Image
-            src={LOGO_URL_WHITE}
+            src={logoUrl}
             alt={displayName || 'KüchenOnline'}
             width={120}
             height={40}
@@ -314,7 +325,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {isMobileMenuOpen && (
         <nav
           id="mobile-menu"
-          className="fixed inset-0 z-40 flex flex-col space-y-4 bg-blue-900 p-6 pt-20 md:hidden print:!hidden"
+          className="fixed inset-0 z-40 flex flex-col overflow-y-auto space-y-4 bg-blue-900 p-6 pt-20 md:hidden print:!hidden"
           aria-label="Mobilmenü"
         >
           {visibleMenuItems.map(item => (

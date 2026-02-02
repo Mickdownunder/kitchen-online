@@ -76,6 +76,24 @@ export function CompanyTab({
             </p>
           </div>
 
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Logo-URL (für Menü oben links)
+            </label>
+            <input
+              type="url"
+              value={companySettings.logoUrl || ''}
+              onChange={e =>
+                setCompanySettings(prev => ({ ...prev, logoUrl: e.target.value || undefined }))
+              }
+              className="w-full rounded-xl bg-slate-50 px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-yellow-500"
+              placeholder="https://... (leer = Küchenonline-Logo)"
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Logo für dunklen Hintergrund (weiß/hell). Für Baleah z.B. eigenes Logo hochladen und URL hier eintragen.
+            </p>
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
               <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
