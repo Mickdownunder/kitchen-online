@@ -40,11 +40,16 @@ export const CustomerRow: React.FC<CustomerRowProps> = ({
   const displayName = `${customer.salutation || ''} ${customer.firstName} ${customer.lastName}`.trim()
   const city = customer.address?.city ? `${customer.address.postalCode} ${customer.address.city}` : '–'
 
+  const shortId = customer.id?.slice(0, 8) || '–'
+
   return (
     <tr
       onClick={onSelect}
       className="group cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50/80"
     >
+      <td className="px-4 py-3 font-mono text-xs text-slate-500">
+        {shortId}
+      </td>
       <td className="px-4 py-3">
         <span className="font-bold text-slate-900">
           {searchTerm ? highlightText(displayName, searchTerm) : displayName}

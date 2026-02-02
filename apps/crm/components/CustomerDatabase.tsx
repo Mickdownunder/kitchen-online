@@ -49,6 +49,10 @@ const CustomerDatabase: React.FC<CustomerDatabaseProps> = ({
       let aVal: string
       let bVal: string
       switch (sortField) {
+        case 'customerNumber':
+          aVal = (a.id || '').toLowerCase()
+          bVal = (b.id || '').toLowerCase()
+          break
         case 'name':
           aVal = `${a.firstName} ${a.lastName}`.toLowerCase()
           bVal = `${b.firstName} ${b.lastName}`.toLowerCase()

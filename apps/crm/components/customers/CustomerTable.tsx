@@ -5,7 +5,7 @@ import { UserCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import type { Customer } from '@/types'
 import { CustomerRow } from './CustomerRow'
 
-export type CustomerSortField = 'name' | 'company' | 'city' | 'email'
+export type CustomerSortField = 'name' | 'company' | 'city' | 'email' | 'customerNumber'
 export type SortDirection = 'asc' | 'desc'
 
 interface CustomerTableProps {
@@ -56,6 +56,15 @@ export const CustomerTable: React.FC<CustomerTableProps> = ({
             <tr>
               <th
                 className="cursor-pointer px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100"
+                onClick={() => onSort('customerNumber')}
+              >
+                <div className="flex items-center gap-2">
+                  Nr.
+                  <SortIcon field="customerNumber" sortField={sortField} sortDirection={sortDirection} />
+                </div>
+              </th>
+              <th
+                className="cursor-pointer px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100"
                 onClick={() => onSort('name')}
               >
                 <div className="flex items-center gap-2">
@@ -101,7 +110,7 @@ export const CustomerTable: React.FC<CustomerTableProps> = ({
           <tbody className="divide-y divide-slate-100">
             {customers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                   <UserCircle className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                   <p className="text-sm font-bold">Keine Kunden gefunden</p>
                   <p className="mt-1 text-xs">

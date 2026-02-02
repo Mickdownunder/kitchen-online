@@ -28,8 +28,8 @@ export const PDF_DESIGN = {
   },
   /** Akzentfarbe pro Dokumenttyp – einheitliche Palette */
   accent: {
-    order: '#0d9488',
-    invoice: '#0f766e',
+    order: '#0d9488',   // Teal (Aufträge)
+    invoice: '#eab308', // Gelb/Amber (Rechnungen)
     delivery: '#3b82f6',
   },
 } as const

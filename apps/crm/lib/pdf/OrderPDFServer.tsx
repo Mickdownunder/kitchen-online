@@ -360,7 +360,9 @@ export const OrderPDFDocumentServer: React.FC<OrderPDFServerProps> = ({
           {project.customerId ? (
             <View style={styles.metaColumn}>
               <Text style={styles.metaLabel}>Kundennummer</Text>
-              <Text style={styles.metaValue}>{project.customerId}</Text>
+              <Text style={styles.metaValue}>
+                {project.customerId.slice(0, 8) || `K-${(project.id || '').slice(0, 6)}`}
+              </Text>
             </View>
           ) : null}
         </View>
