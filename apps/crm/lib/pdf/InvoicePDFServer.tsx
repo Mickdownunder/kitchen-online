@@ -12,7 +12,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
     fontSize: D.fontSize.body,
     padding: D.spacing.pagePadding,
-    paddingBottom: 160, // Platz für fixen Bank-/Zahlungs-Footer
+    paddingBottom: 50, // Platz für Seiteninfo
     backgroundColor: '#ffffff',
     color: D.colors.text,
   },
@@ -242,14 +242,12 @@ const styles = StyleSheet.create({
     color: D.colors.secondary,
   },
   bankSection: {
-    position: 'absolute' as const,
-    bottom: 95,
-    left: D.spacing.pagePadding,
-    right: D.spacing.pagePadding,
     flexDirection: 'row',
     backgroundColor: '#f8fafc',
     padding: 15,
     borderRadius: 4,
+    marginTop: 30,
+    marginBottom: 20,
   },
   bankColumn: {
     flex: 1,
@@ -273,14 +271,11 @@ const styles = StyleSheet.create({
     color: D.colors.text,
   },
   footer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    textAlign: 'center',
+    marginTop: 20,
     paddingTop: 15,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
+    textAlign: 'center',
   },
   footerText: {
     fontSize: D.fontSize.micro,
@@ -637,8 +632,8 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
           </View>
         </View>
 
-        {/* Bank Info + Zahlungsbedingungen – fix am Seitenende */}
-        <View style={styles.bankSection} fixed>
+        {/* Bank Info + Zahlungsbedingungen – am Ende nach allen Beträgen */}
+        <View style={styles.bankSection} wrap={false}>
           <View style={styles.bankColumn}>
             <Text style={styles.bankTitle}>Bankverbindung</Text>
             <Text style={styles.bankText}>{bank.accountHolder || companyFullName}</Text>
@@ -658,8 +653,8 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
           </View>
         </View>
 
-        {/* Footer – fix am Seitenende */}
-        <View style={styles.footer} fixed>
+        {/* Footer – am Ende nach Bank/Zahlungsbedingungen */}
+        <View style={styles.footer} wrap={false}>
           <Text style={styles.footerText}>
             {companyFullName} · {company.street} {company.houseNumber} · {company.postalCode}{' '}
             {company.city} · {company.country || 'Österreich'}
