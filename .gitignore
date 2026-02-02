@@ -8,6 +8,12 @@ dist/
 .turbo/
 coverage/
 
+# DB Backups (sensitive data)
+backup.sql
+backup_inserts.sql
+backup_inserts_baleah.sql
+auth_users.sql
+
 # Environment
 .env
 .env.local

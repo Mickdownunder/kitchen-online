@@ -70,12 +70,17 @@ const nextConfig = {
       bodySizeLimit: '4mb', // Standard limit - use file uploads for larger files
     },
   },
-  // Externe Bilder von Supabase Storage erlauben
+  // Externe Bilder von Supabase Storage erlauben (KüchenOnline + Baleah)
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'tdpyouguwmdrvhwkpdca.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'hysuwlvxpuchmgotvhpx.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
     ],
