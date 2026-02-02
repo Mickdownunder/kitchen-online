@@ -44,7 +44,12 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
         logger.warn('Could not load company settings', { component: 'email' }, error as Error)
       }
     }
-    const fromEmail = options.from || companySettings?.email || 'noreply@example.com'
+    // Resend: Domain muss verifiziert sein. Fallback: onboarding@resend.dev (Resend-Sandbox) oder EMAIL_FROM aus .env
+    const fromEmail =
+      options.from ||
+      companySettings?.email ||
+      process.env.EMAIL_FROM ||
+      'onboarding@resend.dev'
     const fromName = options.fromName || companySettings?.companyName || 'Designstudio BaLeah'
 
     const response = await fetch('https://api.resend.com/emails', {

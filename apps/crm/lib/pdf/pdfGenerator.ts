@@ -10,7 +10,8 @@ import { CustomerDeliveryNotePDFDocumentServer } from '@/lib/pdf/DeliveryNotePDF
 import { ReminderPDFDocumentServer, ReminderData } from '@/lib/pdf/ReminderPDFServer'
 import { OrderPDFDocumentServer } from '@/lib/pdf/OrderPDFServer'
 import { InvoiceData, invoiceToPriorInfo } from '@/components/InvoicePDF'
-import { CustomerProject, Invoice, CompanySettings, BankAccount, InvoiceItem } from '@/types'
+import type { CompanySettings } from '@/types'
+import { CustomerProject, Invoice, BankAccount, InvoiceItem } from '@/types'
 import { getCompanySettings, getBankAccounts } from '@/lib/supabase/services/company'
 import { getInvoices } from '@/lib/supabase/services/invoices'
 import { calculateOverdueDays } from '@/hooks/useInvoiceCalculations'
@@ -40,6 +41,8 @@ export interface PDFGenerationOptions {
   reminderType?: 'first' | 'second' | 'final'
   overdueDays?: number
   appendAgb?: boolean
+  /** Optional: für API-Routes übergeben, da getCompanySettings dort oft null liefert */
+  companySettings?: CompanySettings | null
 }
 
 export interface GeneratedPDF {
@@ -51,14 +54,19 @@ export interface GeneratedPDF {
  * Generiert ein PDF basierend auf Typ und Optionen
  */
 export async function generatePDF(options: PDFGenerationOptions): Promise<GeneratedPDF> {
-  const { type, project, invoice, deliveryNoteId } = options
+  const { type, project, invoice, deliveryNoteId, companySettings: optsCompany } = options
 
-  // Lade Company Settings und Bank Account einmal für alle PDFs
-  const companySettings = await getCompanySettings()
-  let bankAccount = null
-  if (companySettings?.id) {
-    const banks = await getBankAccounts(companySettings.id)
-    bankAccount = banks.find(b => b.isDefault) || banks[0] || null
+  // Lade Company Settings – wenn in options übergeben (z.B. aus API-Route), diese verwenden
+  const companySettings = optsCompany ?? (await getCompanySettings())
+  // Bank-Account nur für Rechnung/Mahnung laden (Order/Lieferschein brauchen keine)
+  let bankAccount: BankAccount | null = null
+  if ((type === 'invoice' || type === 'reminder') && companySettings?.id) {
+    try {
+      const banks = await getBankAccounts(companySettings.id)
+      bankAccount = banks.find(b => b.isDefault) || banks[0] || null
+    } catch {
+      bankAccount = null
+    }
   }
 
   switch (type) {
@@ -247,18 +255,23 @@ async function generateOrderPDF(
   companySettings: CompanySettings,
   appendAgb: boolean
 ): Promise<GeneratedPDF> {
-  const pdfElement = React.createElement(OrderPDFDocumentServer, {
-    project,
-    company: companySettings,
-    showUnitPrices: false,
-    appendAgb,
-  })
-  const pdfBuffer = await renderToBuffer(pdfElement as React.ReactElement)
-  const pdfBase64 = pdfBuffer.toString('base64')
-  const safeOrder = (project.orderNumber || project.id?.slice(0, 8) || 'Auftrag').replace(/\//g, '-')
-  const safeName = (project.customerName || 'Kunde').replace(/\s/g, '_')
-  const filename = `Auftrag_${safeOrder}_${safeName}.pdf`
-  return { pdf: pdfBase64, filename }
+  try {
+    const pdfElement = React.createElement(OrderPDFDocumentServer, {
+      project,
+      company: companySettings,
+      showUnitPrices: false,
+      appendAgb,
+    })
+    const pdfBuffer = await renderToBuffer(pdfElement as React.ReactElement)
+    const pdfBase64 = pdfBuffer.toString('base64')
+    const safeOrder = (project.orderNumber || project.id?.slice(0, 8) || 'Auftrag').replace(/\//g, '-')
+    const safeName = (project.customerName || 'Kunde').replace(/\s/g, '_')
+    const filename = `Auftrag_${safeOrder}_${safeName}.pdf`
+    return { pdf: pdfBase64, filename }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`Order-PDF: ${msg}`)
+  }
 }
 
 /**

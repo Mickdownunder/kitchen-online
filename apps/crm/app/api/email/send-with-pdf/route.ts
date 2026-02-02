@@ -3,7 +3,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { generatePDF, PDFType } from '@/lib/pdf/pdfGenerator'
 import { getProject } from '@/lib/supabase/services/projects'
-import { getCompanySettings } from '@/lib/supabase/services/company'
+import { getCompanySettings, getCompanySettingsById } from '@/lib/supabase/services/company'
 import { deliveryNoteTemplate, invoiceTemplate, orderTemplate } from '@/lib/utils/emailTemplates'
 import { logger } from '@/lib/utils/logger'
 
@@ -115,8 +115,12 @@ export async function POST(request: NextRequest) {
     let emailHtml = emailBody
     let emailText = emailBody
 
-    // Hole Company Name für Email-Templates
-    const companySettings = await getCompanySettings()
+    // Hole Firmeneinstellungen – in API-Routes liefert getCompanySettings oft null (Browser-Client),
+    // daher Fallback auf getCompanySettingsById mit company_id aus RPC
+    let companySettings = await getCompanySettings()
+    if (!companySettings && companyId) {
+      companySettings = await getCompanySettingsById(companyId, supabase)
+    }
     const companyName =
       companySettings?.displayName || companySettings?.companyName || 'Ihr Unternehmen'
 
@@ -259,11 +263,18 @@ export async function POST(request: NextRequest) {
           const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
           const signUrl = `${baseUrl}/portal/auftrag/${token}/unterschreiben`
 
-          // Generiere PDF (mit AGB)
+          // Generiere PDF (mit AGB) – companySettings explizit übergeben (getCompanySettings in API oft null)
+          if (!companySettings) {
+            return NextResponse.json(
+              { error: 'Firmeneinstellungen fehlen. Bitte Firmenstammdaten unter Einstellungen hinterlegen.' },
+              { status: 400 }
+            )
+          }
           generatedPDF = await generatePDF({
             type: 'order',
             project,
             appendAgb: true,
+            companySettings,
           })
 
           const orderTemplateData = orderTemplate(project, signUrl, companyName)
@@ -288,19 +299,27 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: `Unbekannter PDF-Typ: ${pdfType}` }, { status: 400 })
       }
     } catch (pdfError: unknown) {
+      const errMsg =
+        pdfError instanceof Error
+          ? pdfError.message
+          : typeof pdfError === 'object' && pdfError !== null && 'message' in pdfError
+            ? String((pdfError as { message?: unknown }).message)
+            : typeof pdfError === 'string'
+              ? pdfError
+              : 'Unbekannter Fehler'
       logger.error(
         'Fehler beim Generieren des PDFs',
         {
           component: 'api/email/send-with-pdf',
           pdfType,
           projectId,
+          errMsg,
+          raw: pdfError,
         },
         pdfError as Error
       )
       return NextResponse.json(
-        {
-          error: `Fehler beim Generieren des PDFs: ${pdfError instanceof Error ? pdfError.message : 'Unbekannter Fehler'}`,
-        },
+        { error: `Fehler beim Generieren des PDFs: ${errMsg}` },
         { status: 500 }
       )
     }
@@ -312,6 +331,8 @@ export async function POST(request: NextRequest) {
         subject: subject,
         html: emailHtml,
         text: emailText,
+        from: companySettings?.email,
+        fromName: companyName,
         attachments: generatedPDF
           ? [
               {

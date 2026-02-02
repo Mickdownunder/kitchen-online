@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '../client'
 import { BankAccount, CompanySettings, Employee } from '@/types'
 import { getCurrentUser } from './auth'
@@ -35,6 +36,33 @@ export async function getCompanySettings(): Promise<CompanySettings | null> {
       return null
     }
     logger.error('Error loading company settings', { component: 'company' }, error as Error)
+    return null
+  }
+}
+
+/**
+ * Lädt Firmeneinstellungen per company_settings.id (company_id aus get_current_company_id).
+ * Für API-Routes: Server-Client übergeben, da getCompanySettings() mit Browser-Client in API-Kontext oft null liefert.
+ */
+export async function getCompanySettingsById(
+  companyId: string,
+  client?: SupabaseClient
+): Promise<CompanySettings | null> {
+  try {
+    const sb = client ?? supabase
+    const { data, error } = await sb
+      .from('company_settings')
+      .select('*')
+      .eq('id', companyId)
+      .single()
+
+    if (error) {
+      logger.error('Error loading company settings by id', { component: 'company', companyId }, error as Error)
+      return null
+    }
+    return data ? mapCompanySettingsFromDB(data) : null
+  } catch (error: unknown) {
+    logger.error('Error loading company settings by id', { component: 'company', companyId }, error as Error)
     return null
   }
 }
