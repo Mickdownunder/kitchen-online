@@ -5,12 +5,13 @@ const csp = [
   "default-src 'self'",
   "img-src 'self' data: https:",
   "media-src 'self' blob:",
-  "connect-src 'self' https: wss:",
+  "connect-src 'self' data: https: wss:",
   "style-src 'self' 'unsafe-inline' https:",
-  // unsafe-eval only needed for Next.js Hot Reload in development
+  // wasm-unsafe-eval: benötigt für @react-pdf/renderer (PDF-Generierung im Browser)
+  // unsafe-eval nur in Development für Next.js Hot Reload
   isDev 
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:"
-    : "script-src 'self' 'unsafe-inline' https:",
+    : "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https:",
   "font-src 'self' data: https:",
   "frame-ancestors 'self'",
   "base-uri 'self'",
