@@ -645,6 +645,17 @@ export interface CustomerProject {
   /** Hinweise für Auftrag (PDF): erscheint unter den Positionen, oberhalb der Unterschrift (z. B. Zahlungsmodalitäten, Reklamationen, Unterschrift Kunde, Schlusstext). */
   orderFooterText?: string
 
+  /** Online-Unterschrift: Zeitpunkt der Kundenunterschrift */
+  orderContractSignedAt?: string
+  /** Online-Unterschrift: Name des Unterzeichners */
+  orderContractSignedBy?: string
+  /** Online-Unterschrift: Base64-Bild der Unterschrift (Nachweis) */
+  customerSignature?: string
+  /** Online-Unterschrift: Datum der Unterschrift (YYYY-MM-DD) */
+  customerSignatureDate?: string
+  /** Widerrufsverzicht: Zeitpunkt (§ 18 FAGG Maßanfertigung) */
+  withdrawalWaivedAt?: string
+
   // Delivery Status
   deliveryStatus?:
     | 'not_ordered'
