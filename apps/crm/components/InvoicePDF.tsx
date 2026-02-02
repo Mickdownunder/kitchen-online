@@ -11,6 +11,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
     fontSize: D.fontSize.body,
     padding: D.spacing.pagePadding,
+    paddingBottom: 160, // Platz für fixen Bank-/Zahlungs-Footer
     backgroundColor: '#ffffff',
     color: D.colors.text,
   },
@@ -240,11 +241,14 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   bankSection: {
+    position: 'absolute' as const,
+    bottom: 95,
+    left: D.spacing.pagePadding,
+    right: D.spacing.pagePadding,
     flexDirection: 'row',
     backgroundColor: '#f8fafc',
     padding: 15,
     borderRadius: 4,
-    marginBottom: 20,
   },
   bankColumn: {
     flex: 1,
@@ -661,8 +665,8 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
           </View>
         </View>
 
-        {/* Bank Info */}
-        <View style={styles.bankSection}>
+        {/* Bank Info + Zahlungsbedingungen – fix am Seitenende */}
+        <View style={styles.bankSection} fixed>
           <View style={styles.bankColumn}>
             <Text style={styles.bankTitle}>Bankverbindung</Text>
             <Text style={styles.bankText}>{bank.accountHolder || companyFullName}</Text>
@@ -682,8 +686,8 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
           </View>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
+        {/* Footer – fix am Seitenende */}
+        <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
             {companyFullName} · {company.street} {company.houseNumber} · {company.postalCode}{' '}
             {company.city} · {company.country || 'Österreich'}

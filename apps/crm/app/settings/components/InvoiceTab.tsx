@@ -25,13 +25,15 @@ export function InvoiceTab({
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
         <h4 className="mb-4 text-sm font-bold text-slate-700">Fortlaufende Nummern</h4>
         <p className="mb-4 text-xs text-slate-500">
-          Präfix und nächste Nummer für Rechnungen, Aufträge und Lieferscheine. Format: Präfix-Jahr-Nummer (z.B. R-2026-0001).
+          Präfix = nur der kurze Vorsatz (z.B. R-, K-, LS-). Nächste Nr. = die fortlaufende Zahl.
+          Format: Präfix+Jahr+Nummer → z.B. R-2026-0001. Nicht die vollständige Nummer ins Präfix-Feld eintragen!
         </p>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-6">
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
               Rechnung Präfix
             </label>
+            <p className="mb-1 text-[10px] text-slate-400">Nur z.B. R- (nicht R-2026-0001)</p>
             <input
               type="text"
               value={companySettings.invoicePrefix || ''}
@@ -61,6 +63,7 @@ export function InvoiceTab({
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
               Auftrag Präfix
             </label>
+            <p className="mb-1 text-[10px] text-slate-400">Nur z.B. K- (nicht K-2026-0001)</p>
             <input
               type="text"
               value={companySettings.orderPrefix ?? ''}
@@ -90,6 +93,7 @@ export function InvoiceTab({
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
               Lieferschein Präfix
             </label>
+            <p className="mb-1 text-[10px] text-slate-400">Nur z.B. LS- (nicht LS-2026-1100)</p>
             <input
               type="text"
               value={companySettings.deliveryNotePrefix ?? ''}
