@@ -260,7 +260,11 @@ export async function POST(request: NextRequest) {
             )
           }
 
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+          // Basis-URL aus Request (wo der User die App nutzt) – sonst Env, sonst localhost
+          const requestOrigin = request.nextUrl?.origin || new URL(request.url).origin
+          const baseUrl =
+            process.env.NEXT_PUBLIC_BASE_URL ||
+            (requestOrigin && !requestOrigin.includes('localhost') ? requestOrigin : 'http://localhost:3000')
           const signUrl = `${baseUrl}/portal/auftrag/${token}/unterschreiben`
 
           // Generiere PDF (mit AGB) – companySettings explizit übergeben (getCompanySettings in API oft null)
