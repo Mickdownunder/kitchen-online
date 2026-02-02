@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { bookingConfirmationTemplate } from '@/lib/email-templates/booking-confirmation'
-import { generateOrderNumber } from '@/lib/utils/orderNumberGenerator'
 import { logger } from '@/lib/utils/logger'
 import crypto from 'crypto'
 
@@ -285,18 +284,30 @@ export async function POST(request: NextRequest) {
       })
 
     // 5. Company ID und User ID holen (company_settings.id ist die Company ID)
-    const { data: companySettings } = await supabaseAdmin
+    const { data: companySettings, error: csError } = await supabaseAdmin
       .from('company_settings')
-      .select('id, company_name, user_id')
+      .select('id, company_name, user_id, order_prefix, next_order_number')
       .limit(1)
       .single()
 
-    if (!companySettings) {
+    if (csError || !companySettings) {
       throw new Error('Keine Company Settings gefunden')
     }
     const companyId = companySettings.id
     const companyName = companySettings.company_name
     const defaultUserId = companySettings.user_id // Owner der Company
+
+    // Fortlaufende Auftragsnummer (wie Rechnungen)
+    const orderPrefix = companySettings.order_prefix || 'K-'
+    const nextOrderNum = companySettings.next_order_number ?? 1
+    const orderNumber = `${orderPrefix}${new Date().getFullYear()}-${String(nextOrderNum).padStart(4, '0')}`
+    await supabaseAdmin
+      .from('company_settings')
+      .update({
+        next_order_number: nextOrderNum + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', companyId)
 
     // 6. Verkäufer finden (optional - für verkaeuferId im Projekt)
     let salespersonId: string | null = null
@@ -365,7 +376,6 @@ export async function POST(request: NextRequest) {
 
     // 8. Projekt anlegen
     const accessCode = generateAccessCode()
-    const orderNumber = generateOrderNumber()
     const customerFullName = `${firstName} ${lastName}`.trim() || 'Unbekannt'
 
     // Parse appointment date for storing in project

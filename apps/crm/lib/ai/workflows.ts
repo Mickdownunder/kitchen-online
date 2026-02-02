@@ -236,7 +236,7 @@ export async function monthlyInstallationDeliveryWorkflow(
 
           const deliveryNote = await createCustomerDeliveryNote({
             projectId: project.id,
-            deliveryNoteNumber: `LS-${project.orderNumber || project.id.slice(0, 8)}-${new Date().toISOString().split('T')[0]}`,
+            deliveryNoteNumber: undefined, // Fortlaufend aus Stammdaten (getNextDeliveryNoteNumber)
             deliveryDate:
               project.installationDate ||
               project.deliveryDate ||

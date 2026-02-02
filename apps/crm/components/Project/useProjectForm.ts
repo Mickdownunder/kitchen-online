@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CustomerProject, ProjectStatus } from '@/types'
 import type { Customer } from '@/types'
-import { generateOrderNumber } from '@/lib/utils/orderNumberGenerator'
+import { peekNextOrderNumber } from '@/lib/supabase/services/company'
 import { useCustomerSelection } from '@/hooks/useCustomerSelection'
 import { useAddressAutocomplete } from '@/hooks/useAddressAutocomplete'
 import { useArticleSelection } from '@/hooks/useArticleSelection'
@@ -25,7 +25,7 @@ export function useProjectForm(
     address: '',
     phone: '',
     email: '',
-    orderNumber: generateOrderNumber(),
+    orderNumber: '', // Wird bei neuem Projekt per peekNextOrderNumber gefüllt
     status: ProjectStatus.PLANNING,
     isMeasured: false,
     isOrdered: false,
@@ -80,6 +80,13 @@ export function useProjectForm(
 
   // Employees Hook
   const { employees } = useEmployees()
+
+  // Bei neuem Projekt: Vorschau der nächsten Auftragsnummer laden
+  useEffect(() => {
+    if (!initialProject?.id && !formData.orderNumber) {
+      peekNextOrderNumber().then(num => setFormData(prev => ({ ...prev, orderNumber: num })))
+    }
+  }, [initialProject?.id])
 
   // Initialize partial payments if not exists (Legacy-Migration)
   // HINWEIS: Dieser Code existiert nur für die Migration alter Projekte mit depositAmount.

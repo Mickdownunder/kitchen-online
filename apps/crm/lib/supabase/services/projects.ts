@@ -25,6 +25,7 @@ type ProjectRow = Record<string, any>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type InvoiceItemRow = Record<string, any>
 import { getCurrentUser } from './auth'
+import { getNextOrderNumber } from './company'
 import { logger } from '@/lib/utils/logger'
 import {
   calculateItemTotalsFromNet,
@@ -134,7 +135,7 @@ export async function createProject(
         customer_address: project.address || null,
         customer_phone: project.phone || null,
         customer_email: project.email || null,
-        order_number: project.orderNumber || `K-${Date.now()}`,
+        order_number: project.orderNumber || (await getNextOrderNumber()) || `K-${Date.now()}`,
         offer_number: project.offerNumber || null,
         invoice_number: project.invoiceNumber || null,
         contract_number: project.contractNumber || null,

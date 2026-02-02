@@ -78,6 +78,11 @@ export async function saveCompanySettings(
     reminder_days_between_final: settings.reminderDaysBetweenFinal,
     reminder_late_payment_interest: settings.reminderLatePaymentInterest,
     reminder_email_template: settings.reminderEmailTemplate,
+    next_invoice_number: settings.nextInvoiceNumber,
+    order_prefix: settings.orderPrefix,
+    next_order_number: settings.nextOrderNumber,
+    delivery_note_prefix: settings.deliveryNotePrefix,
+    next_delivery_note_number: settings.nextDeliveryNoteNumber,
     updated_at: new Date().toISOString(),
   }
 
@@ -138,6 +143,10 @@ function mapCompanySettingsFromDB(db: Record<string, any>): CompanySettings {
     reminderLatePaymentInterest: db.reminder_late_payment_interest,
     reminderEmailTemplate: db.reminder_email_template,
     nextInvoiceNumber: db.next_invoice_number ?? 1,
+    orderPrefix: db.order_prefix,
+    nextOrderNumber: db.next_order_number ?? 1,
+    deliveryNotePrefix: db.delivery_note_prefix,
+    nextDeliveryNoteNumber: db.next_delivery_note_number ?? 1,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   }
@@ -206,6 +215,114 @@ export async function peekNextInvoiceNumber(): Promise<string> {
   const currentNumber = settings.nextInvoiceNumber || 1
   const year = new Date().getFullYear()
 
+  return `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+}
+
+// ============================================
+// FORTLAUFENDE AUFTRAGSNUMMERN
+// ============================================
+
+/**
+ * Generiert die nächste fortlaufende Auftragsnummer und erhöht den Zähler.
+ * Format: {prefix}{jahr}-{nummer} z.B. "K-2026-0001"
+ */
+export async function getNextOrderNumber(): Promise<string> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: settings, error: loadError } = await supabase
+    .from('company_settings')
+    .select('id, order_prefix, next_order_number')
+    .eq('user_id', user.id)
+    .single()
+
+  if (loadError || !settings) {
+    throw new Error('Firmeneinstellungen nicht gefunden. Bitte zuerst Einstellungen speichern.')
+  }
+
+  const prefix = settings.order_prefix || 'K-'
+  const currentNumber = settings.next_order_number || 1
+  const year = new Date().getFullYear()
+  const orderNumber = `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+
+  const { error: updateError } = await supabase
+    .from('company_settings')
+    .update({
+      next_order_number: currentNumber + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', settings.id)
+
+  if (updateError) {
+    throw new Error('Fehler beim Aktualisieren des Auftragszählers: ' + updateError.message)
+  }
+
+  return orderNumber
+}
+
+/**
+ * Gibt die nächste Auftragsnummer zurück, ohne sie zu vergeben.
+ */
+export async function peekNextOrderNumber(): Promise<string> {
+  const settings = await getCompanySettings()
+  if (!settings) return 'K-' + new Date().getFullYear() + '-0001'
+  const prefix = settings.orderPrefix || 'K-'
+  const currentNumber = settings.nextOrderNumber || 1
+  const year = new Date().getFullYear()
+  return `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+}
+
+// ============================================
+// FORTLAUFENDE LIEFERSCHEINNUMMERN
+// ============================================
+
+/**
+ * Generiert die nächste fortlaufende Lieferscheinnummer und erhöht den Zähler.
+ * Format: {prefix}{jahr}-{nummer} z.B. "LS-2026-0001"
+ */
+export async function getNextDeliveryNoteNumber(): Promise<string> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: settings, error: loadError } = await supabase
+    .from('company_settings')
+    .select('id, delivery_note_prefix, next_delivery_note_number')
+    .eq('user_id', user.id)
+    .single()
+
+  if (loadError || !settings) {
+    throw new Error('Firmeneinstellungen nicht gefunden. Bitte zuerst Einstellungen speichern.')
+  }
+
+  const prefix = settings.delivery_note_prefix || 'LS-'
+  const currentNumber = settings.next_delivery_note_number || 1
+  const year = new Date().getFullYear()
+  const deliveryNoteNumber = `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+
+  const { error: updateError } = await supabase
+    .from('company_settings')
+    .update({
+      next_delivery_note_number: currentNumber + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', settings.id)
+
+  if (updateError) {
+    throw new Error('Fehler beim Aktualisieren des Lieferscheinzählers: ' + updateError.message)
+  }
+
+  return deliveryNoteNumber
+}
+
+/**
+ * Gibt die nächste Lieferscheinnummer zurück, ohne sie zu vergeben.
+ */
+export async function peekNextDeliveryNoteNumber(): Promise<string> {
+  const settings = await getCompanySettings()
+  if (!settings) return 'LS-' + new Date().getFullYear() + '-0001'
+  const prefix = settings.deliveryNotePrefix || 'LS-'
+  const currentNumber = settings.nextDeliveryNoteNumber || 1
+  const year = new Date().getFullYear()
   return `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
 }
 

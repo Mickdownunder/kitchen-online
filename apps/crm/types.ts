@@ -70,8 +70,12 @@ export interface CompanySettings {
   defaultPaymentTerms: number // Days
   defaultTaxRate: number // 20, 13, 10
 
-  // Fortlaufende Rechnungsnummern (gesetzlich vorgeschrieben)
-  nextInvoiceNumber?: number // Nächste zu vergebende Rechnungsnummer (default: 1)
+  // Fortlaufende Nummern (Rechnung, Auftrag, Lieferschein)
+  nextInvoiceNumber?: number // Nächste Rechnungsnummer (default: 1)
+  orderPrefix?: string // z.B. "K-" für Auftragsnummern
+  nextOrderNumber?: number // Nächste Auftragsnummer (default: 1)
+  deliveryNotePrefix?: string // z.B. "LS-" für Lieferscheinnummern
+  nextDeliveryNoteNumber?: number // Nächste Lieferscheinnummer (default: 1)
 
   // Payment Terms Options (customizable list)
   paymentTermsOptions?: number[] // e.g., [0, 7, 14, 30, 60]

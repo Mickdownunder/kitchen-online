@@ -59,8 +59,7 @@ export function useProjectSubmit({
         address: formData.address || '',
         phone: formData.phone || '',
         email: formData.email || '',
-        orderNumber:
-          formData.orderNumber || `K-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+        orderNumber: formData.id ? formData.orderNumber : undefined, // Bei neuem Projekt: createProject nutzt getNextOrderNumber()
         status: formData.status || ProjectStatus.PLANNING,
         items: validItems,
         totalAmount: calculations.grossTotal || 0,

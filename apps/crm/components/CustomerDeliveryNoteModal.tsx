@@ -25,8 +25,7 @@ export default function CustomerDeliveryNoteModal({
   existingDeliveryNote,
 }: CustomerDeliveryNoteModalProps) {
   const [deliveryNoteNumber, setDeliveryNoteNumber] = useState(
-    existingDeliveryNote?.deliveryNoteNumber ||
-      `LS-${new Date().getFullYear()}-${project.orderNumber}`
+    existingDeliveryNote?.deliveryNoteNumber || ''
   )
   const [deliveryDate, setDeliveryDate] = useState(
     existingDeliveryNote?.deliveryDate || new Date().toISOString().split('T')[0]
@@ -40,6 +39,14 @@ export default function CustomerDeliveryNoteModal({
   React.useEffect(() => {
     loadCompanySettings()
   }, [])
+
+  React.useEffect(() => {
+    if (!existingDeliveryNote && !deliveryNoteNumber) {
+      import('@/lib/supabase/services/company')
+        .then(m => m.peekNextDeliveryNoteNumber())
+        .then(num => setDeliveryNoteNumber(num))
+    }
+  }, [existingDeliveryNote])
 
   const loadCompanySettings = async () => {
     try {
@@ -76,7 +83,7 @@ export default function CustomerDeliveryNoteModal({
       } else {
         await createCustomerDeliveryNote({
           projectId: project.id,
-          deliveryNoteNumber,
+          deliveryNoteNumber: undefined, // Wird fortlaufend generiert (getNextDeliveryNoteNumber)
           deliveryDate,
           deliveryAddress: deliveryAddress || undefined,
           items,

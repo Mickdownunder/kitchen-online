@@ -492,10 +492,16 @@ export async function getCustomerDeliveryNote(id: string): Promise<CustomerDeliv
 }
 
 export async function createCustomerDeliveryNote(
-  deliveryNote: Omit<CustomerDeliveryNote, 'id' | 'createdAt' | 'updatedAt' | 'userId'>
+  deliveryNote: Omit<CustomerDeliveryNote, 'id' | 'createdAt' | 'updatedAt' | 'userId'> & {
+    deliveryNoteNumber?: string // Optional: wird fortlaufend generiert wenn nicht angegeben
+  }
 ): Promise<CustomerDeliveryNote> {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
+
+  const { getNextDeliveryNoteNumber } = await import('./company')
+  const deliveryNoteNumber =
+    deliveryNote.deliveryNoteNumber || (await getNextDeliveryNoteNumber())
 
   try {
     const { data, error } = await supabase
@@ -503,7 +509,7 @@ export async function createCustomerDeliveryNote(
       .insert({
         user_id: user.id,
         project_id: deliveryNote.projectId,
-        delivery_note_number: deliveryNote.deliveryNoteNumber,
+        delivery_note_number: deliveryNoteNumber,
         delivery_date: deliveryNote.deliveryDate,
         delivery_address: deliveryNote.deliveryAddress || null,
         items: deliveryNote.items || null,

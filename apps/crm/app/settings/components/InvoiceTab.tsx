@@ -21,20 +21,106 @@ export function InvoiceTab({
         Rechnungseinstellungen
       </h3>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
-            Rechnungsnummer-Präfix
-          </label>
-          <input
-            type="text"
-            value={companySettings.invoicePrefix || ''}
-            onChange={e => setCompanySettings(prev => ({ ...prev, invoicePrefix: e.target.value }))}
-            className="w-full rounded-xl bg-slate-50 px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
-            placeholder="R-"
-          />
-          <p className="mt-1 text-xs text-slate-400">z.B. R-2025-001</p>
+      {/* Fortlaufende Nummern (Rechnung, Auftrag, Lieferschein) */}
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+        <h4 className="mb-4 text-sm font-bold text-slate-700">Fortlaufende Nummern</h4>
+        <p className="mb-4 text-xs text-slate-500">
+          Präfix und nächste Nummer für Rechnungen, Aufträge und Lieferscheine. Format: Präfix-Jahr-Nummer (z.B. R-2026-0001).
+        </p>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-6">
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Rechnung Präfix
+            </label>
+            <input
+              type="text"
+              value={companySettings.invoicePrefix || ''}
+              onChange={e => setCompanySettings(prev => ({ ...prev, invoicePrefix: e.target.value }))}
+              className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+              placeholder="R-"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Nächste Rechnungsnr.
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={companySettings.nextInvoiceNumber ?? 1}
+              onChange={e =>
+                setCompanySettings(prev => ({
+                  ...prev,
+                  nextInvoiceNumber: parseInt(e.target.value) || 1,
+                }))
+              }
+              className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Auftrag Präfix
+            </label>
+            <input
+              type="text"
+              value={companySettings.orderPrefix ?? ''}
+              onChange={e => setCompanySettings(prev => ({ ...prev, orderPrefix: e.target.value }))}
+              className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+              placeholder="K-"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Nächste Auftragsnr.
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={companySettings.nextOrderNumber ?? 1}
+              onChange={e =>
+                setCompanySettings(prev => ({
+                  ...prev,
+                  nextOrderNumber: parseInt(e.target.value) || 1,
+                }))
+              }
+              className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Lieferschein Präfix
+            </label>
+            <input
+              type="text"
+              value={companySettings.deliveryNotePrefix ?? ''}
+              onChange={e =>
+                setCompanySettings(prev => ({ ...prev, deliveryNotePrefix: e.target.value }))
+              }
+              className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+              placeholder="LS-"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Nächste Lieferscheinnr.
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={companySettings.nextDeliveryNoteNumber ?? 1}
+              onChange={e =>
+                setCompanySettings(prev => ({
+                  ...prev,
+                  nextDeliveryNoteNumber: parseInt(e.target.value) || 1,
+                }))
+              }
+              className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
             Angebotsnummer-Präfix

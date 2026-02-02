@@ -32,6 +32,8 @@ export function useCompanySettingsData() {
     defaultTaxRate: 20,
     invoicePrefix: 'R-',
     offerPrefix: 'A-',
+    orderPrefix: 'K-',
+    deliveryNotePrefix: 'LS-',
   })
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
