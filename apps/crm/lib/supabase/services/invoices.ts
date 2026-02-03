@@ -142,7 +142,7 @@ export async function getInvoicesWithProject(projectId?: string): Promise<Invoic
     .select(
       `
       *,
-      projects!left (
+      project:projects (
         id,
         customer_name,
         order_number,
@@ -172,18 +172,18 @@ export async function getInvoicesWithProject(projectId?: string): Promise<Invoic
 
   return (data || []).map(row => {
     const invoice = mapInvoiceFromDB(row)
-    if (row.projects) {
+    if (row.project) {
       invoice.project = {
-        id: row.projects.id,
-        customerName: row.projects.customer_name,
-        orderNumber: row.projects.order_number,
-        address: row.projects.address,
-        phone: row.projects.phone,
-        email: row.projects.email,
-        customerId: row.projects.customer_id,
-        totalAmount: row.projects.total_amount,
-        netAmount: row.projects.net_amount,
-        taxAmount: row.projects.tax_amount,
+        id: row.project.id,
+        customerName: row.project.customer_name,
+        orderNumber: row.project.order_number,
+        address: row.project.address,
+        phone: row.project.phone,
+        email: row.project.email,
+        customerId: row.project.customer_id,
+        totalAmount: row.project.total_amount,
+        netAmount: row.project.net_amount,
+        taxAmount: row.project.tax_amount,
       } as CustomerProject
     }
     return invoice
