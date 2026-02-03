@@ -73,11 +73,16 @@ export function useCustomerSelection({
           customer.lastName
         )
 
+        const addr = customer.address
         setFormData(prev => ({
           ...prev,
           customerId: customer.id,
           customerName: fullName,
           address: fullAddress,
+          addressStreet: addr?.street ?? '',
+          addressHouseNumber: addr?.houseNumber ?? '',
+          addressPostalCode: addr?.postalCode ?? '',
+          addressCity: addr?.city ?? '',
           phone: customer.contact.phone || '',
           email: customer.contact.email || '',
         }))

@@ -562,6 +562,11 @@ export interface CustomerProject {
 
   // Contact info (can come from Customer entity or be stored directly)
   address?: string
+  /** Einzelfelder für Adresse im Formular (wie Stammdaten); beim Speichern zu address zusammengebaut */
+  addressStreet?: string
+  addressHouseNumber?: string
+  addressPostalCode?: string
+  addressCity?: string
   phone?: string
   email?: string
 

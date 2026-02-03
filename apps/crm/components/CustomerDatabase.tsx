@@ -316,13 +316,12 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
       <div className="grid grid-cols-2 gap-4">
         <input
           type="email"
-          placeholder="E-Mail *"
+          placeholder="E-Mail"
           value={formData.contact?.email}
           onChange={e =>
             setFormData({ ...formData, contact: { ...formData.contact!, email: e.target.value } })
           }
           className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-          required
         />
         <input
           type="email"

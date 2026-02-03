@@ -235,7 +235,9 @@ export default function AuditLogTab() {
             <FileText className="mx-auto mb-2 h-12 w-12 text-amber-500" />
             <p className="font-medium text-slate-700">{loadError}</p>
             <p className="mt-1 text-sm text-slate-500">
-              Nur Geschäftsführer und Administration können das Audit-Log einsehen.
+              {loadError.includes('Firma zugeordnet')
+                ? 'Bitte Firmenstammdaten anlegen und deinen Benutzer der Firma als Geschäftsführer/Administration zuordnen.'
+                : 'Nur Geschäftsführer und Administration können das Audit-Log einsehen.'}
             </p>
           </div>
         ) : logs.length === 0 ? (

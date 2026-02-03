@@ -35,7 +35,7 @@ export async function inviteUserByEmail(email: string): Promise<{ user: User | n
   const admin = requireAdminClient()
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?invited=true`,
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/reset-password?invited=true`,
   })
 
   return { user: data?.user, error }
@@ -124,7 +124,7 @@ export async function createInviteAndSendEmail(
 
     // 3. Send Supabase invite email
     const { error: emailError } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?invited=true`,
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/reset-password?invited=true`,
       data: {
         company_id: companyId,
         invited_role: role,

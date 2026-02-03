@@ -440,8 +440,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 10. Bestätigungs-Email senden
-    const portalUrl = process.env.NEXT_PUBLIC_APP_URL 
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/portal`
+    const portalUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL)
+      ? `${(process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL)}/portal`
       : 'https://portal.kuechenonline.com'
 
     const emailData = bookingConfirmationTemplate({

@@ -1,8 +1,11 @@
 import { CustomerProject, ProjectStatus } from '@/types'
 import { logger } from '@/lib/utils/logger'
+import { formatAddressForDB } from '@/lib/utils/addressFormatter'
 
 interface UseProjectSubmitProps {
   formData: Partial<CustomerProject>
+  /** Aktueller Wert des Adressfelds (wird beim Speichern verwendet, falls formData.address noch nicht gesetzt) */
+  currentAddress?: string
   calculations: {
     grossTotal: number
     netTotal: number
@@ -14,6 +17,7 @@ interface UseProjectSubmitProps {
 
 export function useProjectSubmit({
   formData,
+  currentAddress,
   calculations,
   onSave,
   onClose,
@@ -56,7 +60,14 @@ export function useProjectSubmit({
         id: formData.id || Date.now().toString(),
         customerId: formData.customerId,
         customerName: formData.customerName.trim(),
-        address: formData.address || '',
+        address:
+          formatAddressForDB(
+            formData.addressStreet,
+            formData.addressHouseNumber,
+            formData.addressPostalCode,
+            formData.addressCity
+          ) ||
+          (formData.address ?? currentAddress ?? '').trim(),
         phone: formData.phone || '',
         email: formData.email || '',
         orderNumber: formData.id ? formData.orderNumber : undefined, // Bei neuem Projekt: createProject nutzt getNextOrderNumber()

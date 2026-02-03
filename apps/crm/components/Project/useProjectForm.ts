@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CustomerProject, ProjectStatus } from '@/types'
 import type { Customer } from '@/types'
 import { peekNextOrderNumber } from '@/lib/supabase/services/company'
+import { parseAddressFromDB } from '@/lib/utils/addressFormatter'
 import { useCustomerSelection } from '@/hooks/useCustomerSelection'
 import { useAddressAutocomplete } from '@/hooks/useAddressAutocomplete'
 import { useArticleSelection } from '@/hooks/useArticleSelection'
@@ -19,27 +20,40 @@ export function useProjectForm(
   initialProject?: Partial<CustomerProject>,
   existingCustomers: Customer[] = []
 ) {
-  // Basis Form-State
-  const [formData, setFormData] = useState<Partial<CustomerProject>>({
-    customerName: '',
-    address: '',
-    phone: '',
-    email: '',
-    orderNumber: '', // Wird bei neuem Projekt per peekNextOrderNumber gefüllt
-    status: ProjectStatus.PLANNING,
-    isMeasured: false,
-    isOrdered: false,
-    isInstallationAssigned: false,
-    isDepositPaid: false,
-    isFinalPaid: false,
-    totalAmount: 0,
-    depositAmount: 0,
-    items: [],
-    complaints: [],
-    documents: [],
-    notes: '',
-    partialPayments: [],
-    ...initialProject,
+  // Basis Form-State (Adresse aus initialProject parsen → Einzelfelder)
+  const [formData, setFormData] = useState<Partial<CustomerProject>>(() => {
+    const base = {
+      customerName: '',
+      address: '',
+      phone: '',
+      email: '',
+      orderNumber: '',
+      status: ProjectStatus.PLANNING,
+      isMeasured: false,
+      isOrdered: false,
+      isInstallationAssigned: false,
+      isDepositPaid: false,
+      isFinalPaid: false,
+      totalAmount: 0,
+      depositAmount: 0,
+      items: [],
+      complaints: [],
+      documents: [],
+      notes: '',
+      partialPayments: [],
+    }
+    const merged = { ...base, ...initialProject }
+    if (merged.address && !merged.addressStreet) {
+      const parsed = parseAddressFromDB(merged.address)
+      return {
+        ...merged,
+        addressStreet: parsed.street,
+        addressHouseNumber: parsed.houseNumber,
+        addressPostalCode: parsed.postalCode,
+        addressCity: parsed.city,
+      }
+    }
+    return merged
   })
 
   // Local state für setIsManualNameUpdate (wird an beide Hooks weitergegeben)

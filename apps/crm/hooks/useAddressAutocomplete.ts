@@ -24,6 +24,13 @@ export function useAddressAutocomplete({ formData, setFormData }: UseAddressAuto
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Sync addressInput from formData when formData.address is set (z. B. Kunde übernehmen, Projekt bearbeiten)
+  useEffect(() => {
+    if (formData.address != null && formData.address !== '' && formData.address !== addressInput) {
+      setAddressInput(formData.address)
+    }
+  }, [formData.address])
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {

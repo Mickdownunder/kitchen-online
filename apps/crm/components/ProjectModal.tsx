@@ -80,7 +80,13 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     employees,
   } = useProjectForm(project, existingCustomers)
 
-  const { handleSubmit } = useProjectSubmit({ formData, calculations, onSave, onClose })
+  const { handleSubmit } = useProjectSubmit({
+    formData,
+    currentAddress: addressInput,
+    calculations,
+    onSave,
+    onClose,
+  })
 
   // Focus trap and keyboard handlers
   const modalRef = React.useRef<HTMLDivElement>(null)

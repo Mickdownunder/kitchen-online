@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       type: 'recovery',
       email: magicEmail,
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/portal/reset-password`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/portal/reset-password`,
       },
     })
 

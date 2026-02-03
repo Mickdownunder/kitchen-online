@@ -3,12 +3,10 @@
 import React, { useEffect, useState } from 'react'
 import {
   Search,
-  MapPin,
   History,
   Bot,
   User,
   ChevronDown,
-  Loader2,
   Calendar,
   Building2,
   FileText,
@@ -134,9 +132,26 @@ export function ProjectBasicsTab({
           <div className="space-y-4">
             {/* Aufmaß */}
             <div className="space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-widest text-slate-600">
-                Aufmaß
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-semibold uppercase tracking-widest text-slate-600">
+                  Aufmaß
+                </label>
+                {(formData.measurementDate || formData.measurementTime) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData(prev => ({
+                        ...prev,
+                        measurementDate: undefined,
+                        measurementTime: undefined,
+                      }))
+                    }
+                    className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
+                  >
+                    Zurücksetzen
+                  </button>
+                )}
+              </div>
               <div className="flex gap-2">
                 <input
                   type="date"
@@ -467,45 +482,50 @@ export function ProjectBasicsTab({
             </div>
           )}
 
-          {/* Address with real autocomplete */}
-          <div className="address-autocomplete-container relative">
+          {/* Adresse: Einzelfelder wie in Stammdaten */}
+          <div className="space-y-3">
             <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-slate-500">
               Adresse
             </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 transform text-slate-500/70" />
-              {isLoadingAddress && (
-                <Loader2 className="absolute right-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 transform animate-spin text-amber-400/70" />
-              )}
+            <div className="grid grid-cols-3 gap-3">
               <input
                 type="text"
-                placeholder="Straße, Hausnummer, PLZ, Stadt (z.B. Hauptstraße 1, 1010 Wien)"
-                value={addressInput}
-                onChange={e => handleAddressInput(e.target.value)}
-                className="shadow-sm/50 hover:shadow-md/30 w-full rounded-xl bg-gradient-to-br from-slate-50/80 to-slate-100/80 py-3 pl-10 pr-10 text-sm font-medium text-slate-700 outline-none ring-1 ring-slate-200/60 transition-all hover:ring-slate-300/60 focus:bg-white focus:ring-2 focus:ring-amber-400/50"
+                placeholder="Straße"
+                value={formData.addressStreet ?? ''}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, addressStreet: e.target.value }))
+                }
+                className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none ring-1 ring-slate-200/60 transition-all focus:ring-2 focus:ring-amber-400/50"
               />
-              {addressSuggestions.length > 0 && (
-                <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-                  {addressSuggestions.map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        handleAddressInput(suggestion.full)
-                        setAddressSuggestions([])
-                      }}
-                      className="group w-full border-b border-slate-100/60 px-4 py-2.5 text-left transition-all last:border-0 hover:bg-gradient-to-r hover:from-amber-50/50 hover:to-amber-100/50"
-                    >
-                      <p className="text-sm font-medium text-slate-700 group-hover:text-amber-800">
-                        {suggestion.display}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-500/80 group-hover:text-amber-600/80">
-                        {suggestion.full}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <input
+                type="text"
+                placeholder="Hausnummer"
+                value={formData.addressHouseNumber ?? ''}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, addressHouseNumber: e.target.value }))
+                }
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none ring-1 ring-slate-200/60 transition-all focus:ring-2 focus:ring-amber-400/50"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <input
+                type="text"
+                placeholder="PLZ"
+                value={formData.addressPostalCode ?? ''}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, addressPostalCode: e.target.value }))
+                }
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none ring-1 ring-slate-200/60 transition-all focus:ring-2 focus:ring-amber-400/50"
+              />
+              <input
+                type="text"
+                placeholder="Stadt"
+                value={formData.addressCity ?? ''}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, addressCity: e.target.value }))
+                }
+                className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none ring-1 ring-slate-200/60 transition-all focus:ring-2 focus:ring-amber-400/50"
+              />
             </div>
           </div>
 
