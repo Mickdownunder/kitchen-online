@@ -188,7 +188,7 @@ export function ApplianceModal({ item, isOpen, onClose, onSave }: ApplianceModal
             </div>
             <div>
               <h3 className="font-bold text-slate-900">Geräte-Einstellungen</h3>
-              <p className="text-sm text-slate-500">{item.description || item.modelNumber || 'Position'}</p>
+              <p className="text-sm text-slate-500 whitespace-pre-line">{item.description || item.modelNumber || 'Position'}</p>
             </div>
           </div>
           <button

@@ -355,7 +355,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
                       </td>
                       <td className="px-4 py-4 text-slate-600">{item.modelNumber || '-'}</td>
                       <td className="px-4 py-4">
-                        <p className="font-medium text-slate-900">{item.description}</p>
+                        <p className="font-medium text-slate-900 whitespace-pre-line">{item.description}</p>
                       </td>
                       <td className="px-4 py-4 text-slate-600">{item.manufacturer || '-'}</td>
                     </tr>

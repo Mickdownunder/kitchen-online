@@ -58,6 +58,10 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
     stockQuantity: 0,
     isActive: true,
     ..._article,
+    // Beim Bearbeiten: Beschreibung aus name füllen wenn description leer
+    description: _article
+      ? (_article.description ?? _article.name ?? '')
+      : '',
   })
 
   const [specKey, setSpecKey] = useState('')
@@ -65,14 +69,19 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // Name aus erster Zeile der Beschreibung ableiten (Artikelname ist Teil der Beschreibung)
+    const desc = (formData.description || '').trim()
+    const derivedName = desc
+      ? desc.split('\n')[0].trim() || desc
+      : (_article?.name || 'Unbenannt')
     const newArticle: Article = {
       id: _article?.id || Date.now().toString(),
       sku: formData.sku!,
       manufacturer: formData.manufacturer,
       modelNumber: formData.modelNumber,
       category: formData.category!,
-      name: formData.name!,
-      description: formData.description,
+      name: derivedName,
+      description: desc || undefined,
       specifications: formData.specifications || {},
       defaultPurchasePrice: formData.defaultPurchasePrice!,
       defaultSalePrice: formData.defaultSalePrice!,
@@ -130,11 +139,11 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
         </select>
       </div>
 
-      <input
-        placeholder="Artikelname *"
-        value={formData.name}
-        onChange={e => setFormData({ ...formData, name: e.target.value })}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+      <textarea
+        placeholder="Artikelbeschreibung *"
+        value={formData.description}
+        onChange={e => setFormData({ ...formData, description: e.target.value })}
+        className="min-h-[100px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
         required
       />
 
@@ -152,13 +161,6 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
           className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
         />
       </div>
-
-      <textarea
-        placeholder="Beschreibung"
-        value={formData.description}
-        onChange={e => setFormData({ ...formData, description: e.target.value })}
-        className="min-h-[100px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-      />
 
       {/* Specifications */}
       <div className="rounded-xl bg-slate-50 p-4">

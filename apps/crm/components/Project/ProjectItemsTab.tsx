@@ -551,18 +551,18 @@ export function ProjectItemsTab({
                       )}
                     </td>
 
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       {isEditing ? (
-                        <input
-                          type="text"
+                        <textarea
                           value={item.description || ''}
                           onChange={e => updateItem(item.id, { description: e.target.value })}
-                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
-                          placeholder="Beschreibung"
+                          className="min-h-[60px] w-full resize-y rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Beschreibung (Enter = neue Zeile)"
+                          rows={2}
                           autoFocus
                         />
                       ) : (
-                        <div className="text-sm font-medium text-slate-900">
+                        <div className="text-sm font-medium text-slate-900 whitespace-pre-line">
                           {item.description || '-'}
                         </div>
                       )}

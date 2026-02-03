@@ -261,7 +261,7 @@ export default function DeliveryNoteDetail({
                         )}
                         {projectItem && <CheckCircle2 className="h-4 w-4 text-green-500" />}
                       </div>
-                      <h3 className="mb-1 font-black text-slate-900">{item.description}</h3>
+                      <h3 className="mb-1 font-black text-slate-900 whitespace-pre-line">{item.description}</h3>
                       <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 md:grid-cols-4">
                         {item.modelNumber && (
                           <div>

@@ -133,6 +133,65 @@ export async function deleteArticle(id: string): Promise<void> {
   if (error) throw error
 }
 
+/** Minimal item from Auftragsposition zum Abgleich/Anlegen im Artikelstamm */
+export interface ItemLike {
+  description: string
+  modelNumber?: string
+  manufacturer?: string
+  pricePerUnit?: number
+  purchasePricePerUnit?: number
+  taxRate?: number
+  unit?: string
+}
+
+/**
+ * Sucht einen Artikel anhand der Beschreibung (Name) oder legt einen neuen im Artikelstamm an.
+ * Wird beim Speichern von Auftragspositionen verwendet, wenn keine articleId gesetzt ist.
+ */
+export async function findOrCreateArticleFromItem(item: ItemLike): Promise<string | null> {
+  const user = await getCurrentUser()
+  if (!user) return null
+
+  const desc = (item.description || '').trim()
+  if (!desc) return null
+
+  const nameForMatch = desc.split('\n')[0].trim() || desc
+
+  const { data: existing } = await supabase
+    .from('articles')
+    .select('id')
+    .eq('name', nameForMatch)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (existing?.id) return existing.id
+
+  const unit = (item.unit === 'Stk' || item.unit === 'Pkg' || item.unit === 'Std' || item.unit === 'Paush' || item.unit === 'm' || item.unit === 'm²' || item.unit === 'lfm')
+    ? item.unit
+    : 'Stk'
+  const taxRate = (item.taxRate === 10 || item.taxRate === 13 || item.taxRate === 20) ? item.taxRate : 20
+  const sku = (item.modelNumber && /^[A-Z0-9-]+$/i.test(item.modelNumber))
+    ? item.modelNumber
+    : `ART-${Date.now().toString().slice(-8)}`
+
+  const newArticle = await createArticle({
+    name: nameForMatch,
+    description: desc,
+    sku,
+    manufacturer: item.manufacturer ?? undefined,
+    modelNumber: item.modelNumber ?? undefined,
+    category: 'Other',
+    unit,
+    taxRate: taxRate as 10 | 13 | 20,
+    defaultSalePrice: item.pricePerUnit ?? 0,
+    defaultPurchasePrice: item.purchasePricePerUnit ?? 0,
+    isActive: true,
+  })
+
+  return newArticle.id
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapArticleFromDB(dbArticle: Record<string, any>): Article {
   if (!dbArticle || typeof dbArticle !== 'object') {

@@ -338,7 +338,11 @@ export const CustomerDeliveryNotePDFDocumentServer: React.FC<CustomerDeliveryNot
               {deliveryNote.items.map((item, idx) => (
                 <View key={idx} style={styles.tableRow}>
                   <Text style={[styles.tableCell, styles.colPosition]}>{item.position}</Text>
-                  <Text style={[styles.tableCell, styles.colDescription]}>{item.description}</Text>
+                  <View style={styles.colDescription}>
+                    {(item.description || '').split('\n').map((line, i) => (
+                      <Text key={i} style={[styles.tableCell, styles.colDescription]}>{line}</Text>
+                    ))}
+                  </View>
                   <Text style={[styles.tableCell, styles.colQuantity]}>{item.quantity}</Text>
                   <Text style={[styles.tableCell, styles.colUnit]}>{item.unit}</Text>
                 </View>

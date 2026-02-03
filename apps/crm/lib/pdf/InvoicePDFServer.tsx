@@ -492,7 +492,9 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
                     {item.modelNumber || '-'}
                   </Text>
                   <View style={styles.colDesc}>
-                    <Text style={styles.tableCellBold}>{item.description}</Text>
+                    {(item.description || '').split('\n').map((line, i) => (
+                      <Text key={i} style={styles.tableCellBold}>{line}</Text>
+                    ))}
                   </View>
                   <Text style={[styles.tableCell, styles.colManufacturer]}>
                     {item.manufacturer || '-'}

@@ -217,7 +217,7 @@ export default function CustomerDeliveryNoteModal({
                       {project.items.map((item, idx) => (
                         <tr key={idx} className="border-b border-slate-100">
                           <td className="py-2 text-slate-700">{item.position}</td>
-                          <td className="py-2 text-slate-700">{item.description}</td>
+                          <td className="py-2 text-slate-700 whitespace-pre-line">{item.description}</td>
                           <td className="py-2 text-right text-slate-700">{item.quantity || 1}</td>
                           <td className="py-2 text-center text-slate-700">{item.unit || 'Stk'}</td>
                         </tr>

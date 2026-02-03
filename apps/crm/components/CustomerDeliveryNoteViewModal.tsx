@@ -205,7 +205,7 @@ export default function CustomerDeliveryNoteViewModal({
                     {displayItems.map((it, idx) => (
                       <tr key={idx} className="border-b border-slate-100">
                         <td className="py-2 text-slate-700">{it.position}</td>
-                        <td className="py-2 text-slate-700">{it.description}</td>
+                        <td className="py-2 text-slate-700 whitespace-pre-line">{it.description}</td>
                         <td className="py-2 text-right text-slate-700">{it.quantity}</td>
                         <td className="py-2 text-center text-slate-700">{it.unit}</td>
                       </tr>
