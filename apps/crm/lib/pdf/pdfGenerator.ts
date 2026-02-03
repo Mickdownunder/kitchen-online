@@ -14,6 +14,8 @@ import type { CompanySettings } from '@/types'
 import { CustomerProject, Invoice, BankAccount, InvoiceItem } from '@/types'
 import { getCompanySettings, getBankAccounts } from '@/lib/supabase/services/company'
 import { getInvoices } from '@/lib/supabase/services/invoices'
+import { getCustomer } from '@/lib/supabase/services/customers'
+import { formatCustomerAddress, formatAddressForDB } from '@/lib/utils/addressFormatter'
 import { calculateOverdueDays } from '@/hooks/useInvoiceCalculations'
 
 export type PDFType = 'invoice' | 'deliveryNote' | 'order' | 'offer' | 'statistics' | 'reminder'
@@ -165,6 +167,28 @@ async function generateInvoicePDF(
     }
   }
 
+  // Kundendaten für PDF: Adresse aus Projekt oder aus Kundenstamm
+  let recipientAddress = (project.address || '').trim()
+  let recipientPhone = project.phone || ''
+  let recipientEmail = project.email || ''
+  if (!recipientAddress && project.customerId) {
+    try {
+      const customer = await getCustomer(project.customerId)
+      if (customer) {
+        recipientAddress = formatCustomerAddress(customer)
+        if (!recipientPhone && customer.contact?.phone) recipientPhone = customer.contact.phone
+        if (!recipientEmail && customer.contact?.email) recipientEmail = customer.contact.email
+      }
+    } catch {
+      // Fallback: Projekt-Daten beibehalten
+    }
+  }
+  // Fallback: Adresse aus Einzelfeldern bauen (wenn im Projekt vorhanden)
+  if (!recipientAddress && (project as CustomerProject & { addressStreet?: string }).addressStreet) {
+    const p = project as CustomerProject & { addressStreet?: string; addressHouseNumber?: string; addressPostalCode?: string; addressCity?: string }
+    recipientAddress = formatAddressForDB(p.addressStreet, p.addressHouseNumber, p.addressPostalCode, p.addressCity)
+  }
+
   const invoiceData: InvoiceData = {
     type: invoiceType,
     invoiceNumber: invoice.invoiceNumber,
@@ -174,11 +198,11 @@ async function generateInvoicePDF(
     isPaid: invoice.isPaid,
     paidDate: invoice.paidDate,
     project: {
-      customerName: project.customerName,
-      address: project.address,
-      phone: project.phone,
-      email: project.email,
-      orderNumber: project.orderNumber,
+      customerName: project.customerName || 'Kunde',
+      address: recipientAddress,
+      phone: recipientPhone,
+      email: recipientEmail,
+      orderNumber: project.orderNumber || '',
       customerId: project.customerId,
       id: project.id,
       items: project.items || [],

@@ -216,7 +216,12 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
           )}
 
           {activeTab === 'documents' && formData.id && (
-            <ProjectDocumentsTab project={formData as CustomerProject} />
+            <ProjectDocumentsTab
+              project={formData as CustomerProject}
+              onPortalAccessSent={accessCode =>
+                setFormData(prev => ({ ...prev, accessCode }))
+              }
+            />
           )}
 
           {activeTab === 'tickets' && (

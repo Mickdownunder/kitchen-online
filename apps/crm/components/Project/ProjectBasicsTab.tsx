@@ -11,12 +11,8 @@ import {
   Building2,
   FileText,
   UserCircle,
-  Mail,
-  Copy,
-  KeyRound,
 } from 'lucide-react'
 import { CustomerProject, Customer, Employee } from '@/types'
-import { useToast } from '@/components/providers/ToastProvider'
 import { PaymentScheduleSection } from './PaymentScheduleSection'
 import { getCompanySettings } from '@/lib/supabase/services'
 import { DEFAULT_ORDER_FOOTER_TEMPLATES } from '@/lib/constants/orderFooterTemplates'
@@ -83,10 +79,7 @@ export function ProjectBasicsTab({
   contactPerson,
   setContactPerson,
 }: ProjectBasicsTabProps) {
-  const { success } = useToast()
   const [showSalespersonDropdown, setShowSalespersonDropdown] = useState(false)
-  const [sendingPortalAccess, setSendingPortalAccess] = useState(false)
-  const [portalAccessError, setPortalAccessError] = useState<string | null>(null)
   const [orderFooterTemplates, setOrderFooterTemplates] = useState<
     { name: string; body: string }[]
   >([])
@@ -577,89 +570,6 @@ export function ProjectBasicsTab({
               />
             </div>
           </div>
-
-          {/* Kundenportal-Zugang (nur bei bestehendem Projekt) */}
-          {formData.id && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-              <h4 className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-emerald-800">
-                <KeyRound className="h-4 w-4" />
-                Kundenportal-Zugang
-              </h4>
-              {formData.accessCode ? (
-                <div className="mb-3 flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={formData.accessCode}
-                    className="flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 font-mono text-sm font-bold tracking-widest text-slate-800"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(formData.accessCode || '')
-                    }}
-                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700"
-                    title="Kopieren"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Kopieren
-                  </button>
-                </div>
-              ) : (
-                <p className="mb-3 text-xs text-emerald-700">
-                  Beim Senden wird automatisch ein Projektcode erstellt.
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!formData.email?.trim()) {
-                    setPortalAccessError('Bitte zuerst die Kunden-E-Mail eintragen.')
-                    return
-                  }
-                  setSendingPortalAccess(true)
-                  setPortalAccessError(null)
-                  try {
-                    const res = await fetch('/api/projects/send-portal-access', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ projectId: formData.id }),
-                    })
-                    const data = await res.json()
-                    if (!res.ok) {
-                      setPortalAccessError(data.error || 'Fehler beim Senden')
-                      return
-                    }
-                    if (data.accessCode) {
-                      setFormData(prev => ({ ...prev, accessCode: data.accessCode }))
-                    }
-                    success('Portal-Zugang wurde an den Kunden gesendet.')
-                  } catch {
-                    setPortalAccessError('Fehler beim Senden')
-                  } finally {
-                    setSendingPortalAccess(false)
-                  }
-                }}
-                disabled={sendingPortalAccess}
-                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {sendingPortalAccess ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Wird gesendet…
-                  </>
-                ) : (
-                  <>
-                    <Mail className="h-4 w-4" />
-                    Portal-Zugang senden
-                  </>
-                )}
-              </button>
-              {portalAccessError && (
-                <p className="mt-2 text-xs font-medium text-red-600">{portalAccessError}</p>
-              )}
-            </div>
-          )}
 
           {/* Salesperson Selection */}
           <div className="relative">

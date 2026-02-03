@@ -404,19 +404,27 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
           </View>
         </View>
 
-        {/* Recipient */}
+        {/* Recipient – alle Kundendaten: Name, Adresse (mehrzeilig), Tel, E-Mail */}
         <View style={styles.recipientSection}>
           <Text style={styles.recipientLabel}>Rechnungsempfänger</Text>
-          <Text style={styles.recipientName}>{invoice.project.customerName}</Text>
-          {invoice.project.address && (
-            <Text style={styles.recipientAddress}>{invoice.project.address}</Text>
-          )}
-          {invoice.project.phone && (
+          <Text style={styles.recipientName}>{invoice.project.customerName || 'Kunde'}</Text>
+          {invoice.project.address
+            ? (invoice.project.address.includes(', ')
+                ? invoice.project.address.split(', ').map((line: string, i: number) => (
+                    <Text key={i} style={styles.recipientAddress}>
+                      {line.trim()}
+                    </Text>
+                  ))
+                : (
+                    <Text style={styles.recipientAddress}>{invoice.project.address}</Text>
+                  ))
+            : null}
+          {invoice.project.phone ? (
             <Text style={styles.recipientAddress}>Tel: {invoice.project.phone}</Text>
-          )}
-          {invoice.project.email && (
+          ) : null}
+          {invoice.project.email ? (
             <Text style={styles.recipientAddress}>E-Mail: {invoice.project.email}</Text>
-          )}
+          ) : null}
         </View>
 
         {/* Invoice Title */}

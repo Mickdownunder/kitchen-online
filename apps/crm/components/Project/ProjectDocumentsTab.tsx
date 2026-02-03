@@ -39,14 +39,17 @@ import {
   Mail,
   PenLine,
   X,
+  KeyRound,
 } from 'lucide-react'
 // PDF functions are dynamically imported when needed to reduce initial bundle size (~300KB saving)
 // The InvoiceData type is imported separately for type checking
 import type { InvoiceData } from '../InvoicePDF'
 import CustomerDeliveryNoteViewModal from '../CustomerDeliveryNoteViewModal'
+import { useToast } from '@/components/providers/ToastProvider'
 
 interface ProjectDocumentsTabProps {
   project: CustomerProject
+  onPortalAccessSent?: (accessCode: string) => void
 }
 
 type DocumentType =
@@ -76,8 +79,9 @@ interface DocumentItem {
   data: any // Document data can vary by type
 }
 
-export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
+export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocumentsTabProps) {
   const router = useRouter()
+  const { success } = useToast()
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<DocumentType>('all')
@@ -99,6 +103,8 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
   const [publishedDocs, setPublishedDocs] = useState<Set<string>>(new Set())
   const [publishingDoc, setPublishingDoc] = useState<string | null>(null)
   const [sendingOrderEmail, setSendingOrderEmail] = useState(false)
+  const [sendingPortalAccess, setSendingPortalAccess] = useState(false)
+  const [portalAccessError, setPortalAccessError] = useState<string | null>(null)
 
   const loadCompanySettings = useCallback(async () => {
     try {
@@ -791,6 +797,71 @@ export function ProjectDocumentsTab({ project }: ProjectDocumentsTabProps) {
         <p className="text-sm text-slate-500">
           Auftrag, Rechnungen und Kunden-Lieferscheine für dieses Projekt
         </p>
+      </div>
+
+      {/* Portal-Zugang senden */}
+      <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/80 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-600 p-2.5 text-white">
+              <KeyRound className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900">Kundenportal-Zugang</p>
+              <p className="text-sm text-slate-600">
+                Projektcode und Link per E-Mail an den Kunden senden (z. B. bei Verkauf im Geschäft).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!project.email?.trim()) {
+                setPortalAccessError('Bitte zuerst die Kunden-E-Mail in den Stammdaten eintragen.')
+                return
+              }
+              setSendingPortalAccess(true)
+              setPortalAccessError(null)
+              try {
+                const res = await fetch('/api/projects/send-portal-access', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ projectId: project.id }),
+                })
+                const data = await res.json()
+                if (!res.ok) {
+                  setPortalAccessError(data.error || 'Fehler beim Senden')
+                  return
+                }
+                if (data.accessCode && onPortalAccessSent) {
+                  onPortalAccessSent(data.accessCode)
+                }
+                success('Portal-Zugang wurde an den Kunden gesendet.')
+              } catch {
+                setPortalAccessError('Fehler beim Senden')
+              } finally {
+                setSendingPortalAccess(false)
+              }
+            }}
+            disabled={sendingPortalAccess}
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {sendingPortalAccess ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Wird gesendet…
+              </>
+            ) : (
+              <>
+                <Mail className="h-4 w-4" />
+                Portal-Zugang senden
+              </>
+            )}
+          </button>
+        </div>
+        {portalAccessError && (
+          <p className="mt-3 text-sm font-medium text-red-600">{portalAccessError}</p>
+        )}
       </div>
 
       {/* Header mit Filter und Suche */}
