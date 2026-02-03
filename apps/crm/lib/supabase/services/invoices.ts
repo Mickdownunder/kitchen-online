@@ -4,6 +4,7 @@ import { getCurrentUser } from './auth'
 import { getNextInvoiceNumber } from './company'
 import { audit } from '@/lib/utils/auditLogger'
 import { logger } from '@/lib/utils/logger'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 // ============================================
 // INVOICE SERVICE - CRUD Operations
@@ -216,11 +217,13 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
   let netAmount = params.netAmount
   let taxAmount = params.taxAmount
 
+  const amountRounded = roundTo2Decimals(params.amount)
+
   if (netAmount === undefined || taxAmount === undefined) {
     // Brutto ist angegeben: Netto auf 2 Dezimalen, MwSt = Brutto - Netto (damit net + tax = amount exakt)
-    const netRounded = Math.round((params.amount / (1 + taxRate / 100)) * 100) / 100
+    const netRounded = roundTo2Decimals(amountRounded / (1 + taxRate / 100))
     netAmount = netRounded
-    taxAmount = Math.round((params.amount - netRounded) * 100) / 100
+    taxAmount = roundTo2Decimals(amountRounded - netRounded)
   }
 
   const invoiceDate = params.invoiceDate || new Date().toISOString().split('T')[0]
@@ -232,7 +235,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
       project_id: params.projectId,
       invoice_number: invoiceNumber,
       type: params.type,
-      amount: params.amount,
+      amount: amountRounded,
       net_amount: netAmount,
       tax_amount: taxAmount,
       tax_rate: taxRate,
@@ -281,7 +284,7 @@ export async function updateInvoice(
   if (updates.projectId !== undefined) updateData.project_id = updates.projectId
   if (updates.invoiceNumber !== undefined) updateData.invoice_number = updates.invoiceNumber
   if (updates.type !== undefined) updateData.type = updates.type
-  if (updates.amount !== undefined) updateData.amount = updates.amount
+  if (updates.amount !== undefined) updateData.amount = roundTo2Decimals(updates.amount)
   if (updates.netAmount !== undefined) updateData.net_amount = updates.netAmount
   if (updates.taxAmount !== undefined) updateData.tax_amount = updates.taxAmount
   if (updates.taxRate !== undefined) updateData.tax_rate = updates.taxRate

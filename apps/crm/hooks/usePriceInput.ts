@@ -114,8 +114,9 @@ export function usePriceInput({
         return
       }
 
-      // Callback mit geparstem Wert
-      onValueChange(numValue > 0 || allowEmpty ? numValue : undefined)
+      // Callback mit geparstem Wert (immer auf 2 Dezimalen runden für Geldbeträge)
+      const rounded = Math.round(numValue * 100) / 100
+      onValueChange(numValue > 0 || allowEmpty ? rounded : undefined)
     },
     [parseNumber, onValueChange, allowEmpty, min, max]
   )
@@ -142,9 +143,10 @@ export function usePriceInput({
           setRawInput('')
           onValueChange(undefined)
         } else {
-          const formatted = formatNumber(numValue, true)
+          const rounded = Math.round(numValue * 100) / 100
+          const formatted = formatNumber(rounded, true)
           setRawInput(formatted)
-          onValueChange(numValue)
+          onValueChange(rounded)
         }
       } else {
         // Ungültiger Wert → zurücksetzen
@@ -155,12 +157,12 @@ export function usePriceInput({
         }
       }
     } else {
-      // Keine Formatierung, aber trotzdem Wert setzen
+      // Keine Formatierung, aber trotzdem Wert setzen (auf 2 Dezimalen runden)
       const numValue = parseNumber(rawInput)
       if (rawInput === '' && allowEmpty) {
         onValueChange(undefined)
       } else {
-        onValueChange(numValue)
+        onValueChange(Math.round(numValue * 100) / 100)
       }
     }
   }, [rawInput, formatOnBlur, parseNumber, formatNumber, allowEmpty, onValueChange, initialValue])

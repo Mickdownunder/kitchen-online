@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Pencil, Trash2, Check, X } from 'lucide-react'
 import { usePriceInput } from '@/hooks/usePriceInput'
 import type { PartialPayment } from '@/types'
@@ -20,7 +20,8 @@ interface PaymentRowProps {
   onPercentChange: (value: string) => void
   onPercentBlur: () => void
   onQuickPercent: (percent: number) => void
-  onTogglePaid: (isPaid: boolean) => void
+  onMarkAsPaid: (paidDate: string) => void
+  onUnmarkAsPaid: () => void
 }
 
 export const PaymentRow: React.FC<PaymentRowProps> = ({
@@ -38,8 +39,13 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
   onPercentChange,
   onPercentBlur,
   onQuickPercent,
-  onTogglePaid,
+  onMarkAsPaid,
+  onUnmarkAsPaid,
 }) => {
+  const [showPaidDateInput, setShowPaidDateInput] = useState(false)
+  const [paidDateInput, setPaidDateInput] = useState(
+    () => new Date().toISOString().split('T')[0]
+  )
   const paymentData = isEditing && editFormData ? editFormData : payment
 
   const amountInput = usePriceInput({
@@ -231,15 +237,57 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
               </span>
             )}
           </div>
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              className="h-5 w-5 accent-amber-500"
-              checked={payment.isPaid}
-              onChange={e => onTogglePaid(e.target.checked)}
-            />
-            <span className="text-sm font-bold text-slate-700">Als bezahlt markieren</span>
-          </label>
+          {showPaidDateInput ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={paidDateInput}
+                onChange={e => setPaidDateInput(e.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  onMarkAsPaid(paidDateInput)
+                  setShowPaidDateInput(false)
+                }}
+                className="flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-bold text-white transition-all hover:bg-emerald-600"
+              >
+                <Check className="h-4 w-4" />
+                Bestätigen
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPaidDateInput(false)}
+                className="rounded-lg bg-slate-200 p-2 transition-all hover:bg-slate-300"
+                title="Abbrechen"
+              >
+                <X className="h-4 w-4 text-slate-600" />
+              </button>
+            </div>
+          ) : payment.isPaid ? (
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-amber-500"
+                checked
+                onChange={() => onUnmarkAsPaid()}
+              />
+              <span className="text-sm font-bold text-slate-700">Als bezahlt markieren</span>
+            </label>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setPaidDateInput(new Date().toISOString().split('T')[0])
+                setShowPaidDateInput(true)
+              }}
+              className="flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-sm font-bold text-amber-700 transition-all hover:bg-amber-200"
+            >
+              <Check className="h-4 w-4" />
+              Als bezahlt markieren
+            </button>
+          )}
         </div>
       </div>
     </div>

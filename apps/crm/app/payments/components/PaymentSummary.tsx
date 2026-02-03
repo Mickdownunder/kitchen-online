@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
-import { ReceiptText } from 'lucide-react'
+import React, { useState } from 'react'
+import { ReceiptText, Check, X } from 'lucide-react'
 import type { PartialPayment } from '@/types'
 
 interface PaymentSummaryProps {
@@ -16,7 +16,8 @@ interface PaymentSummaryProps {
     paidDate?: string
   }
   onGenerateFinalInvoice: () => void
-  onToggleFinalInvoicePaid: (isPaid: boolean) => void
+  onMarkFinalInvoicePaid: (paidDate: string) => void
+  onUnmarkFinalInvoicePaid: () => void
   onDeleteFinalInvoice: () => void
 }
 
@@ -25,9 +26,14 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
   grossTotal,
   finalInvoice,
   onGenerateFinalInvoice,
-  onToggleFinalInvoicePaid,
+  onMarkFinalInvoicePaid,
+  onUnmarkFinalInvoicePaid,
   onDeleteFinalInvoice,
 }) => {
+  const [showPaidDateInput, setShowPaidDateInput] = useState(false)
+  const [paidDateInput, setPaidDateInput] = useState(
+    () => new Date().toISOString().split('T')[0]
+  )
   const totalPartial = partialPayments.reduce((sum, p) => sum + p.amount, 0)
   const remaining = grossTotal - totalPartial
   const hasUnpaidPayments = partialPayments.some(p => !p.isPaid)
@@ -76,15 +82,57 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
             <span className="text-2xl font-black text-slate-900">
               {finalInvoice.amount.toLocaleString('de-AT')} €
             </span>
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                className="h-5 w-5 accent-purple-500"
-                checked={finalInvoice.isPaid}
-                onChange={e => onToggleFinalInvoicePaid(e.target.checked)}
-              />
-              <span className="text-sm font-bold text-slate-700">Als bezahlt markieren</span>
-            </label>
+            {showPaidDateInput ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={paidDateInput}
+                  onChange={e => setPaidDateInput(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onMarkFinalInvoicePaid(paidDateInput)
+                    setShowPaidDateInput(false)
+                  }}
+                  className="flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-bold text-white transition-all hover:bg-emerald-600"
+                >
+                  <Check className="h-4 w-4" />
+                  Bestätigen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPaidDateInput(false)}
+                  className="rounded-lg bg-slate-200 p-2 transition-all hover:bg-slate-300"
+                  title="Abbrechen"
+                >
+                  <X className="h-4 w-4 text-slate-600" />
+                </button>
+              </div>
+            ) : finalInvoice.isPaid ? (
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 accent-purple-500"
+                  checked
+                  onChange={() => onUnmarkFinalInvoicePaid()}
+                />
+                <span className="text-sm font-bold text-slate-700">Als bezahlt markieren</span>
+              </label>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setPaidDateInput(new Date().toISOString().split('T')[0])
+                  setShowPaidDateInput(true)
+                }}
+                className="flex items-center gap-2 rounded-lg bg-purple-100 px-3 py-2 text-sm font-bold text-purple-700 transition-all hover:bg-purple-200"
+              >
+                <Check className="h-4 w-4" />
+                Als bezahlt markieren
+              </button>
+            )}
           </div>
           <div className="mt-2 text-xs text-slate-600">
             Datum: {new Date(finalInvoice.date).toLocaleDateString('de-DE')}

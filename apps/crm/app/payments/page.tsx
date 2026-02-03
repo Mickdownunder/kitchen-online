@@ -10,6 +10,7 @@ import {
   markInvoiceUnpaid,
   getInvoices,
 } from '@/lib/supabase/services'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 import { CustomerProject, Invoice } from '@/types'
 import { CreditCard, Plus, ArrowLeft } from 'lucide-react'
 import { useApp } from '../providers'
@@ -101,7 +102,7 @@ function PaymentsPageContent() {
   const handleQuickPercent = useCallback(
     (percent: number) => {
       if (!selectedProject || calculations.grossTotal <= 0) return
-      const amount = (calculations.grossTotal * percent) / 100
+      const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)
       setNewPaymentForm({ ...newPaymentForm, amount })
       setPercentInput(percent.toString())
     },
@@ -113,10 +114,10 @@ function PaymentsPageContent() {
       setPercentInput(value)
       const percent = parseFloat(value) || 0
       if (!isNaN(percent) && percent >= 0 && percent <= 100 && calculations.grossTotal > 0) {
-        const amount = (calculations.grossTotal * percent) / 100
+        const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)
         setNewPaymentForm({ ...newPaymentForm, amount })
       } else if (value === '' || value === '.') {
-        setNewPaymentForm({ ...newPaymentForm, amount: 0 })
+        setNewPaymentForm({ ...newPaymentForm, amount: undefined })
       }
     },
     [calculations.grossTotal, newPaymentForm]
@@ -138,10 +139,10 @@ function PaymentsPageContent() {
       setEditingPercentInput(value)
       const percent = parseFloat(value) || 0
       if (!isNaN(percent) && percent >= 0 && percent <= 100 && calculations.grossTotal > 0) {
-        const amount = (calculations.grossTotal * percent) / 100
+        const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)
         setNewPaymentForm(prev => ({ ...prev, amount }))
       } else if (value === '' || value === '.') {
-        setNewPaymentForm(prev => ({ ...prev, amount: 0 }))
+        setNewPaymentForm(prev => ({ ...prev, amount: undefined }))
       }
     },
     [calculations.grossTotal]
@@ -164,11 +165,13 @@ function PaymentsPageContent() {
       return
     }
 
+    const amountRounded = roundTo2Decimals(newPaymentForm.amount)
+
     try {
       if (editingPaymentId) {
         // Bestehende Rechnung aktualisieren
         await updateInvoice(editingPaymentId, {
-          amount: newPaymentForm.amount,
+          amount: amountRounded,
           description: newPaymentForm.description,
           invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
         })
@@ -177,7 +180,7 @@ function PaymentsPageContent() {
         await createInvoice({
           projectId,
           type: 'partial',
-          amount: newPaymentForm.amount,
+          amount: amountRounded,
           invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
           description: newPaymentForm.description,
         })
@@ -204,19 +207,25 @@ function PaymentsPageContent() {
     }
   }
 
-  const handleTogglePaymentPaid = async (paymentId: string, isPaid: boolean) => {
+  const handleMarkPaymentPaid = async (paymentId: string, paidDate: string) => {
     if (!selectedProject) return
 
     try {
-      if (isPaid) {
-        await markInvoicePaid(paymentId)
-      } else {
-        await markInvoiceUnpaid(paymentId)
-      }
-      // Rechnungen neu laden
+      await markInvoicePaid(paymentId, paidDate)
       await loadProjectInvoices(selectedProject.id)
     } catch (error) {
-      console.error('Error toggling payment status:', error)
+      console.error('Error marking payment as paid:', error)
+    }
+  }
+
+  const handleUnmarkPaymentPaid = async (paymentId: string) => {
+    if (!selectedProject) return
+
+    try {
+      await markInvoiceUnpaid(paymentId)
+      await loadProjectInvoices(selectedProject.id)
+    } catch (error) {
+      console.error('Error unmarking payment:', error)
     }
   }
 
@@ -264,21 +273,29 @@ function PaymentsPageContent() {
     }
   }
 
-  const handleToggleFinalInvoicePaid = async (isPaid: boolean) => {
+  const handleMarkFinalInvoicePaid = async (paidDate: string) => {
     if (!finalInvoice) return
 
     try {
-      if (isPaid) {
-        await markInvoicePaid(finalInvoice.id)
-      } else {
-        await markInvoiceUnpaid(finalInvoice.id)
-      }
-      // Rechnungen neu laden
+      await markInvoicePaid(finalInvoice.id, paidDate)
       if (selectedProject) {
         await loadProjectInvoices(selectedProject.id)
       }
     } catch (error) {
-      console.error('Error toggling final invoice status:', error)
+      console.error('Error marking final invoice as paid:', error)
+    }
+  }
+
+  const handleUnmarkFinalInvoicePaid = async () => {
+    if (!finalInvoice) return
+
+    try {
+      await markInvoiceUnpaid(finalInvoice.id)
+      if (selectedProject) {
+        await loadProjectInvoices(selectedProject.id)
+      }
+    } catch (error) {
+      console.error('Error unmarking final invoice:', error)
     }
   }
 
@@ -479,11 +496,16 @@ function PaymentsPageContent() {
                           onPercentChange={handleEditingPercentChange}
                           onPercentBlur={handleEditingPercentBlur}
                           onQuickPercent={percent => {
-                            const amount = (calculations.grossTotal * percent) / 100
+                            const amount = roundTo2Decimals(
+                              (calculations.grossTotal * percent) / 100
+                            )
                             setNewPaymentForm(prev => ({ ...prev, amount }))
                             setEditingPercentInput(percent.toString())
                           }}
-                          onTogglePaid={isPaid => handleTogglePaymentPaid(invoice.id, isPaid)}
+                          onMarkAsPaid={paidDate =>
+                            handleMarkPaymentPaid(invoice.id, paidDate)
+                          }
+                          onUnmarkAsPaid={() => handleUnmarkPaymentPaid(invoice.id)}
                         />
                       ))
                     ) : (
@@ -523,7 +545,8 @@ function PaymentsPageContent() {
                           : undefined
                       }
                       onGenerateFinalInvoice={() => handleGenerateFinalInvoice(selectedProject.id)}
-                      onToggleFinalInvoicePaid={handleToggleFinalInvoicePaid}
+                      onMarkFinalInvoicePaid={handleMarkFinalInvoicePaid}
+                      onUnmarkFinalInvoicePaid={handleUnmarkFinalInvoicePaid}
                       onDeleteFinalInvoice={handleDeleteFinalInvoice}
                     />
                   )}
