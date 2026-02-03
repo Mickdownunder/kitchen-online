@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Article, InvoiceItem, CustomerProject } from '@/types'
-import { getArticles } from '@/lib/supabase/services'
+import { getArticlesSearch } from '@/lib/supabase/services'
 import { calculateItemTotalsFromGross, roundTo2Decimals } from '@/lib/utils/priceCalculations'
+
+const ARTICLE_SEARCH_DEBOUNCE_MS = 300
+const ARTICLE_SEARCH_LIMIT = 50
 
 interface UseArticleSelectionProps {
   formData: Partial<CustomerProject>
@@ -11,50 +14,45 @@ interface UseArticleSelectionProps {
 }
 
 /**
- * Hook für Article-Suche, -Filterung und -Hinzufügen zu Items
+ * Hook für Artikel-Suche (server-seitig) und Hinzufügen zu Items.
+ * Lädt nur begrenzte Treffer pro Suche, kein voller Artikelstamm.
  */
 export function useArticleSelection({ formData, setFormData }: UseArticleSelectionProps) {
   const [articles, setArticles] = useState<Article[]>([])
   const [articleSearchTerm, setArticleSearchTerm] = useState('')
+  const [articleSearchLoading, setArticleSearchLoading] = useState(false)
   const [showArticleDropdown, setShowArticleDropdown] = useState(false)
   const [selectedArticleForPosition, setSelectedArticleForPosition] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadArticles()
-  }, [])
-
-  const loadArticles = async () => {
+  const searchArticles = useCallback(async (term: string) => {
+    setArticleSearchLoading(true)
     try {
-      const data = await getArticles()
+      const data = await getArticlesSearch(term, ARTICLE_SEARCH_LIMIT)
       setArticles(data)
     } catch (error) {
-      console.error('Error loading articles:', error)
+      console.error('Error searching articles:', error)
+      setArticles([])
+    } finally {
+      setArticleSearchLoading(false)
     }
-  }
+  }, [])
 
-  // Filter articles by search term
-  const filteredArticles = useMemo(() => {
-    if (!articleSearchTerm) return articles
-    const term = articleSearchTerm.toLowerCase()
-    return articles.filter(
-      a =>
-        a.name.toLowerCase().includes(term) ||
-        a.sku.toLowerCase().includes(term) ||
-        (a.manufacturer && a.manufacturer.toLowerCase().includes(term)) ||
-        (a.modelNumber && a.modelNumber.toLowerCase().includes(term))
-    )
-  }, [articles, articleSearchTerm])
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchArticles(articleSearchTerm)
+    }, ARTICLE_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [articleSearchTerm, searchArticles])
 
-  // Add article as new item
+  // Treffer der Suche (server-seitig)
+  const filteredArticles = articles
+
   const addArticleAsItem = (article: Article) => {
     const items = formData.items || []
     const quantity = 1
     const taxRate = article.taxRate || 20
 
-    // WICHTIG: Wir gehen davon aus, dass defaultSalePrice der BRUTTO-Preis (VK) ist
     const grossPricePerUnit = article.defaultSalePrice
-
-    // Verwende zentrale Utility-Funktion für Brutto-basierte Berechnung
     const totals = calculateItemTotalsFromGross(quantity, grossPricePerUnit, taxRate)
 
     const newItem: InvoiceItem = {
@@ -87,6 +85,7 @@ export function useArticleSelection({ formData, setFormData }: UseArticleSelecti
     articles,
     articleSearchTerm,
     setArticleSearchTerm,
+    articleSearchLoading,
     showArticleDropdown,
     setShowArticleDropdown,
     filteredArticles,

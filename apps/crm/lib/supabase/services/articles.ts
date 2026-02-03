@@ -58,6 +58,162 @@ export async function getArticles(category?: string): Promise<Article[]> {
   }
 }
 
+export type ArticleSortField =
+  | 'name'
+  | 'sku'
+  | 'manufacturer'
+  | 'category'
+  | 'purchasePrice'
+  | 'salePrice'
+export type ArticleSortDirection = 'asc' | 'desc'
+
+export interface GetArticlesPaginatedParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  category?: string
+  sortField?: ArticleSortField
+  sortDirection?: ArticleSortDirection
+}
+
+export interface GetArticlesPaginatedResult {
+  data: Article[]
+  total: number
+}
+
+/**
+ * Artikelstamm: paginierte Liste mit Suche, Filter und Sortierung (server-seitig).
+ */
+export async function getArticlesPaginated(
+  params: GetArticlesPaginatedParams = {}
+): Promise<GetArticlesPaginatedResult> {
+  try {
+    if (!supabase) {
+      logger.error('[getArticlesPaginated] Supabase client not initialized', { component: 'articles' })
+      return { data: [], total: 0 }
+    }
+
+    const page = Math.max(1, params.page ?? 1)
+    const pageSize = Math.min(100, Math.max(10, params.pageSize ?? 50))
+    const search = (params.search ?? '').trim()
+    const category = params.category === 'all' || !params.category ? undefined : params.category
+    const sortField = params.sortField ?? 'name'
+    const sortDirection = params.sortDirection ?? 'asc'
+
+    const dbSortColumn =
+      sortField === 'purchasePrice'
+        ? 'default_purchase_price'
+        : sortField === 'salePrice'
+          ? 'default_sale_price'
+          : sortField
+
+    let query = supabase
+      .from('articles')
+      .select('*', { count: 'exact' })
+      .eq('is_active', true)
+
+    if (category) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query = query.eq('category', category as any)
+    }
+
+    if (search) {
+      const pattern = `%${search.replace(/%/g, '\\%')}%`
+      query = query.or(
+        `name.ilike.${pattern},sku.ilike.${pattern},manufacturer.ilike.${pattern},model_number.ilike.${pattern}`
+      )
+    }
+
+    query = query.order(dbSortColumn, {
+      ascending: sortDirection === 'asc',
+      nullsFirst: false,
+    })
+
+    const fromIndex = (page - 1) * pageSize
+    const toIndex = fromIndex + pageSize - 1
+    const { data, error, count } = await query.range(fromIndex, toIndex)
+
+    if (error) {
+      const errObj = error as Error
+      if (
+        errObj?.name === 'AbortError' ||
+        String(errObj?.message ?? '').toLowerCase().includes('aborted')
+      ) {
+        return { data: [], total: 0 }
+      }
+      logger.error('[getArticlesPaginated] Supabase error', { component: 'articles' }, error as Error)
+      return { data: [], total: 0 }
+    }
+
+    const total = typeof count === 'number' ? count : 0
+    const items = Array.isArray(data) ? data.map(mapArticleFromDB) : []
+    return { data: items, total }
+  } catch (err: unknown) {
+    const errObj = err as Error
+    if (
+      errObj?.name === 'AbortError' ||
+      String(errObj?.message ?? '').toLowerCase().includes('aborted')
+    ) {
+      return { data: [], total: 0 }
+    }
+    logger.error('[getArticlesPaginated] Unexpected error', { component: 'articles' }, err as Error)
+    return { data: [], total: 0 }
+  }
+}
+
+/**
+ * Leichte Suche für Artikelauswahl (z. B. im Auftrag): begrenzte Treffer, server-seitig.
+ */
+export async function getArticlesSearch(search: string, limit = 50): Promise<Article[]> {
+  try {
+    if (!supabase) {
+      logger.error('[getArticlesSearch] Supabase client not initialized', { component: 'articles' })
+      return []
+    }
+
+    const term = (search ?? '').trim()
+    let query = supabase
+      .from('articles')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .limit(Math.min(100, Math.max(1, limit)))
+
+    if (term) {
+      const pattern = `%${term.replace(/%/g, '\\%')}%`
+      query = query.or(
+        `name.ilike.${pattern},sku.ilike.${pattern},manufacturer.ilike.${pattern},model_number.ilike.${pattern}`
+      )
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      const errObj = error as Error
+      if (
+        errObj?.name === 'AbortError' ||
+        String(errObj?.message ?? '').toLowerCase().includes('aborted')
+      ) {
+        return []
+      }
+      logger.error('[getArticlesSearch] Supabase error', { component: 'articles' }, error as Error)
+      return []
+    }
+
+    return Array.isArray(data) ? data.map(mapArticleFromDB) : []
+  } catch (err: unknown) {
+    const errObj = err as Error
+    if (
+      errObj?.name === 'AbortError' ||
+      String(errObj?.message ?? '').toLowerCase().includes('aborted')
+    ) {
+      return []
+    }
+    logger.error('[getArticlesSearch] Unexpected error', { component: 'articles' }, err as Error)
+    return []
+  }
+}
+
 export async function getArticle(id: string): Promise<Article | null> {
   const { data, error } = await supabase.from('articles').select('*').eq('id', id).single()
 
