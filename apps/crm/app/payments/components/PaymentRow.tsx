@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { Pencil, Trash2, Check, X } from 'lucide-react'
+import { usePriceInput } from '@/hooks/usePriceInput'
 import type { PartialPayment } from '@/types'
 
 interface PaymentRowProps {
@@ -40,6 +41,21 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
   onTogglePaid,
 }) => {
   const paymentData = isEditing && editFormData ? editFormData : payment
+
+  const amountInput = usePriceInput({
+    initialValue: paymentData?.amount,
+    onValueChange: value => {
+      if (!paymentData) return
+      onFormChange({ ...paymentData, amount: value })
+      if (grossTotal > 0 && value != null && value > 0) {
+        onPercentChange(((value / grossTotal) * 100).toFixed(1))
+      } else {
+        onPercentChange('')
+      }
+    },
+    allowEmpty: true,
+    min: 0,
+  })
 
   if (isEditing) {
     return (
@@ -88,21 +104,11 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
                 Betrag (€)
               </label>
               <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
+                {...amountInput}
+                type="text"
+                placeholder="z.B. 500,00"
+                inputMode="decimal"
                 className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
-                value={paymentData?.amount || ''}
-                onChange={e => {
-                  const amount = parseFloat(e.target.value) || 0
-                  onFormChange({ ...paymentData, amount })
-                  if (grossTotal > 0 && amount > 0) {
-                    const percent = (amount / grossTotal) * 100
-                    onPercentChange(percent.toFixed(1))
-                  } else {
-                    onPercentChange('')
-                  }
-                }}
               />
             </div>
             <div>

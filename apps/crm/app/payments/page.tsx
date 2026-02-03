@@ -304,7 +304,7 @@ function PaymentsPageContent() {
     const paymentCount = partialPayments.length
     setNewPaymentForm({
       description: `Anzahlung ${paymentCount + 1}`,
-      amount: 0,
+      amount: undefined,
       date: new Date().toISOString().split('T')[0],
     })
     setEditingPaymentId(null)
@@ -324,14 +324,6 @@ function PaymentsPageContent() {
     } else {
       setEditingPercentInput('')
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-slate-400">Lade Projekte...</div>
-      </div>
-    )
   }
 
   const showProjectList = !projectIdParam
@@ -378,11 +370,16 @@ function PaymentsPageContent() {
 
           {/* Payment Details */}
           <div className={showProjectList ? 'lg:col-span-2' : 'lg:col-span-full'}>
-            {isLoading && projectIdParam ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-lg">
-                <div className="text-slate-400">Lade Auftrag...</div>
+            {isLoading ? (
+              <div className="min-h-[400px] rounded-2xl border border-slate-200 bg-white p-12 shadow-lg">
+                <div className="flex min-h-[300px] flex-col items-center justify-center text-slate-400">
+                  <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+                  <p className="text-sm font-medium">
+                    {projectIdParam ? 'Lade Auftrag...' : 'Lade Projekte...'}
+                  </p>
+                </div>
               </div>
-            ) : projectIdParam && !selectedProject && !isLoading ? (
+            ) : projectIdParam && !selectedProject ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-lg">
                 <CreditCard className="mx-auto mb-4 h-16 w-16 text-slate-300" />
                 <p className="mb-4 text-lg text-slate-400">Auftrag nicht gefunden</p>

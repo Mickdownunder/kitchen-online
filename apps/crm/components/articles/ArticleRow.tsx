@@ -118,12 +118,27 @@ export const ArticleRow = React.memo(function ArticleRow({
             autoFocus
           />
         </td>
-        <td className="px-4 py-3">
-          <input
-            type="text"
-            value={editData.name}
-            onChange={e => setEditData({ ...editData, name: e.target.value })}
-            className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+        <td className="px-4 py-3 align-top">
+          <textarea
+            value={editData.description ?? editData.name ?? ''}
+            onChange={e => {
+              const desc = e.target.value
+              const firstLine = desc.trim() ? desc.split('\n')[0].trim() || desc.trim() : editData.name ?? ''
+              setEditData({
+                ...editData,
+                description: desc || undefined,
+                name: (firstLine || editData.name) ?? '',
+              })
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && e.target instanceof HTMLTextAreaElement) {
+                e.stopPropagation()
+                e.preventDefault()
+              }
+            }}
+            rows={10}
+            className="min-h-[220px] w-full min-w-[280px] resize-y rounded border border-slate-300 bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-amber-500"
+            placeholder="Beschreibung (Enter = neue Zeile)"
             onClick={e => e.stopPropagation()}
           />
         </td>

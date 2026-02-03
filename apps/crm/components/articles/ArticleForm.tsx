@@ -140,10 +140,16 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
       </div>
 
       <textarea
-        placeholder="Artikelbeschreibung *"
-        value={formData.description}
+        placeholder="Artikelbeschreibung * (Enter für neue Zeile)"
+        value={formData.description ?? ''}
         onChange={e => setFormData({ ...formData, description: e.target.value })}
-        className="min-h-[100px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+        onKeyDown={e => {
+          if (e.key === 'Enter' && e.target instanceof HTMLTextAreaElement) {
+            e.stopPropagation()
+          }
+        }}
+        rows={10}
+        className="min-h-[220px] w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-sans text-sm leading-relaxed"
         required
       />
 

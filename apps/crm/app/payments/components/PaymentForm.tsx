@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { Check, X } from 'lucide-react'
+import { usePriceInput } from '@/hooks/usePriceInput'
 import type { PartialPayment } from '@/types'
 
 interface PaymentFormProps {
@@ -27,6 +28,20 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   onSave,
   onCancel,
 }) => {
+  const amountInput = usePriceInput({
+    initialValue: formData.amount,
+    onValueChange: value => {
+      onFormChange({ ...formData, amount: value })
+      if (grossTotal > 0 && value != null && value > 0) {
+        onPercentChange(((value / grossTotal) * 100).toFixed(1))
+      } else {
+        onPercentChange('')
+      }
+    },
+    allowEmpty: true,
+    min: 0,
+  })
+
   return (
     <div className="mb-6 rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-amber-100 p-6">
       <div className="mb-4 flex items-center justify-between">
@@ -60,21 +75,11 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
               Betrag (€)
             </label>
             <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
+              {...amountInput}
+              type="text"
+              placeholder="z.B. 500,00"
+              inputMode="decimal"
               className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
-              value={formData.amount || ''}
-              onChange={e => {
-                const amount = parseFloat(e.target.value) || 0
-                onFormChange({ ...formData, amount })
-                if (grossTotal > 0 && amount > 0) {
-                  const percent = (amount / grossTotal) * 100
-                  onPercentChange(percent.toFixed(1))
-                } else {
-                  onPercentChange('')
-                }
-              }}
             />
           </div>
           <div>
