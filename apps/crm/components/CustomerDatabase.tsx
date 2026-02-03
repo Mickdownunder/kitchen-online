@@ -212,12 +212,25 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
         <select
           value={formData.salutation}
           onChange={e =>
-            setFormData({ ...formData, salutation: e.target.value as 'Herr' | 'Frau' | 'Firma' })
+            setFormData({
+              ...formData,
+              salutation: (e.target.value || undefined) as Customer['salutation'],
+            })
           }
           className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
         >
+          <option value="">-</option>
           <option value="Herr">Herr</option>
           <option value="Frau">Frau</option>
+          <option value="Familie">Familie</option>
+          <option value="Herr und Frau">Herr und Frau</option>
+          <option value="Dr.">Dr.</option>
+          <option value="Prof.">Prof.</option>
+          <option value="Prof. Dr.">Prof. Dr.</option>
+          <option value="Ing.">Ing.</option>
+          <option value="Dipl.-Ing.">Dipl.-Ing.</option>
+          <option value="Mag.">Mag.</option>
+          <option value="Mag. Dr.">Mag. Dr.</option>
           <option value="Firma">Firma</option>
         </select>
       </div>
