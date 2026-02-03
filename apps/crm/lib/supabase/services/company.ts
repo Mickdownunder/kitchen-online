@@ -224,14 +224,28 @@ export async function getNextInvoiceNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseInvoiceNumberSegment(year, row.invoice_number ?? '')
-    if (n != null) used.add(n)
+    const num = parseInvoiceNumberSegment(year, row.invoice_number ?? '')
+    if (num != null) used.add(num)
   }
 
-  const maxUsed = used.size > 0 ? Math.max(...used) : 0
-  let n = 1
-  while (n <= maxUsed && used.has(n)) n++
-  if (n > maxUsed) n = maxUsed + 1
+  // Finde die nächste freie Nummer:
+  // - Wenn Rechnungen existieren: Suche Lücken ab dem Minimum, oder maxUsed + 1
+  // - Wenn keine Rechnungen: Verwende next_invoice_number aus Einstellungen
+  let n: number
+  if (used.size > 0) {
+    const minUsed = Math.min(...used)
+    const maxUsed = Math.max(...used)
+    
+    // Suche nach Lücken zwischen minUsed und maxUsed
+    n = minUsed
+    while (n <= maxUsed && used.has(n)) n++
+    
+    // Wenn keine Lücke gefunden, nimm maxUsed + 1
+    if (n > maxUsed) n = maxUsed + 1
+  } else {
+    // Keine Rechnungen vorhanden - verwende Zähler aus Einstellungen
+    n = settings.next_invoice_number || 1
+  }
 
   const invoiceNumber = `${prefix}${year}-${String(n).padStart(4, '0')}`
 
@@ -272,14 +286,22 @@ export async function peekNextInvoiceNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseInvoiceNumberSegment(year, row.invoice_number ?? '')
-    if (n != null) used.add(n)
+    const num = parseInvoiceNumberSegment(year, row.invoice_number ?? '')
+    if (num != null) used.add(num)
   }
 
-  const maxUsed = used.size > 0 ? Math.max(...used) : 0
-  let n = 1
-  while (n <= maxUsed && used.has(n)) n++
-  if (n > maxUsed) n = maxUsed + 1
+  // Gleiche Logik wie getNextInvoiceNumber
+  let n: number
+  if (used.size > 0) {
+    const minUsed = Math.min(...used)
+    const maxUsed = Math.max(...used)
+    
+    n = minUsed
+    while (n <= maxUsed && used.has(n)) n++
+    if (n > maxUsed) n = maxUsed + 1
+  } else {
+    n = settings.nextInvoiceNumber || 1
+  }
 
   return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }
@@ -327,14 +349,22 @@ export async function getNextOrderNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseOrderNumberSegment(year, row.order_number ?? '')
-    if (n != null) used.add(n)
+    const num = parseOrderNumberSegment(year, row.order_number ?? '')
+    if (num != null) used.add(num)
   }
 
-  const maxUsed = used.size > 0 ? Math.max(...used) : 0
-  let n = 1
-  while (n <= maxUsed && used.has(n)) n++
-  if (n > maxUsed) n = maxUsed + 1
+  // Finde die nächste freie Nummer (gleiche Logik wie bei Rechnungsnummern)
+  let n: number
+  if (used.size > 0) {
+    const minUsed = Math.min(...used)
+    const maxUsed = Math.max(...used)
+    
+    n = minUsed
+    while (n <= maxUsed && used.has(n)) n++
+    if (n > maxUsed) n = maxUsed + 1
+  } else {
+    n = settings.next_order_number || 1
+  }
 
   const orderNumber = `${prefix}${year}-${String(n).padStart(4, '0')}`
 
@@ -374,14 +404,22 @@ export async function peekNextOrderNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseOrderNumberSegment(year, row.order_number ?? '')
-    if (n != null) used.add(n)
+    const num = parseOrderNumberSegment(year, row.order_number ?? '')
+    if (num != null) used.add(num)
   }
 
-  const maxUsed = used.size > 0 ? Math.max(...used) : 0
-  let n = 1
-  while (n <= maxUsed && used.has(n)) n++
-  if (n > maxUsed) n = maxUsed + 1
+  // Gleiche Logik wie getNextOrderNumber
+  let n: number
+  if (used.size > 0) {
+    const minUsed = Math.min(...used)
+    const maxUsed = Math.max(...used)
+    
+    n = minUsed
+    while (n <= maxUsed && used.has(n)) n++
+    if (n > maxUsed) n = maxUsed + 1
+  } else {
+    n = settings.nextOrderNumber || 1
+  }
 
   return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }
