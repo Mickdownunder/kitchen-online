@@ -142,7 +142,7 @@ export async function getInvoicesWithProject(projectId?: string): Promise<Invoic
     .select(
       `
       *,
-      projects (
+      projects!left (
         id,
         customer_name,
         order_number,
