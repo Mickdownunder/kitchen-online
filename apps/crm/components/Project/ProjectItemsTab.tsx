@@ -16,8 +16,8 @@ interface ProjectItemsTabProps {
     taxTotal: number
     grossTotal: number
     totalPurchaseNet: number
-    profitNet: number
-    marginPercent: number
+    profitNet: number | null
+    marginPercent: number | null
     taxByRate: Record<number, number>
   }
   addItem: () => void
@@ -821,7 +821,9 @@ export function ProjectItemsTab({
                 <div className="mb-1 text-xs font-black uppercase tracking-widest text-slate-400">
                   Gewinn
                 </div>
-                {calculations.totalPurchaseNet > 0 ? (
+                {calculations.totalPurchaseNet > 0 &&
+                calculations.profitNet != null &&
+                calculations.marginPercent != null ? (
                   <>
                     <div
                       className={`text-lg font-black ${calculations.profitNet >= 0 ? 'text-emerald-400' : 'text-red-400'}`}

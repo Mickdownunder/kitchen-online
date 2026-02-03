@@ -1,4 +1,5 @@
 import { CustomerProject, Invoice } from '@/types'
+import { calculateMarginOnlyWithPurchase } from '@/lib/utils/priceCalculations'
 
 /**
  * Statistics Calculations - Invoice-based (New System)
@@ -273,17 +274,23 @@ export function calculateProjectStats(projects: CustomerProject[], filter: DateF
   const totalRevenue = filtered.reduce((acc, p) => acc + (p.totalAmount || 0), 0)
   const totalNet = filtered.reduce((acc, p) => acc + (p.netAmount || 0), 0)
 
-  const totalPurchasePrice = filtered.reduce((acc, p) => {
-    const projectPurchase = p.items.reduce((sum, item) => {
-      const purchasePrice = item.purchasePricePerUnit || 0
-      const quantity = item.quantity || 1
-      return sum + purchasePrice * quantity
-    }, 0)
-    return acc + projectPurchase
-  }, 0)
-
-  const grossMargin = totalNet - totalPurchasePrice
-  const marginPercent = totalNet > 0 ? (grossMargin / totalNet) * 100 : 0
+  let totalPurchasePrice = 0
+  let grossMargin = 0
+  let netWithPurchase = 0
+  filtered.forEach(p => {
+    const { margin, netWithPurchase: nwp } = calculateMarginOnlyWithPurchase(p.items || [])
+    if (nwp > 0) {
+      grossMargin += margin
+      netWithPurchase += nwp
+      totalPurchasePrice += (p.items || []).reduce((s, i) => {
+        const q = i.quantity || 1
+        const pp =
+          i.purchasePricePerUnit && i.purchasePricePerUnit > 0 ? i.purchasePricePerUnit : 0
+        return s + q * pp
+      }, 0)
+    }
+  })
+  const marginPercent = netWithPurchase > 0 ? (grossMargin / netWithPurchase) * 100 : null
   const projectCount = filtered.length
   const avgProjectValue = projectCount > 0 ? totalRevenue / projectCount : 0
 
@@ -291,7 +298,7 @@ export function calculateProjectStats(projects: CustomerProject[], filter: DateF
     totalRevenue,
     totalNet,
     totalPurchasePrice,
-    grossMargin,
+    grossMargin: marginPercent != null ? grossMargin : null,
     marginPercent,
     projectCount,
     avgProjectValue,

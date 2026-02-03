@@ -21,6 +21,7 @@ import {
   calculateInvoiceStatsFromInvoices,
   calculateMonthlyInvoiceDataFromInvoices,
 } from '@/components/statistics/utils/revenueCalculations'
+import { calculateMarginOnlyWithPurchase } from '@/lib/utils/priceCalculations'
 import dynamic from 'next/dynamic'
 import StatisticsTabs, { StatisticsTab } from '@/components/statistics/StatisticsTabs'
 import { useApp } from '@/app/providers'
@@ -201,11 +202,12 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
         net: number
         purchase: number
         margin: number
+        netWithPurchase: number
         count: number
       }
     } = {}
     for (let i = 0; i < 12; i++) {
-      monthlyProject[i] = { revenue: 0, net: 0, purchase: 0, margin: 0, count: 0 }
+      monthlyProject[i] = { revenue: 0, net: 0, purchase: 0, margin: 0, netWithPurchase: 0, count: 0 }
     }
 
     projects.forEach(p => {
@@ -216,30 +218,36 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
         monthlyProject[month].revenue += p.totalAmount || 0
         monthlyProject[month].net += p.netAmount || 0
         monthlyProject[month].count += 1
-        const projectPurchase = p.items.reduce((sum, item) => {
-          const purchasePrice = item.purchasePricePerUnit || 0
-          const quantity = item.quantity || 1
-          return sum + purchasePrice * quantity
-        }, 0)
-        monthlyProject[month].purchase += projectPurchase
-        monthlyProject[month].margin += (p.netAmount || 0) - projectPurchase
+        const { margin, netWithPurchase } = calculateMarginOnlyWithPurchase(p.items || [])
+        if (netWithPurchase > 0) {
+          monthlyProject[month].purchase += (p.items || []).reduce((s, i) => {
+            const q = i.quantity || 1
+            const pp =
+              i.purchasePricePerUnit && i.purchasePricePerUnit > 0 ? i.purchasePricePerUnit : 0
+            return s + q * pp
+          }, 0)
+          monthlyProject[month].margin += margin
+          monthlyProject[month].netWithPurchase += netWithPurchase
+        }
       }
     })
 
-    const monthlyProjectData = monthNames.map((month, index) => ({
-      month,
-      revenue: Math.round(monthlyProject[index].revenue),
-      net: Math.round(monthlyProject[index].net),
-      purchase: Math.round(monthlyProject[index].purchase),
-      margin: Math.round(monthlyProject[index].margin),
-      marginPercent:
-        monthlyProject[index].net > 0
-          ? Math.round((monthlyProject[index].margin / monthlyProject[index].net) * 100)
-          : 0,
-      count: monthlyProject[index].count,
-    }))
+    const monthlyProjectData = monthNames.map((month, index) => {
+      const m = monthlyProject[index]
+      const marginPercent =
+        m.netWithPurchase > 0 ? Math.round((m.margin / m.netWithPurchase) * 100) : null
+      return {
+        month,
+        revenue: Math.round(m.revenue),
+        net: Math.round(m.net),
+        purchase: Math.round(m.purchase),
+        margin: Math.round(m.margin),
+        marginPercent,
+        count: m.count,
+      }
+    })
 
-    // Calculate top customers
+    // Calculate top customers (Marge nur wo EK erfasst)
     const customerRevenue: {
       [key: string]: {
         name: string
@@ -247,6 +255,7 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
         net: number
         purchase: number
         margin: number
+        netWithPurchase: number
         projects: number
       }
     } = {}
@@ -258,25 +267,31 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
           net: 0,
           purchase: 0,
           margin: 0,
+          netWithPurchase: 0,
           projects: 0,
         }
       }
       customerRevenue[p.customerName].revenue += p.totalAmount
       customerRevenue[p.customerName].net += p.netAmount
       customerRevenue[p.customerName].projects += 1
-      const projectPurchase = p.items.reduce((sum, item) => {
-        const purchasePrice = item.purchasePricePerUnit || 0
-        const quantity = item.quantity || 1
-        return sum + purchasePrice * quantity
-      }, 0)
-      customerRevenue[p.customerName].purchase += projectPurchase
-      customerRevenue[p.customerName].margin += (p.netAmount || 0) - projectPurchase
+      const { margin, netWithPurchase } = calculateMarginOnlyWithPurchase(p.items || [])
+      if (netWithPurchase > 0) {
+        customerRevenue[p.customerName].purchase += (p.items || []).reduce((s, i) => {
+          const q = i.quantity || 1
+          const pp =
+            i.purchasePricePerUnit && i.purchasePricePerUnit > 0 ? i.purchasePricePerUnit : 0
+          return s + q * pp
+        }, 0)
+        customerRevenue[p.customerName].margin += margin
+        customerRevenue[p.customerName].netWithPurchase += netWithPurchase
+      }
     })
 
     const topCustomers = Object.values(customerRevenue)
       .map(c => ({
         ...c,
-        marginPercent: c.net > 0 ? (c.margin / c.net) * 100 : 0,
+        marginPercent:
+          c.netWithPurchase > 0 ? (c.margin / c.netWithPurchase) * 100 : (null as number | null),
         avgValue: c.projects > 0 ? c.revenue / c.projects : 0,
       }))
       .sort((a, b) => b.revenue - a.revenue)

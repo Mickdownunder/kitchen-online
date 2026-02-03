@@ -30,10 +30,18 @@ export function useProjectCalculations({ formData, setFormData }: UseProjectCalc
     // Verwende zentrale Utility-Funktion für Einkaufspreis-Gesamt
     const totalPurchaseNet = calculateTotalPurchaseNet(items)
 
-    // Verwende zentrale Utility-Funktion für Gewinn und Marge
+    // Gewinn und Marge nur wenn EK erfasst (sonst null, um 100%-Verfälschung zu vermeiden)
     const { profitNet, marginPercent } = calculateProfitAndMargin(netTotal, totalPurchaseNet)
 
-    return { netTotal, taxTotal, grossTotal, totalPurchaseNet, profitNet, marginPercent, taxByRate }
+    return {
+      netTotal,
+      taxTotal,
+      grossTotal,
+      totalPurchaseNet,
+      profitNet,
+      marginPercent,
+      taxByRate,
+    }
   }, [formData.items])
 
   // Aktualisiere formData.totalAmount wenn sich grossTotal ändert

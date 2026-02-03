@@ -18,8 +18,8 @@ interface StatisticsPDFAdvancedProps {
     totalRevenue: number
     totalNet: number
     totalPurchasePrice: number
-    grossMargin: number
-    marginPercent: number
+    grossMargin: number | null
+    marginPercent: number | null
     projectCount: number
     avgProjectValue: number
   }
@@ -29,7 +29,7 @@ interface StatisticsPDFAdvancedProps {
     net: number
     purchase: number
     margin: number
-    marginPercent: number
+    marginPercent: number | null
     count: number
   }>
   topCustomers?: Array<{
@@ -38,7 +38,7 @@ interface StatisticsPDFAdvancedProps {
     net: number
     purchase: number
     margin: number
-    marginPercent: number
+    marginPercent: number | null
     projects: number
     avgValue: number
   }>
@@ -256,14 +256,16 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
   invoiceStats,
   chartImages,
 }) => {
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value == null) return '—'
     return new Intl.NumberFormat('de-DE', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)
   }
 
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number | null | undefined) => {
+    if (value == null) return '—'
     return `${value.toFixed(1)}%`
   }
 
@@ -368,7 +370,9 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
                 <Text style={styles.metricLabel}>Marge</Text>
                 <Text style={styles.metricValue}>{formatPercent(projectStats.marginPercent)}</Text>
                 <Text style={styles.metricSubtext}>
-                  {formatCurrency(projectStats.grossMargin)} €
+                  {projectStats.grossMargin != null
+                    ? `${formatCurrency(projectStats.grossMargin)} €`
+                    : 'EK erfassen'}
                 </Text>
               </View>
               <View style={styles.metricCard}>
@@ -413,7 +417,9 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
                       {formatCurrency(customer.revenue)} €
                     </Text>
                     <Text style={[styles.tableCell, styles.colMargin]}>
-                      {formatCurrency(customer.margin)} €
+                      {customer.marginPercent != null
+                        ? `${formatCurrency(customer.margin)} €`
+                        : '—'}
                     </Text>
                     <Text style={[styles.tableCell, styles.colMarginPercent]}>
                       {formatPercent(customer.marginPercent)}

@@ -16,6 +16,7 @@ import {
 } from 'recharts'
 import { CustomerProject } from '@/types'
 import { DateFilter } from './utils/revenueCalculations'
+import { calculateMarginOnlyWithPurchase } from '@/lib/utils/priceCalculations'
 import { Download } from 'lucide-react'
 
 interface ProjectsTabProps {
@@ -126,20 +127,27 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
       }))
   }, [filteredProjects])
 
-  // Calculate statistics
+  // Calculate statistics (Marge nur wo EK erfasst)
   const stats = useMemo(() => {
     const totalRevenue = filteredProjects.reduce((sum, p) => sum + (p.totalAmount || 0), 0)
-    const totalPurchasePrice = filteredProjects.reduce((acc, p) => {
-      const purchaseTotal = p.items.reduce((sum, item) => {
-        const purchasePrice = item.purchasePricePerUnit || 0
-        const quantity = item.quantity || 1
-        return sum + purchasePrice * quantity
-      }, 0)
-      return acc + purchaseTotal
-    }, 0)
     const totalNet = filteredProjects.reduce((acc, p) => acc + (p.netAmount || 0), 0)
-    const grossMargin = totalNet - totalPurchasePrice
-    const marginPercent = totalNet > 0 ? (grossMargin / totalNet) * 100 : 0
+    let totalPurchasePrice = 0
+    let grossMargin = 0
+    let netWithPurchase = 0
+    filteredProjects.forEach(p => {
+      const { margin, netWithPurchase: nwp } = calculateMarginOnlyWithPurchase(p.items || [])
+      if (nwp > 0) {
+        grossMargin += margin
+        netWithPurchase += nwp
+        totalPurchasePrice += (p.items || []).reduce((s, i) => {
+          const q = i.quantity || 1
+          const pp =
+            i.purchasePricePerUnit && i.purchasePricePerUnit > 0 ? i.purchasePricePerUnit : 0
+          return s + q * pp
+        }, 0)
+      }
+    })
+    const marginPercent = netWithPurchase > 0 ? (grossMargin / netWithPurchase) * 100 : null
     const avgProjectValue = filteredProjects.length > 0 ? totalRevenue / filteredProjects.length : 0
 
     return {
@@ -215,8 +223,12 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
         </div>
         <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg">
           <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">Marge</p>
-          <p className="text-3xl font-black text-slate-900">{stats.marginPercent.toFixed(1)}%</p>
-          <p className="text-xs text-slate-500">{formatCurrency(stats.grossMargin)} €</p>
+          <p className="text-3xl font-black text-slate-900">
+            {stats.marginPercent != null ? `${stats.marginPercent.toFixed(1)}%` : '—'}
+          </p>
+          <p className="text-xs text-slate-500">
+            {stats.marginPercent != null ? formatCurrency(stats.grossMargin) + ' €' : 'EK erfassen'}
+          </p>
         </div>
       </div>
 

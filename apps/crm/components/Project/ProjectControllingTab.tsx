@@ -11,8 +11,8 @@ interface ProjectControllingTabProps {
     taxTotal: number
     grossTotal: number
     totalPurchaseNet: number
-    profitNet: number
-    marginPercent: number
+    profitNet: number | null
+    marginPercent: number | null
     taxByRate: Record<number, number>
   }
 }
@@ -34,25 +34,45 @@ export function ProjectControllingTab({ calculations }: ProjectControllingTabPro
             Rohgewinn (Netto)
           </p>
           <p className="text-3xl font-black text-indigo-600">
-            {calculations.profitNet.toLocaleString('de-AT')} €
+            {calculations.profitNet != null
+              ? `${calculations.profitNet.toLocaleString('de-AT')} €`
+              : '—'}
           </p>
+          {calculations.profitNet == null && (
+            <p className="mt-1 text-xs italic text-slate-500">Wird angezeigt, sobald EK erfasst</p>
+          )}
         </div>
         <div
-          className={`rounded-[2.5rem] border p-8 ${calculations.marginPercent < 25 ? 'border-red-100 bg-red-50' : 'border-emerald-100 bg-emerald-50'}`}
+          className={`rounded-[2.5rem] border p-8 ${
+            calculations.marginPercent == null
+              ? 'border-slate-100 bg-slate-50'
+              : calculations.marginPercent < 25
+                ? 'border-red-100 bg-red-50'
+                : 'border-emerald-100 bg-emerald-50'
+          }`}
         >
           <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
             Marge (%)
           </p>
           <div className="flex items-center gap-3">
-            <p
-              className={`text-3xl font-black ${calculations.marginPercent < 25 ? 'text-red-600' : 'text-emerald-600'}`}
-            >
-              {calculations.marginPercent.toFixed(1)}%
-            </p>
-            {calculations.marginPercent < 25 ? (
-              <AlertCircle className="h-6 w-6 text-red-500" />
+            {calculations.marginPercent != null ? (
+              <>
+                <p
+                  className={`text-3xl font-black ${calculations.marginPercent < 25 ? 'text-red-600' : 'text-emerald-600'}`}
+                >
+                  {calculations.marginPercent.toFixed(1)}%
+                </p>
+                {calculations.marginPercent < 25 ? (
+                  <AlertCircle className="h-6 w-6 text-red-500" />
+                ) : (
+                  <ShieldCheck className="h-6 w-6 text-emerald-500" />
+                )}
+              </>
             ) : (
-              <ShieldCheck className="h-6 w-6 text-emerald-500" />
+              <>
+                <p className="text-3xl font-black text-slate-400">—</p>
+                <p className="text-xs italic text-slate-500">EK erfassen</p>
+              </>
             )}
           </div>
         </div>
@@ -79,15 +99,25 @@ export function ProjectControllingTab({ calculations }: ProjectControllingTabPro
           <div className="flex justify-between border-t border-slate-200 pt-3">
             <span className="font-black text-slate-900">Rohgewinn (Netto):</span>
             <span className="text-lg font-black text-indigo-600">
-              {calculations.profitNet.toLocaleString('de-AT', { minimumFractionDigits: 2 })} €
+              {calculations.profitNet != null
+                ? `${calculations.profitNet.toLocaleString('de-AT', { minimumFractionDigits: 2 })} €`
+                : '—'}
             </span>
           </div>
           <div className="flex justify-between border-t-2 border-slate-300 pt-3">
             <span className="font-black text-slate-900">Marge:</span>
             <span
-              className={`text-lg font-black ${calculations.marginPercent < 25 ? 'text-red-600' : 'text-emerald-600'}`}
+              className={`text-lg font-black ${
+                calculations.marginPercent == null
+                  ? 'text-slate-400'
+                  : calculations.marginPercent < 25
+                    ? 'text-red-600'
+                    : 'text-emerald-600'
+              }`}
             >
-              {calculations.marginPercent.toFixed(1)}%
+              {calculations.marginPercent != null
+                ? `${calculations.marginPercent.toFixed(1)}%`
+                : '—'}
             </span>
           </div>
         </div>

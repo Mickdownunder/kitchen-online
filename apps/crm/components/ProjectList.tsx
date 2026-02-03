@@ -27,6 +27,7 @@ import {
   Customer,
 } from '@/types'
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
+import { calculateMarginOnlyWithPurchase } from '@/lib/utils/priceCalculations'
 import { logger } from '@/lib/utils/logger'
 import ProjectModal from './ProjectModal'
 import { getCustomers, getComplaints } from '@/lib/supabase/services'
@@ -193,15 +194,20 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const statsData = useMemo(() => {
     const totalRevenue = filteredProjects.reduce((sum, p) => sum + (p.totalAmount || 0), 0)
     const totalNet = filteredProjects.reduce((sum, p) => sum + (p.netAmount || 0), 0)
-    const totalPurchase = filteredProjects.reduce((acc, p) => {
-      return acc + p.items.reduce((sum, item) => {
-        const purchasePrice = item.purchasePricePerUnit || 0
-        const quantity = item.quantity || 1
-        return sum + purchasePrice * quantity
-      }, 0)
-    }, 0)
-    const margin = totalNet - totalPurchase
-    const marginPercent = totalNet > 0 ? (margin / totalNet) * 100 : 0
+    let marginSum = 0
+    let netWithPurchaseSum = 0
+    filteredProjects.forEach(p => {
+      const { margin, netWithPurchase, marginPercent } = calculateMarginOnlyWithPurchase(
+        p.items || []
+      )
+      if (marginPercent != null) {
+        marginSum += margin
+        netWithPurchaseSum += netWithPurchase
+      }
+    })
+    const margin = marginSum
+    const marginPercent =
+      netWithPurchaseSum > 0 ? (margin / netWithPurchaseSum) * 100 : null
     const completedCount = filteredProjects.filter(p => p.status === ProjectStatus.COMPLETED).length
     const completedPercent = filteredProjects.length > 0
       ? Math.round((completedCount / filteredProjects.length) * 100)
@@ -213,7 +219,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
     return {
       totalRevenue,
       margin,
-      marginPercent,
+      marginPercent: marginPercent ?? null,
       completedCount,
       completedPercent,
       averageAmount,
@@ -601,8 +607,12 @@ const ProjectList: React.FC<ProjectListProps> = ({
                 Durchschnittliche Marge
               </p>
             </div>
-            <p className="text-3xl font-black text-slate-900">{statsData.marginPercent.toFixed(1)}%</p>
-            <p className="mt-1 text-xs text-slate-500">{formatCurrency(statsData.margin)} €</p>
+            <p className="text-3xl font-black text-slate-900">
+              {statsData.marginPercent != null ? `${statsData.marginPercent.toFixed(1)}%` : '—'}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {statsData.marginPercent != null ? formatCurrency(statsData.margin) + ' €' : 'EK erfassen'}
+            </p>
           </div>
           <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg">
             <div className="mb-2 flex items-center gap-3">

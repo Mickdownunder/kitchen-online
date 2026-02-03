@@ -24,8 +24,8 @@ export interface StatisticsExcelData {
     totalRevenue: number
     totalNet: number
     totalPurchasePrice: number
-    grossMargin: number
-    marginPercent: number
+    grossMargin: number | null
+    marginPercent: number | null
     projectCount: number
     avgProjectValue: number
   }
@@ -35,7 +35,7 @@ export interface StatisticsExcelData {
     net: number
     purchase: number
     margin: number
-    marginPercent: number
+    marginPercent: number | null
     count: number
   }>
   topCustomers?: Array<{
@@ -44,7 +44,7 @@ export interface StatisticsExcelData {
     net: number
     purchase: number
     margin: number
-    marginPercent: number
+    marginPercent: number | null
     projects: number
     avgValue: number
   }>
@@ -117,7 +117,12 @@ export function exportStatisticsToExcel(
       ['Verkaufter Umsatz', formatCurrencyForExcel(data.projectStats.totalRevenue) + ' €'],
       ['Netto Umsatz', formatCurrencyForExcel(data.projectStats.totalNet) + ' €'],
       ['Einkaufspreis', formatCurrencyForExcel(data.projectStats.totalPurchasePrice) + ' €'],
-      ['Bruttomarge', formatCurrencyForExcel(data.projectStats.grossMargin) + ' €'],
+      [
+        'Bruttomarge',
+        data.projectStats.grossMargin != null
+          ? formatCurrencyForExcel(data.projectStats.grossMargin) + ' €'
+          : '—',
+      ],
       ['Marge %', formatPercentForExcel(data.projectStats.marginPercent)],
       ['Projekte', data.projectStats.projectCount],
       ['Ø Projektwert', formatCurrencyForExcel(data.projectStats.avgProjectValue) + ' €'],
@@ -133,7 +138,7 @@ export function exportStatisticsToExcel(
       formatCurrencyForExcel(month.revenue) + ' €',
       formatCurrencyForExcel(month.net) + ' €',
       formatCurrencyForExcel(month.purchase) + ' €',
-      formatCurrencyForExcel(month.margin) + ' €',
+      month.marginPercent != null ? formatCurrencyForExcel(month.margin) + ' €' : '—',
       formatPercentForExcel(month.marginPercent),
       month.count,
     ])
@@ -156,7 +161,7 @@ export function exportStatisticsToExcel(
       formatCurrencyForExcel(customer.revenue) + ' €',
       formatCurrencyForExcel(customer.net) + ' €',
       formatCurrencyForExcel(customer.purchase) + ' €',
-      formatCurrencyForExcel(customer.margin) + ' €',
+      customer.marginPercent != null ? formatCurrencyForExcel(customer.margin) + ' €' : '—',
       formatPercentForExcel(customer.marginPercent),
       customer.projects,
       formatCurrencyForExcel(customer.avgValue) + ' €',

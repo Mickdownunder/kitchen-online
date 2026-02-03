@@ -226,19 +226,49 @@ export function calculateTotalPurchaseNet(
 }
 
 /**
- * Berechnet Gewinn und Marge aus Netto-Verkaufspreis und Einkaufspreis
- * @param netSaleTotal - Netto-Verkaufspreis-Gesamt
- * @param purchaseNetTotal - Einkaufspreis-Gesamt (Netto)
- * @returns Objekt mit profitNet und marginPercent
+ * Berechnet Gewinn und Marge aus Netto-Verkaufspreis und Einkaufspreis.
+ * WICHTIG: Wenn kein Einkaufspreis erfasst ist (purchaseNetTotal=0), werden null zurückgegeben,
+ * da sonst 100% Marge angezeigt würde und die Statistik verfälscht.
  */
 export function calculateProfitAndMargin(
   netSaleTotal: number,
   purchaseNetTotal: number
-): { profitNet: number; marginPercent: number } {
+): { profitNet: number | null; marginPercent: number | null } {
+  if (!purchaseNetTotal || purchaseNetTotal <= 0) {
+    return { profitNet: null, marginPercent: null }
+  }
   const profitNet = netSaleTotal - purchaseNetTotal
   const marginPercent = netSaleTotal > 0 ? (profitNet / netSaleTotal) * 100 : 0
   return {
     profitNet: roundTo2Decimals(profitNet),
     marginPercent: roundTo2Decimals(marginPercent),
+  }
+}
+
+/**
+ * Berechnet Marge nur für Items mit erfasstem Einkaufspreis.
+ * Für Aggregationen (Statistik, Kunden, Monate): nur diese Werte verwenden.
+ */
+export function calculateMarginOnlyWithPurchase(items: Array<{
+  quantity?: number
+  netTotal?: number
+  purchasePricePerUnit?: number | null
+}>): { margin: number; netWithPurchase: number; marginPercent: number | null } {
+  let margin = 0
+  let netWithPurchase = 0
+  for (const item of items) {
+    const qty = item.quantity || 1
+    const purchase = item.purchasePricePerUnit && item.purchasePricePerUnit > 0 ? item.purchasePricePerUnit : 0
+    if (purchase <= 0) continue
+    const itemNet = item.netTotal ?? 0
+    margin += itemNet - qty * purchase
+    netWithPurchase += itemNet
+  }
+  const marginPercent =
+    netWithPurchase > 0 ? roundTo2Decimals((margin / netWithPurchase) * 100) : null
+  return {
+    margin: roundTo2Decimals(margin),
+    netWithPurchase: roundTo2Decimals(netWithPurchase),
+    marginPercent,
   }
 }

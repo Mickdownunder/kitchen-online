@@ -35,9 +35,10 @@ export interface ExcelSheetData {
 }
 
 /**
- * Formats a number as currency for Excel
+ * Formats a number as currency for Excel. Bei null/undefined: "—"
  */
-export function formatCurrencyForExcel(value: number): string {
+export function formatCurrencyForExcel(value: number | null | undefined): string {
+  if (value == null) return '—'
   return value.toLocaleString('de-DE', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -45,9 +46,10 @@ export function formatCurrencyForExcel(value: number): string {
 }
 
 /**
- * Formats a number as percentage for Excel
+ * Formats a number as percentage for Excel. Bei null/undefined: "—"
  */
-export function formatPercentForExcel(value: number): string {
+export function formatPercentForExcel(value: number | null | undefined): string {
+  if (value == null) return '—'
   return `${value.toFixed(1)}%`
 }
 
