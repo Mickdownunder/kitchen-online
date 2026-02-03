@@ -594,14 +594,20 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
         alert('Bitte Firmenstammdaten hinterlegen.')
         return
       }
+      const win = window.open('', '_blank')
+      if (!win) {
+        alert('Popup wurde blockiert. Bitte erlauben Sie Popups für diese Seite und versuchen Sie es erneut.')
+        return
+      }
       try {
-        // Dynamic import to reduce initial bundle size
         const { openOrderPDFInNewTab } = await import('../OrderPDF')
         await openOrderPDFInNewTab(project, companySettings, {
           appendAgb: !!companySettings.agbText?.trim(),
+          targetWindow: win,
         })
       } catch (err) {
         logger.error('Error opening order PDF', { component: 'ProjectDocumentsTab' }, err as Error)
+        win.close()
         alert('Fehler beim Öffnen der PDF-Vorschau.')
       }
       return
@@ -610,6 +616,11 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
     if (doc.type === 'invoice') {
       if (!companySettings) {
         alert('Bitte Firmenstammdaten hinterlegen.')
+        return
+      }
+      const win = window.open('', '_blank')
+      if (!win) {
+        alert('Popup wurde blockiert. Bitte erlauben Sie Popups für diese Seite und versuchen Sie es erneut.')
         return
       }
       try {
@@ -658,6 +669,7 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
 
         if (!currentInvoice) {
           logger.error('[ProjectDocumentsTab] No invoice data available for PDF preview', { component: 'ProjectDocumentsTab' })
+          win.close()
           alert('Rechnungsdaten konnten nicht geladen werden. Bitte versuchen Sie es erneut.')
           return
         }
@@ -689,15 +701,15 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
           company: companySettings,
           bankAccount: bankAccount,
         }
-        // Dynamic import to reduce initial bundle size
         const { openInvoicePDFInNewTab } = await import('../InvoicePDF')
-        await openInvoicePDFInNewTab(invoiceData)
+        await openInvoicePDFInNewTab(invoiceData, win)
       } catch (err) {
         logger.error(
           'Error opening invoice PDF',
           { component: 'ProjectDocumentsTab' },
           err as Error
         )
+        if (win && !win.closed) win.close()
         alert('Fehler beim Öffnen der PDF-Vorschau.')
       }
       return
@@ -1019,6 +1031,7 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => handleView(doc)}
                     className="rounded-lg bg-slate-100 p-2 text-slate-700 transition-all hover:bg-slate-200 group-hover:bg-emerald-100 group-hover:text-emerald-700"
                     title="Ansehen"
@@ -1026,6 +1039,7 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
                     <Eye className="h-5 w-5" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDownload(doc)}
                     className="rounded-lg bg-slate-100 p-2 text-slate-700 transition-all hover:bg-slate-200 group-hover:bg-blue-100 group-hover:text-blue-700"
                     title="Download"

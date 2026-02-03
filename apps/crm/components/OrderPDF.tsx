@@ -537,13 +537,14 @@ export const downloadOrderPDF = async (
   URL.revokeObjectURL(url)
 }
 
-/** Quickview: PDF in neuem Tab öffnen (ohne Download). Kunden-PDF: showUnitPrices immer false. */
+/** Quickview: PDF in neuem Tab öffnen (ohne Download). Kunden-PDF: showUnitPrices immer false. targetWindow: sofort beim Klick geöffnetes Fenster, um Popup-Blocker zu vermeiden. */
 export const openOrderPDFInNewTab = async (
   project: CustomerProject,
   company: CompanySettings | null,
-  options?: { appendAgb?: boolean }
+  options?: { appendAgb?: boolean; targetWindow?: Window | null }
 ): Promise<void> => {
   const appendAgb = options?.appendAgb ?? false
+  const targetWindow = options?.targetWindow
   const blob = await pdf(
     <OrderPDFDocumentWithProps
       project={project}
@@ -553,6 +554,10 @@ export const openOrderPDFInNewTab = async (
     />
   ).toBlob()
   const url = URL.createObjectURL(blob)
-  window.open(url, '_blank')
+  if (targetWindow && !targetWindow.closed) {
+    targetWindow.location.href = url
+  } else {
+    window.open(url, '_blank')
+  }
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }

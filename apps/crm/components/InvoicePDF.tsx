@@ -382,15 +382,6 @@ const InvoicePDFDocument: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => 
     (invoice as { is_paid?: boolean | string | number }).is_paid === 1 ||
     Boolean(paidDateValue)
 
-  // Debug logging
-  console.log('[InvoicePDF] isPaid check:', {
-    'invoice.isPaid': invoice.isPaid,
-    'invoice.is_paid': (invoice as { is_paid?: boolean | string | number }).is_paid,
-    paidDateValue,
-    isPaidResult: isPaid,
-    invoiceNumber: invoice.invoiceNumber,
-  })
-
   // Anzahlungen summieren (Brutto) - from priorInvoices (new system)
   const totalPartialPayments = invoice.priorInvoices?.reduce((sum, inv) => sum + inv.amount, 0) || 0
 
@@ -786,11 +777,18 @@ export const downloadInvoicePDF = async (invoice: InvoiceData): Promise<void> =>
   URL.revokeObjectURL(url)
 }
 
-/** Quickview: Rechnungs-PDF in neuem Tab öffnen (ohne Download). */
-export const openInvoicePDFInNewTab = async (invoice: InvoiceData): Promise<void> => {
+/** Quickview: Rechnungs-PDF in neuem Tab öffnen (ohne Download). targetWindow: sofort beim Klick geöffnetes Fenster, um Popup-Blocker zu vermeiden. */
+export const openInvoicePDFInNewTab = async (
+  invoice: InvoiceData,
+  targetWindow?: Window | null
+): Promise<void> => {
   const blob = await pdf(<InvoicePDFDocument invoice={invoice} />).toBlob()
   const url = URL.createObjectURL(blob)
-  window.open(url, '_blank')
+  if (targetWindow && !targetWindow.closed) {
+    targetWindow.location.href = url
+  } else {
+    window.open(url, '_blank')
+  }
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
