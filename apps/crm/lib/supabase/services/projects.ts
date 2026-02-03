@@ -37,6 +37,15 @@ import {
 import { createFirstPayment } from '@/lib/utils/paymentSchedule'
 import { audit } from '@/lib/utils/auditLogger'
 
+function generateAccessCode(length = 12): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return result
+}
+
 export async function getProjects(): Promise<CustomerProject[]> {
   try {
     const user = await getCurrentUser()
@@ -129,12 +138,15 @@ export async function createProject(
       }
     }
 
+    const accessCode = project.accessCode || generateAccessCode()
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase
       .from('projects')
       .insert({
         user_id: user.id,
         customer_id: project.customerId || null,
+        access_code: accessCode,
         salesperson_id: project.salespersonId || null,
         salesperson_name: project.salespersonName || null,
         customer_name: project.customerName || 'Unbekannt',
@@ -403,6 +415,7 @@ export async function updateProject(
     if (project.notes !== undefined) updateData.notes = project.notes
     if (project.orderFooterText !== undefined)
       updateData.order_footer_text = project.orderFooterText
+    if (project.accessCode !== undefined) updateData.access_code = project.accessCode
 
     // Add partial_payments, final_invoice, complaints, and documents if provided
     if (project.partialPayments !== undefined) {
