@@ -207,6 +207,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 700,
     color: D.accent.invoice,
+    textAlign: 'right' as const,
   },
   paymentsSection: {
     marginBottom: 10,
@@ -302,7 +303,8 @@ const styles = StyleSheet.create({
 })
 
 const formatCurrency = (amount: number): string => {
-  return `${amount.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  // \u00A0 = Non-Breaking Space verhindert Zeilenumbruch zwischen Betrag und €
+  return `${amount.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`
 }
 
 // Prior invoice data for displaying on final invoices
