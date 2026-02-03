@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const project = await getProject(projectId)
+    const project = await getProject(projectId, supabase)
     if (!project) {
       return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
     }
@@ -80,10 +80,11 @@ export async function POST(request: NextRequest) {
     let accessCode = project.accessCode
     if (!accessCode?.trim()) {
       accessCode = generateAccessCode()
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('projects')
         .update({ access_code: accessCode })
         .eq('id', projectId)
+        .select('id')
 
       if (updateError) {
         logger.error('Failed to save access code', {
@@ -93,6 +94,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Projektcode konnte nicht gespeichert werden' },
           { status: 500 }
+        )
+      }
+      if (!updated?.length) {
+        return NextResponse.json(
+          {
+            error:
+              'Sie haben keine Berechtigung, den Projektcode zu setzen. Nur der Projekt-Owner oder Kollegen derselben Firma können den Portal-Zugang senden.',
+          },
+          { status: 403 }
         )
       }
     }
@@ -128,12 +138,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     apiLogger.error(error as Error, 500)
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : 'Fehler beim Senden des Portal-Zugangs',
-      },
-      { status: 500 }
-    )
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : 'Fehler beim Senden des Portal-Zugangs'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

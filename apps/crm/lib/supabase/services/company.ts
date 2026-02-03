@@ -185,17 +185,26 @@ function mapCompanySettingsFromDB(db: Record<string, any>): CompanySettings {
 // ============================================
 
 /**
- * Generiert die nächste fortlaufende Rechnungsnummer und erhöht den Zähler.
+ * Extrahiert die laufende Nummer aus Rechnungsnummern wie "R-2026-0001" oder "R-2026-1001-A1".
+ * Gibt null zurück, wenn das Format nicht passt.
+ */
+function parseInvoiceNumberSegment(prefix: string, year: number, invoiceNumber: string): number | null {
+  const pattern = `${prefix}${year}-`
+  if (!invoiceNumber || !invoiceNumber.startsWith(pattern)) return null
+  const rest = invoiceNumber.slice(pattern.length)
+  const numPart = rest.split('-')[0]
+  const n = parseInt(numPart, 10)
+  return Number.isNaN(n) ? null : n
+}
+
+/**
+ * Generiert die nächste freie Rechnungsnummer (füllt Lücken: gelöschte Nummern werden wiederverwendet).
  * Format: {prefix}{jahr}-{nummer} z.B. "R-2026-0001"
- *
- * WICHTIG: Diese Funktion ist atomar - sie holt und inkrementiert in einem Schritt,
- * um Race Conditions zu vermeiden.
  */
 export async function getNextInvoiceNumber(): Promise<string> {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
 
-  // Lade aktuelle Einstellungen
   const { data: settings, error: loadError } = await supabase
     .from('company_settings')
     .select('id, invoice_prefix, next_invoice_number')
@@ -207,17 +216,29 @@ export async function getNextInvoiceNumber(): Promise<string> {
   }
 
   const prefix = settings.invoice_prefix || 'R-'
-  const currentNumber = settings.next_invoice_number || 1
   const year = new Date().getFullYear()
 
-  // Formatiere Rechnungsnummer: R-2026-0001
-  const invoiceNumber = `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+  const { data: existing } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .eq('user_id', user.id)
 
-  // Inkrementiere den Zähler
+  const used = new Set<number>()
+  for (const row of existing || []) {
+    const n = parseInvoiceNumberSegment(prefix, year, row.invoice_number ?? '')
+    if (n != null) used.add(n)
+  }
+
+  let n = 1
+  while (used.has(n)) n++
+
+  const invoiceNumber = `${prefix}${year}-${String(n).padStart(4, '0')}`
+
+  const nextCounter = Math.max(settings.next_invoice_number || 1, n + 1)
   const { error: updateError } = await supabase
     .from('company_settings')
     .update({
-      next_invoice_number: currentNumber + 1,
+      next_invoice_number: nextCounter,
       updated_at: new Date().toISOString(),
     })
     .eq('id', settings.id)
@@ -230,20 +251,34 @@ export async function getNextInvoiceNumber(): Promise<string> {
 }
 
 /**
- * Gibt die aktuelle (noch nicht vergebene) Rechnungsnummer zurück, ohne sie zu inkrementieren.
- * Nützlich für Vorschau-Zwecke.
+ * Gibt die nächste freie Rechnungsnummer zurück, ohne sie zu vergeben (Vorschau).
+ * Berücksichtigt Lücken wie getNextInvoiceNumber.
  */
 export async function peekNextInvoiceNumber(): Promise<string> {
+  const user = await getCurrentUser()
+  if (!user) return 'R-' + new Date().getFullYear() + '-0001'
+
   const settings = await getCompanySettings()
-  if (!settings) {
-    return 'R-' + new Date().getFullYear() + '-0001'
-  }
+  if (!settings) return 'R-' + new Date().getFullYear() + '-0001'
 
   const prefix = settings.invoicePrefix || 'R-'
-  const currentNumber = settings.nextInvoiceNumber || 1
   const year = new Date().getFullYear()
 
-  return `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+  const { data: existing } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .eq('user_id', user.id)
+
+  const used = new Set<number>()
+  for (const row of existing || []) {
+    const n = parseInvoiceNumberSegment(prefix, year, row.invoice_number ?? '')
+    if (n != null) used.add(n)
+  }
+
+  let n = 1
+  while (used.has(n)) n++
+
+  return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }
 
 // ============================================
@@ -251,7 +286,19 @@ export async function peekNextInvoiceNumber(): Promise<string> {
 // ============================================
 
 /**
- * Generiert die nächste fortlaufende Auftragsnummer und erhöht den Zähler.
+ * Extrahiert die laufende Nummer aus Auftragsnummern wie "K-2026-0001" oder "K-2026-1001".
+ */
+function parseOrderNumberSegment(prefix: string, year: number, orderNumber: string): number | null {
+  const pattern = `${prefix}${year}-`
+  if (!orderNumber || !orderNumber.startsWith(pattern)) return null
+  const rest = orderNumber.slice(pattern.length)
+  const numPart = rest.split('-')[0]
+  const n = parseInt(numPart, 10)
+  return Number.isNaN(n) ? null : n
+}
+
+/**
+ * Generiert die nächste freie Auftragsnummer (füllt Lücken: gelöschte Nummern werden wiederverwendet).
  * Format: {prefix}{jahr}-{nummer} z.B. "K-2026-0001"
  */
 export async function getNextOrderNumber(): Promise<string> {
@@ -269,14 +316,29 @@ export async function getNextOrderNumber(): Promise<string> {
   }
 
   const prefix = settings.order_prefix || 'K-'
-  const currentNumber = settings.next_order_number || 1
   const year = new Date().getFullYear()
-  const orderNumber = `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
 
+  const { data: existing } = await supabase
+    .from('projects')
+    .select('order_number')
+    .eq('user_id', user.id)
+
+  const used = new Set<number>()
+  for (const row of existing || []) {
+    const n = parseOrderNumberSegment(prefix, year, row.order_number ?? '')
+    if (n != null) used.add(n)
+  }
+
+  let n = 1
+  while (used.has(n)) n++
+
+  const orderNumber = `${prefix}${year}-${String(n).padStart(4, '0')}`
+
+  const nextCounter = Math.max(settings.next_order_number || 1, n + 1)
   const { error: updateError } = await supabase
     .from('company_settings')
     .update({
-      next_order_number: currentNumber + 1,
+      next_order_number: nextCounter,
       updated_at: new Date().toISOString(),
     })
     .eq('id', settings.id)
@@ -289,15 +351,33 @@ export async function getNextOrderNumber(): Promise<string> {
 }
 
 /**
- * Gibt die nächste Auftragsnummer zurück, ohne sie zu vergeben.
+ * Gibt die nächste freie Auftragsnummer zurück, ohne sie zu vergeben (Vorschau).
  */
 export async function peekNextOrderNumber(): Promise<string> {
+  const user = await getCurrentUser()
+  if (!user) return 'K-' + new Date().getFullYear() + '-0001'
+
   const settings = await getCompanySettings()
   if (!settings) return 'K-' + new Date().getFullYear() + '-0001'
+
   const prefix = settings.orderPrefix || 'K-'
-  const currentNumber = settings.nextOrderNumber || 1
   const year = new Date().getFullYear()
-  return `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+
+  const { data: existing } = await supabase
+    .from('projects')
+    .select('order_number')
+    .eq('user_id', user.id)
+
+  const used = new Set<number>()
+  for (const row of existing || []) {
+    const n = parseOrderNumberSegment(prefix, year, row.order_number ?? '')
+    if (n != null) used.add(n)
+  }
+
+  let n = 1
+  while (used.has(n)) n++
+
+  return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }
 
 // ============================================
