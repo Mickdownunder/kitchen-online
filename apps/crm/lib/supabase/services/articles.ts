@@ -331,6 +331,16 @@ export async function findOrCreateArticleFromItem(item: ItemLike): Promise<strin
     ? item.modelNumber
     : `ART-${Date.now().toString().slice(-8)}`
 
+  // Vor dem Anlegen: auch nach SKU suchen (Unique-Constraint), sonst Duplikat-Fehler beim Speichern
+  const { data: existingBySku } = await supabase
+    .from('articles')
+    .select('id')
+    .eq('sku', sku)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle()
+  if (existingBySku?.id) return existingBySku.id
+
   const newArticle = await createArticle({
     name: nameForMatch,
     description: desc,

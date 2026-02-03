@@ -28,7 +28,6 @@ type ProjectRow = Record<string, any>
 type InvoiceItemRow = Record<string, any>
 import { getCurrentUser } from './auth'
 import { getNextOrderNumber } from './company'
-import { findOrCreateArticleFromItem } from './articles'
 import { logger } from '@/lib/utils/logger'
 import {
   calculateItemTotalsFromNet,
@@ -208,24 +207,8 @@ export async function createProject(
         }
       }
 
-      // Fehlende Artikel im Artikelstamm anlegen und article_id setzen
-      const resolvedItems = await Promise.all(
-        project.items.map(async item => {
-          const articleId =
-            item.articleId ?? (await findOrCreateArticleFromItem({
-              description: item.description || '',
-              modelNumber: item.modelNumber,
-              manufacturer: item.manufacturer,
-              pricePerUnit: item.pricePerUnit,
-              purchasePricePerUnit: item.purchasePricePerUnit,
-              taxRate: item.taxRate,
-              unit: item.unit,
-            }))
-          return { ...item, articleId: articleId ?? undefined }
-        })
-      )
-
-      const itemsToInsert = resolvedItems.map(item => {
+      // Positionen nur im Auftrag speichern (kein Auto-Anlegen im Artikelstamm)
+      const itemsToInsert = project.items.map(item => {
         const taxRate = item.taxRate || 20
         const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1
         const pricePerUnit = item.pricePerUnit || 0
@@ -493,23 +476,7 @@ export async function updateProject(
         }
       }
 
-      // Fehlende Artikel im Artikelstamm anlegen und articleId setzen (wie bei createProject)
-      const resolvedItems = await Promise.all(
-        project.items.map(async item => {
-          const articleId =
-            item.articleId ?? (await findOrCreateArticleFromItem({
-              description: item.description || '',
-              modelNumber: item.modelNumber,
-              manufacturer: item.manufacturer,
-              pricePerUnit: item.pricePerUnit,
-              purchasePricePerUnit: item.purchasePricePerUnit,
-              taxRate: item.taxRate,
-              unit: item.unit,
-            }))
-          return { ...item, articleId: articleId ?? undefined }
-        })
-      )
-
+      // Positionen nur im Auftrag speichern (kein Auto-Anlegen im Artikelstamm)
       // Hole alle bestehenden Items für dieses Projekt
       const { data: existingItems, error: fetchError } = await supabase
         .from('invoice_items')
@@ -559,9 +526,9 @@ export async function updateProject(
         return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
       }
 
-      // Process each item: Update existing or Insert new (use resolvedItems for articleId)
-      for (let index = 0; index < resolvedItems.length; index++) {
-        const item = resolvedItems[index]
+      // Process each item: Update existing or Insert new
+      for (let index = 0; index < project.items.length; index++) {
+        const item = project.items[index]
         const taxRate = item.taxRate || 20
         const quantity = item.quantity || 1
         const pricePerUnit = item.pricePerUnit || 0
