@@ -284,17 +284,20 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
         const invoices = await getInvoices(project.id)
         invoices.forEach((invoice: Invoice) => {
           const isPartial = invoice.type === 'partial'
+          const isCredit = invoice.type === 'credit'
           allDocs.push({
             id: invoice.id,
             type: 'invoice',
-            title: isPartial
-              ? `Teilrechnung ${invoice.invoiceNumber}`
-              : `Schlussrechnung ${invoice.invoiceNumber}`,
+            title: isCredit
+              ? `Stornorechnung ${invoice.invoiceNumber}`
+              : isPartial
+                ? `Teilrechnung ${invoice.invoiceNumber}`
+                : `Schlussrechnung ${invoice.invoiceNumber}`,
             date: invoice.invoiceDate,
             number: invoice.invoiceNumber,
-            status: invoice.isPaid ? 'bezahlt' : 'offen',
+            status: isCredit ? 'storniert' : invoice.isPaid ? 'bezahlt' : 'offen',
             data: {
-              type: isPartial ? 'partial' : 'final',
+              type: isCredit ? 'credit' : isPartial ? 'partial' : 'final',
               invoice,
               // Für PDF-Kompatibilität
               payment: isPartial
@@ -530,13 +533,18 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
         })
 
         const invoiceData: InvoiceData = {
-          type: currentInvoice.type === 'partial' ? 'deposit' : 'final',
+          type: currentInvoice.type === 'credit' 
+            ? 'credit' 
+            : currentInvoice.type === 'partial' 
+              ? 'deposit' 
+              : 'final',
           invoiceNumber: currentInvoice.invoiceNumber,
           amount: currentInvoice.amount,
           date: currentInvoice.invoiceDate,
           description: currentInvoice.description,
           isPaid: currentInvoice.isPaid,
           paidDate: currentInvoice.paidDate,
+          originalInvoiceNumber: currentInvoice.originalInvoiceNumber,
           project: {
             customerName: project.customerName,
             address: project.address,
@@ -653,13 +661,18 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
         }
 
         const invoiceData: InvoiceData = {
-          type: currentInvoice.type === 'partial' ? 'deposit' : 'final',
+          type: currentInvoice.type === 'credit' 
+            ? 'credit' 
+            : currentInvoice.type === 'partial' 
+              ? 'deposit' 
+              : 'final',
           invoiceNumber: currentInvoice.invoiceNumber,
           amount: currentInvoice.amount,
           date: currentInvoice.invoiceDate,
           description: currentInvoice.description,
           isPaid: currentInvoice.isPaid,
           paidDate: currentInvoice.paidDate,
+          originalInvoiceNumber: currentInvoice.originalInvoiceNumber,
           project: {
             customerName: project.customerName,
             address: project.address,

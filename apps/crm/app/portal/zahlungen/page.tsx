@@ -19,7 +19,7 @@ import { useProject } from '../context/ProjectContext'
 interface Invoice {
   id: string
   invoice_number: string
-  type: 'partial' | 'final'
+  type: 'partial' | 'final' | 'credit'
   amount: number
   invoice_date: string
   due_date: string | null
@@ -127,8 +127,8 @@ function InvoiceCard({
         <div className="flex-1">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-semibold text-slate-900">
-                {invoice.type === 'final' ? 'Schlussrechnung' : 'Teilrechnung'}
+              <h3 className={`font-semibold ${invoice.type === 'credit' ? 'text-red-600' : 'text-slate-900'}`}>
+                {invoice.type === 'credit' ? 'Stornorechnung' : invoice.type === 'final' ? 'Schlussrechnung' : 'Teilrechnung'}
               </h3>
               <p className="text-sm text-slate-500">{invoice.invoice_number}</p>
             </div>

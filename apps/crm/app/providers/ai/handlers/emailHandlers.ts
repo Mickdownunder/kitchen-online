@@ -197,7 +197,7 @@ export async function handleSendEmail(ctx: HandlerContext): Promise<string> {
                     invoiceNumber: invoice.invoiceNumber,
                     amount: invoice.amount,
                     date: invoice.invoiceDate,
-                    type: invoice.type === 'final' ? 'final' : 'deposit',
+                    type: invoice.type === 'credit' ? 'credit' : invoice.type === 'final' ? 'final' : 'deposit',
                   },
                   project,
                 }),

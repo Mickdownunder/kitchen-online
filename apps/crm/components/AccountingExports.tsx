@@ -24,6 +24,7 @@ export interface InvoiceData {
   paidDate?: string
   projectId: string
   orderNumber: string
+  type?: 'partial' | 'final' | 'credit'
 }
 
 export interface SupplierInvoiceData {

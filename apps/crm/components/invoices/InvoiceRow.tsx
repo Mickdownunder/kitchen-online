@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { FileText, Printer, Mail, Clock, CheckCircle2, Check, X } from 'lucide-react'
+import { FileText, Printer, Mail, Clock, CheckCircle2, Check, X, Ban } from 'lucide-react'
 import type { ListInvoice } from '@/hooks/useInvoiceFilters'
 import type { CompanySettings } from '@/types'
 import {
@@ -28,6 +28,7 @@ interface InvoiceRowProps {
   onSetPaidDateInput: (date: string) => void
   onSetReminderDropdownOpen: (id: string | null) => void
   onSendReminder: (type: 'first' | 'second' | 'final') => void
+  onCancelInvoice?: () => void
 }
 
 /**
@@ -50,7 +51,9 @@ export const InvoiceRow = React.memo(function InvoiceRow({
   onSetPaidDateInput,
   onSetReminderDropdownOpen,
   onSendReminder,
+  onCancelInvoice,
 }: InvoiceRowProps) {
+  const isCredit = invoice.type === 'credit'
   // Neue Struktur: Daten direkt aus der Invoice
   const invoiceDate = invoice.invoiceDate || invoice.date
   const dueDate = invoice.dueDate
@@ -105,15 +108,17 @@ export const InvoiceRow = React.memo(function InvoiceRow({
       <td className="px-6 py-4 text-center">
         <span
           className={`rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-widest ${
-            invoice.type === 'partial'
-              ? 'bg-amber-50 text-amber-600'
-              : 'bg-indigo-50 text-indigo-600'
+            isCredit
+              ? 'bg-red-50 text-red-600'
+              : invoice.type === 'partial'
+                ? 'bg-amber-50 text-amber-600'
+                : 'bg-indigo-50 text-indigo-600'
           }`}
         >
-          {invoice.type === 'partial' ? 'Anzahlung' : 'Schluss'}
+          {isCredit ? 'Storno' : invoice.type === 'partial' ? 'Anzahlung' : 'Schluss'}
         </span>
       </td>
-      <td className="px-6 py-4 text-right font-black text-slate-900">
+      <td className={`px-6 py-4 text-right font-black ${isCredit ? 'text-red-600' : 'text-slate-900'}`}>
         {invoice.amount.toLocaleString('de-DE')} €
       </td>
       <td className="px-6 py-4 text-center">
@@ -246,6 +251,16 @@ export const InvoiceRow = React.memo(function InvoiceRow({
           >
             <Printer className="h-3.5 w-3.5 text-slate-600" />
           </button>
+          {/* Storno-Button - nur für nicht-Storno-Rechnungen */}
+          {!isCredit && onCancelInvoice && (
+            <button
+              onClick={onCancelInvoice}
+              className="rounded-xl bg-red-50 p-1.5 transition-all hover:bg-red-100"
+              title="Stornieren"
+            >
+              <Ban className="h-3.5 w-3.5 text-red-600" />
+            </button>
+          )}
           {showReminderDropdown && (
             <div className="relative">
               <button

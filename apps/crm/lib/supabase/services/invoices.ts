@@ -360,6 +360,204 @@ export async function deleteInvoice(id: string): Promise<void> {
 }
 
 // ============================================
+// STORNORECHNUNGEN (Credit Notes)
+// ============================================
+
+interface CreateCreditNoteParams {
+  invoiceId: string // ID der zu stornierenden Rechnung
+  partialAmount?: number // Optional: Teilstorno (Brutto-Betrag, positiv angeben!)
+  description?: string // Optional: Beschreibung
+  notes?: string // Optional: Notizen
+}
+
+/**
+ * Prüft ob eine Rechnung bereits (voll) storniert wurde
+ */
+export async function getExistingCreditNotes(originalInvoiceId: string): Promise<Invoice[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('original_invoice_id', originalInvoiceId)
+    .eq('type', 'credit')
+
+  if (error) {
+    logger.error('Error fetching credit notes', { component: 'invoices' }, error as Error)
+    return []
+  }
+
+  return (data || []).map(mapInvoiceFromDB)
+}
+
+/**
+ * Berechnet den noch stornierbaren Restbetrag einer Rechnung
+ * (Originalbetrag minus bereits stornierte Beträge)
+ */
+export async function getRemainingCancellableAmount(invoiceId: string): Promise<number> {
+  const invoice = await getInvoice(invoiceId)
+  if (!invoice) return 0
+
+  const creditNotes = await getExistingCreditNotes(invoiceId)
+  
+  // Summe der Stornos (negative Beträge) → Betrag wird positiv
+  const alreadyCancelled = creditNotes.reduce((sum, cn) => sum + Math.abs(cn.amount), 0)
+  
+  return Math.max(0, invoice.amount - alreadyCancelled)
+}
+
+/**
+ * Stornorechnung erstellen
+ * 
+ * WICHTIG: Erstellt eine Rechnung mit negativen Beträgen (Spiegelung der Originalrechnung)
+ * 
+ * @param params.invoiceId - ID der zu stornierenden Rechnung
+ * @param params.partialAmount - Optional: Betrag für Teilstorno (positiv angeben, wird negiert)
+ * @param params.description - Optional: Beschreibung für die Stornorechnung
+ * @returns Die erstellte Stornorechnung mit negativen Beträgen
+ */
+export async function createCreditNote(params: CreateCreditNoteParams): Promise<Invoice> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // 1. Originalrechnung laden
+  const originalInvoice = await getInvoice(params.invoiceId)
+  if (!originalInvoice) {
+    throw new Error('Originalrechnung nicht gefunden')
+  }
+
+  // 2. Prüfen ob Originalrechnung selbst eine Stornorechnung ist
+  if (originalInvoice.type === 'credit') {
+    throw new Error('Eine Stornorechnung kann nicht storniert werden')
+  }
+
+  // 3. Prüfen wieviel noch stornierbar ist
+  const remainingAmount = await getRemainingCancellableAmount(params.invoiceId)
+  
+  if (remainingAmount <= 0) {
+    throw new Error('Diese Rechnung wurde bereits vollständig storniert')
+  }
+
+  // 4. Storno-Betrag bestimmen (Vollstorno oder Teilstorno)
+  let cancelAmount: number
+  if (params.partialAmount !== undefined && params.partialAmount > 0) {
+    // Teilstorno
+    if (params.partialAmount > remainingAmount) {
+      throw new Error(
+        `Teilstorno-Betrag (${params.partialAmount.toFixed(2)}€) übersteigt den noch stornierbaren Betrag (${remainingAmount.toFixed(2)}€)`
+      )
+    }
+    cancelAmount = params.partialAmount
+  } else {
+    // Vollstorno: Restbetrag stornieren
+    cancelAmount = remainingAmount
+  }
+
+  // 5. Beträge berechnen (NEGATIV!)
+  // Wir berechnen proportional zum Originalbetrag
+  const proportion = cancelAmount / originalInvoice.amount
+  
+  const creditAmount = roundTo2Decimals(-cancelAmount) // Brutto negativ
+  const creditNetAmount = roundTo2Decimals(-originalInvoice.netAmount * proportion) // Netto negativ
+  const creditTaxAmount = roundTo2Decimals(creditAmount - creditNetAmount) // MwSt = Brutto - Netto (auch negativ)
+
+  // 6. Rechnungsnummer generieren
+  const invoiceNumber = await getNextInvoiceNumber()
+
+  // 7. Beschreibung erstellen
+  const isPartialCancel = cancelAmount < originalInvoice.amount
+  const defaultDescription = isPartialCancel
+    ? `Teilstorno zu ${originalInvoice.invoiceNumber} (${cancelAmount.toFixed(2)}€ von ${originalInvoice.amount.toFixed(2)}€)`
+    : `Stornorechnung zu ${originalInvoice.invoiceNumber}`
+
+  const invoiceDate = new Date().toISOString().split('T')[0]
+
+  // 8. Stornorechnung erstellen
+  const { data, error } = await supabase
+    .from('invoices')
+    .insert({
+      user_id: user.id,
+      project_id: originalInvoice.projectId,
+      invoice_number: invoiceNumber,
+      type: 'credit',
+      amount: creditAmount,
+      net_amount: creditNetAmount,
+      tax_amount: creditTaxAmount,
+      tax_rate: originalInvoice.taxRate, // Gleicher Steuersatz wie Original!
+      invoice_date: invoiceDate,
+      due_date: null, // Stornorechnungen haben kein Fälligkeitsdatum
+      description: params.description || defaultDescription,
+      notes: params.notes || `Storno erstellt am ${new Date().toLocaleDateString('de-AT')}`,
+      original_invoice_id: originalInvoice.id,
+      is_paid: true, // Stornorechnungen gelten als "abgeschlossen"
+      paid_date: invoiceDate,
+      reminders: [],
+    })
+    .select()
+    .single()
+
+  if (error) {
+    logger.error('Error creating credit note', { component: 'invoices' }, error as Error)
+    throw error
+  }
+
+  const creditNote = mapInvoiceFromDB(data)
+  // Originalrechnungsnummer für Anzeige setzen
+  creditNote.originalInvoiceNumber = originalInvoice.invoiceNumber
+
+  // 9. Audit logging
+  audit.invoiceCreated(creditNote.id, {
+    invoiceNumber: creditNote.invoiceNumber,
+    type: 'credit',
+    amount: creditNote.amount,
+    projectId: creditNote.projectId,
+    originalInvoiceId: originalInvoice.id,
+    originalInvoiceNumber: originalInvoice.invoiceNumber,
+  })
+
+  logger.info('Credit note created', {
+    component: 'invoices',
+    creditNoteId: creditNote.id,
+    creditNoteNumber: creditNote.invoiceNumber,
+    originalInvoiceId: originalInvoice.id,
+    originalInvoiceNumber: originalInvoice.invoiceNumber,
+    amount: creditNote.amount,
+    isPartialCancel,
+  })
+
+  return creditNote
+}
+
+/**
+ * Prüft ob eine Rechnung stornierbar ist
+ */
+export async function canCancelInvoice(invoiceId: string): Promise<{
+  canCancel: boolean
+  reason?: string
+  remainingAmount?: number
+}> {
+  const invoice = await getInvoice(invoiceId)
+  
+  if (!invoice) {
+    return { canCancel: false, reason: 'Rechnung nicht gefunden' }
+  }
+  
+  if (invoice.type === 'credit') {
+    return { canCancel: false, reason: 'Stornorechnungen können nicht storniert werden' }
+  }
+  
+  const remainingAmount = await getRemainingCancellableAmount(invoiceId)
+  
+  if (remainingAmount <= 0) {
+    return { canCancel: false, reason: 'Rechnung wurde bereits vollständig storniert' }
+  }
+  
+  return { canCancel: true, remainingAmount }
+}
+
+// ============================================
 // STATISTIK-FUNKTIONEN
 // ============================================
 
@@ -372,6 +570,8 @@ export async function getInvoiceStats(year: number): Promise<{
   totalOutstanding: number
   partialCount: number
   finalCount: number
+  creditCount: number
+  creditAmount: number
   paidCount: number
   overdueCount: number
 }> {
@@ -383,6 +583,8 @@ export async function getInvoiceStats(year: number): Promise<{
       totalOutstanding: 0,
       partialCount: 0,
       finalCount: 0,
+      creditCount: 0,
+      creditAmount: 0,
       paidCount: 0,
       overdueCount: 0,
     }
@@ -408,14 +610,18 @@ export async function getInvoiceStats(year: number): Promise<{
       totalOutstanding: 0,
       partialCount: 0,
       finalCount: 0,
+      creditCount: 0,
+      creditAmount: 0,
       paidCount: 0,
       overdueCount: 0,
     }
   }
 
   const invoices = data || []
+  const creditNotes = invoices.filter(inv => inv.type === 'credit')
 
   return {
+    // Hinweis: totalInvoiced enthält Stornos (negative Beträge werden subtrahiert)
     totalInvoiced: invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0),
     totalPaid: invoices.filter(inv => inv.is_paid).reduce((sum, inv) => sum + (inv.amount || 0), 0),
     totalOutstanding: invoices
@@ -423,6 +629,8 @@ export async function getInvoiceStats(year: number): Promise<{
       .reduce((sum, inv) => sum + (inv.amount || 0), 0),
     partialCount: invoices.filter(inv => inv.type === 'partial').length,
     finalCount: invoices.filter(inv => inv.type === 'final').length,
+    creditCount: creditNotes.length,
+    creditAmount: creditNotes.reduce((sum, inv) => sum + Math.abs(inv.amount || 0), 0),
     paidCount: invoices.filter(inv => inv.is_paid).length,
     overdueCount: invoices.filter(inv => !inv.is_paid && inv.due_date && inv.due_date < today)
       .length,
@@ -452,6 +660,8 @@ function mapInvoiceFromDB(dbInvoice: Record<string, any>): Invoice {
     description: dbInvoice.description || undefined,
     notes: dbInvoice.notes || undefined,
     scheduleType: dbInvoice.schedule_type || undefined,
+    originalInvoiceId: dbInvoice.original_invoice_id || undefined,
+    originalInvoiceNumber: dbInvoice.original_invoice_number || undefined, // Aus JOIN
     reminders: dbInvoice.reminders || [],
     overdueDays: calculateOverdueDays(dbInvoice),
     createdAt: dbInvoice.created_at,

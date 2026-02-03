@@ -59,7 +59,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine invoice type
-    const invoiceType = invoice.type || (invoice.invoiceNumber?.includes('A') ? 'deposit' : 'final')
+    const invoiceType = invoice.type === 'credit'
+      ? 'credit'
+      : invoice.type === 'partial'
+        ? 'deposit'
+        : invoice.type || (invoice.invoiceNumber?.includes('A') ? 'deposit' : 'final')
 
     // For final invoices, load prior partial invoices from DB
     let priorInvoices: {

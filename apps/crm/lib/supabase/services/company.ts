@@ -185,15 +185,14 @@ function mapCompanySettingsFromDB(db: Record<string, any>): CompanySettings {
 // ============================================
 
 /**
- * Extrahiert die laufende Nummer aus Rechnungsnummern wie "R-2026-0001" oder "R-2026-1001-A1".
- * Gibt null zurück, wenn das Format nicht passt.
+ * Extrahiert die laufende Nummer aus Rechnungsnummern.
+ * Unterstützt: R2026-1108, R-2026-1108, R-2026-1001-A1 (nimmt Basisnummer).
  */
-function parseInvoiceNumberSegment(prefix: string, year: number, invoiceNumber: string): number | null {
-  const pattern = `${prefix}${year}-`
-  if (!invoiceNumber || !invoiceNumber.startsWith(pattern)) return null
-  const rest = invoiceNumber.slice(pattern.length)
-  const numPart = rest.split('-')[0]
-  const n = parseInt(numPart, 10)
+function parseInvoiceNumberSegment(year: number, invoiceNumber: string): number | null {
+  if (!invoiceNumber?.trim()) return null
+  const match = invoiceNumber.match(new RegExp(`${year}-(\\d+)`))
+  if (!match) return null
+  const n = parseInt(match[1], 10)
   return Number.isNaN(n) ? null : n
 }
 
@@ -225,12 +224,14 @@ export async function getNextInvoiceNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseInvoiceNumberSegment(prefix, year, row.invoice_number ?? '')
+    const n = parseInvoiceNumberSegment(year, row.invoice_number ?? '')
     if (n != null) used.add(n)
   }
 
+  const maxUsed = used.size > 0 ? Math.max(...used) : 0
   let n = 1
-  while (used.has(n)) n++
+  while (n <= maxUsed && used.has(n)) n++
+  if (n > maxUsed) n = maxUsed + 1
 
   const invoiceNumber = `${prefix}${year}-${String(n).padStart(4, '0')}`
 
@@ -271,12 +272,14 @@ export async function peekNextInvoiceNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseInvoiceNumberSegment(prefix, year, row.invoice_number ?? '')
+    const n = parseInvoiceNumberSegment(year, row.invoice_number ?? '')
     if (n != null) used.add(n)
   }
 
+  const maxUsed = used.size > 0 ? Math.max(...used) : 0
   let n = 1
-  while (used.has(n)) n++
+  while (n <= maxUsed && used.has(n)) n++
+  if (n > maxUsed) n = maxUsed + 1
 
   return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }
@@ -286,14 +289,13 @@ export async function peekNextInvoiceNumber(): Promise<string> {
 // ============================================
 
 /**
- * Extrahiert die laufende Nummer aus Auftragsnummern wie "K-2026-0001" oder "K-2026-1001".
+ * Extrahiert die laufende Nummer aus Auftragsnummern (K2026-0001, K-2026-0001, etc.).
  */
-function parseOrderNumberSegment(prefix: string, year: number, orderNumber: string): number | null {
-  const pattern = `${prefix}${year}-`
-  if (!orderNumber || !orderNumber.startsWith(pattern)) return null
-  const rest = orderNumber.slice(pattern.length)
-  const numPart = rest.split('-')[0]
-  const n = parseInt(numPart, 10)
+function parseOrderNumberSegment(year: number, orderNumber: string): number | null {
+  if (!orderNumber?.trim()) return null
+  const match = orderNumber.match(new RegExp(`${year}-(\\d+)`))
+  if (!match) return null
+  const n = parseInt(match[1], 10)
   return Number.isNaN(n) ? null : n
 }
 
@@ -325,12 +327,14 @@ export async function getNextOrderNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseOrderNumberSegment(prefix, year, row.order_number ?? '')
+    const n = parseOrderNumberSegment(year, row.order_number ?? '')
     if (n != null) used.add(n)
   }
 
+  const maxUsed = used.size > 0 ? Math.max(...used) : 0
   let n = 1
-  while (used.has(n)) n++
+  while (n <= maxUsed && used.has(n)) n++
+  if (n > maxUsed) n = maxUsed + 1
 
   const orderNumber = `${prefix}${year}-${String(n).padStart(4, '0')}`
 
@@ -370,12 +374,14 @@ export async function peekNextOrderNumber(): Promise<string> {
 
   const used = new Set<number>()
   for (const row of existing || []) {
-    const n = parseOrderNumberSegment(prefix, year, row.order_number ?? '')
+    const n = parseOrderNumberSegment(year, row.order_number ?? '')
     if (n != null) used.add(n)
   }
 
+  const maxUsed = used.size > 0 ? Math.max(...used) : 0
   let n = 1
-  while (used.has(n)) n++
+  while (n <= maxUsed && used.has(n)) n++
+  if (n > maxUsed) n = maxUsed + 1
 
   return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }

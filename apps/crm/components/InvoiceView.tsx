@@ -33,7 +33,8 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
   const [projectData, setProjectData] = useState<CustomerProject | null>(invoiceProp.project || null)
   const project = projectData
   const isDeposit = invoice.type === 'partial'
-  const items = isDeposit ? [] : project?.items || []
+  const isCredit = invoice.type === 'credit'
+  const items = (isDeposit || isCredit) ? [] : project?.items || []
 
   // Lade frische Rechnungsdaten beim Mount
   useEffect(() => {
@@ -176,13 +177,18 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
       })
 
       const invoiceData: InvoiceData = {
-        type: currentInvoice.type === 'partial' ? 'deposit' : currentInvoice.type,
+        type: currentInvoice.type === 'credit' 
+          ? 'credit' 
+          : currentInvoice.type === 'partial' 
+            ? 'deposit' 
+            : 'final',
         invoiceNumber: currentInvoice.invoiceNumber,
         amount: currentInvoice.amount,
         date: currentInvoice.invoiceDate || invoice.date,
         description: currentInvoice.description,
         isPaid: currentInvoice.isPaid,
         paidDate: currentInvoice.paidDate,
+        originalInvoiceNumber: currentInvoice.originalInvoiceNumber,
         project: {
           customerName: project?.customerName || '',
           address: project?.address,
@@ -281,9 +287,14 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
           <div className="mb-8 border-b border-slate-200 pb-6">
             <div className="flex items-end justify-between">
               <div>
-                <h1 className="text-3xl font-black tracking-tight text-slate-900">
-                  {isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
+                <h1 className={`text-3xl font-black tracking-tight ${isCredit ? 'text-red-600' : 'text-slate-900'}`}>
+                  {isCredit ? 'STORNORECHNUNG' : isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
                 </h1>
+                {isCredit && invoice.originalInvoiceNumber && (
+                  <p className="mt-1 font-semibold text-red-500">
+                    Korrektur zu Rechnung {invoice.originalInvoiceNumber}
+                  </p>
+                )}
                 {invoice.description && (
                   <p className="mt-1 text-slate-600">{invoice.description}</p>
                 )}

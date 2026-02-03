@@ -25,6 +25,7 @@ interface InvoiceTableProps {
   onSetPaidDateInput: (date: string) => void
   onSetReminderDropdownOpen: (id: string | null) => void
   onSendReminder: (invoice: ListInvoice, type: 'first' | 'second' | 'final') => void
+  onCancelInvoice?: (invoice: ListInvoice) => void
   onLoadMore: () => void
 }
 
@@ -47,6 +48,7 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
   onSetPaidDateInput,
   onSetReminderDropdownOpen,
   onSendReminder,
+  onCancelInvoice,
   onLoadMore,
 }) => {
   if (groupedInvoices.length === 0) {
@@ -153,6 +155,7 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                         onSetPaidDateInput={onSetPaidDateInput}
                         onSetReminderDropdownOpen={onSetReminderDropdownOpen}
                         onSendReminder={type => onSendReminder(invoice, type)}
+                        onCancelInvoice={onCancelInvoice ? () => onCancelInvoice(invoice) : undefined}
                       />
                     ))}
                   </tbody>

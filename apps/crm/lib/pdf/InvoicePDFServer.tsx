@@ -333,7 +333,8 @@ const DEFAULT_BANK = {
 
 export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ invoice }) => {
   const isDeposit = invoice.type === 'deposit'
-  const items = isDeposit ? [] : invoice.project.items || []
+  const isCredit = invoice.type === 'credit'
+  const items = (isDeposit || isCredit) ? [] : invoice.project.items || []
   const paidDateValue =
     invoice.paidDate || (invoice as { paid_date?: string | null }).paid_date || undefined
   const isPaid =
@@ -370,9 +371,19 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
   const restNet = projectNetTotal - partialPaymentsNet
   const restTax = projectTaxTotal - partialPaymentsTax
 
+  // Für Stornorechnung: Beträge sind bereits negativ, direkte Berechnung
   // Für Anzahlungsrechnung: einfache Berechnung
-  const netAmount = isDeposit ? invoice.amount / 1.2 : restNet
-  const taxAmount = isDeposit ? invoice.amount - netAmount : restTax
+  // Für Schlussrechnung: Restbetrag
+  const netAmount = isCredit 
+    ? invoice.amount / 1.2 
+    : isDeposit 
+      ? invoice.amount / 1.2 
+      : restNet
+  const taxAmount = isCredit 
+    ? invoice.amount - netAmount 
+    : isDeposit 
+      ? invoice.amount - netAmount 
+      : restTax
 
   // Use company data from settings or fallback
   const company: Partial<CompanySettings> = invoice.company || DEFAULT_COMPANY
@@ -431,11 +442,16 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <View>
-              <View style={styles.titleBadge}>
+              <View style={[styles.titleBadge, isCredit && { backgroundColor: '#dc2626' }]}>
                 <Text style={styles.titleBadgeText}>
-                  {isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
+                  {isCredit ? 'STORNORECHNUNG' : isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
                 </Text>
               </View>
+              {isCredit && invoice.originalInvoiceNumber && (
+                <Text style={[styles.invoiceSubtitle, { color: '#dc2626', fontWeight: 600 }]}>
+                  Korrektur zu Rechnung {invoice.originalInvoiceNumber}
+                </Text>
+              )}
               {invoice.description && (
                 <Text style={styles.invoiceSubtitle}>{invoice.description}</Text>
               )}
@@ -478,7 +494,21 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
               <Text style={[styles.tableHeaderCell, styles.colManufacturer]}>Hersteller</Text>
             </View>
 
-            {isDeposit ? (
+            {isCredit ? (
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.colQty]}>1</Text>
+                <Text style={[styles.tableCell, styles.colModel]}>-</Text>
+                <View style={styles.colDesc}>
+                  <Text style={[styles.tableCellBold, { color: '#dc2626' }]}>
+                    {invoice.description || `Stornierung der Rechnung ${invoice.originalInvoiceNumber || ''}`}
+                  </Text>
+                  <Text style={styles.tableCell}>
+                    Korrekturrechnung gemäß § 11 UStG
+                  </Text>
+                </View>
+                <Text style={[styles.tableCell, styles.colManufacturer]}>-</Text>
+              </View>
+            ) : isDeposit ? (
               <View style={styles.tableRow}>
                 <Text style={[styles.tableCell, styles.colQty]}>1</Text>
                 <Text style={[styles.tableCell, styles.colModel]}>-</Text>
@@ -613,6 +643,27 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
                   )}
                 </View>
               </>
+            ) : isCredit ? (
+              <>
+                {/* Stornorechnung - negative Beträge */}
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>Netto</Text>
+                  <Text style={[styles.totalsValue, { color: '#dc2626' }]}>{formatCurrency(netAmount)}</Text>
+                </View>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>MwSt. (20%)</Text>
+                  <Text style={[styles.totalsValue, { color: '#dc2626' }]}>{formatCurrency(taxAmount)}</Text>
+                </View>
+                <View style={[styles.totalsFinal, { backgroundColor: '#fef2f2' }]}>
+                  <Text style={styles.totalsFinalLabel}>Stornobetrag (Brutto)</Text>
+                  <Text style={[styles.totalsFinalValue, { color: '#dc2626' }]}>{formatCurrency(invoice.amount)}</Text>
+                </View>
+                {invoice.originalInvoiceNumber && (
+                  <Text style={[styles.paidNote, { color: '#64748b', marginTop: 8 }]}>
+                    Dieser Betrag wird mit Rechnung {invoice.originalInvoiceNumber} verrechnet.
+                  </Text>
+                )}
+              </>
             ) : (
               <>
                 {/* Anzahlungsrechnung oder Schlussrechnung ohne Anzahlungen */}
@@ -642,26 +693,28 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
           </View>
         </View>
 
-        {/* Bank Info + Zahlungsbedingungen – am Ende nach allen Beträgen */}
-        <View style={styles.bankSection} wrap={false}>
-          <View style={styles.bankColumn}>
-            <Text style={styles.bankTitle}>Bankverbindung</Text>
-            <Text style={styles.bankText}>{bank.accountHolder || companyFullName}</Text>
-            <Text style={styles.bankTextBold}>IBAN: {bank.iban}</Text>
-            {bank.bic && <Text style={styles.bankText}>BIC: {bank.bic}</Text>}
-            {bank.bankName && <Text style={styles.bankText}>{bank.bankName}</Text>}
-          </View>
-          <View style={styles.bankColumn}>
-            <Text style={styles.bankTitle}>Zahlungsbedingungen</Text>
-            <Text style={styles.bankText}>
-              Zahlbar innerhalb von {company.defaultPaymentTerms || 14} Tagen
-            </Text>
-            <Text style={styles.bankText}>ohne Abzug.</Text>
+        {/* Bank Info + Zahlungsbedingungen – nicht bei Stornorechnungen */}
+        {!isCredit && (
+          <View style={styles.bankSection} wrap={false}>
+            <View style={styles.bankColumn}>
+              <Text style={styles.bankTitle}>Bankverbindung</Text>
+              <Text style={styles.bankText}>{bank.accountHolder || companyFullName}</Text>
+              <Text style={styles.bankTextBold}>IBAN: {bank.iban}</Text>
+              {bank.bic && <Text style={styles.bankText}>BIC: {bank.bic}</Text>}
+              {bank.bankName && <Text style={styles.bankText}>{bank.bankName}</Text>}
+            </View>
+            <View style={styles.bankColumn}>
+              <Text style={styles.bankTitle}>Zahlungsbedingungen</Text>
+              <Text style={styles.bankText}>
+                Zahlbar innerhalb von {company.defaultPaymentTerms || 14} Tagen
+              </Text>
+              <Text style={styles.bankText}>ohne Abzug.</Text>
             <Text style={[styles.bankText, { marginTop: 4 }]}>
               Verwendungszweck: <Text style={styles.bankTextBold}>{invoice.invoiceNumber}</Text>
             </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Footer – am Ende nach Bank/Zahlungsbedingungen */}
         <View style={styles.footer} wrap={false}>
@@ -675,7 +728,9 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
             {company.court && ` · ${company.court}`}
           </Text>
           <Text style={styles.footerThank}>
-            {company.invoiceFooterText || 'Vielen Dank für Ihren Auftrag!'}
+            {isCredit 
+              ? 'Diese Stornorechnung wurde maschinell erstellt.' 
+              : (company.invoiceFooterText || 'Vielen Dank für Ihren Auftrag!')}
           </Text>
         </View>
         <Text

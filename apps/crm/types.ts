@@ -314,12 +314,16 @@ export interface PaymentSchedule {
 // RECHNUNGS-SYSTEM (Invoices) - Neue Struktur
 // ============================================
 
-export type InvoiceType = 'partial' | 'final'
+export type InvoiceType = 'partial' | 'final' | 'credit'
 export type InvoiceScheduleType = 'first' | 'second' | 'manual'
 
 /**
  * Invoice - Zentrale Rechnungsentität
  * Ersetzt die JSONB-Felder partialPayments und finalInvoice in projects
+ * 
+ * Bei type='credit' (Stornorechnung):
+ * - Alle Beträge (amount, netAmount, taxAmount) sind NEGATIV
+ * - originalInvoiceId verweist auf die stornierte Rechnung
  */
 export interface Invoice {
   id: string
@@ -328,9 +332,9 @@ export interface Invoice {
 
   // Rechnungsnummer (fortlaufend, eindeutig)
   invoiceNumber: string
-  type: InvoiceType // 'partial' = Anzahlung, 'final' = Schlussrechnung
+  type: InvoiceType // 'partial' = Anzahlung, 'final' = Schlussrechnung, 'credit' = Stornorechnung
 
-  // Beträge
+  // Beträge (bei Stornorechnung negativ!)
   amount: number // Brutto
   netAmount: number // Netto
   taxAmount: number // MwSt
@@ -345,9 +349,13 @@ export interface Invoice {
   paidDate?: string
 
   // Beschreibung
-  description?: string // z.B. "40% Anzahlung", "Schlussrechnung"
+  description?: string // z.B. "40% Anzahlung", "Schlussrechnung", "Stornorechnung zu RE-2025-0042"
   notes?: string
   scheduleType?: InvoiceScheduleType // 'first', 'second', 'manual'
+
+  // Stornierung: Referenz zur Originalrechnung
+  originalInvoiceId?: string // Bei Stornorechnung: ID der stornierten Rechnung
+  originalInvoiceNumber?: string // Für Anzeige (aus JOIN oder manuell gesetzt)
 
   // Mahnungen
   reminders?: Reminder[]

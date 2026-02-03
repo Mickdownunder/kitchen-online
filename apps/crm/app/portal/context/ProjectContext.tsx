@@ -46,6 +46,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setError('Nicht eingeloggt')
         setProjects([])
+        setSelectedProjectId(null)
         return
       }
 
@@ -71,8 +72,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
       setProjects(loadedProjects)
 
-      // Ausgewähltes Projekt setzen
-      if (loadedProjects.length > 0) {
+      // Ausgewähltes Projekt setzen oder zurücksetzen
+      if (loadedProjects.length === 0) {
+        setSelectedProjectId(null)
+      } else {
         // Versuche gespeicherte Auswahl zu laden (nur im Browser)
         const storage =
           typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function'
@@ -95,9 +98,26 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Initial laden
+  // Initial laden + bei Auth-Änderung neu laden (z. B. nach Login)
+  // Ohne diesen Listener: Provider mountet auf Login-Seite, loadProjects läuft ohne User → projects = [].
+  // Nach Login bleibt Provider gemountet, Effect läuft nicht erneut → projects bleibt leer, andere Seiten warten ewig auf selectedProject.
   useEffect(() => {
     loadProjects()
+  }, [loadProjects])
+
+  useEffect(() => {
+    const { data: { subscription } } = portalSupabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        loadProjects()
+      }
+      if (event === 'SIGNED_OUT') {
+        setProjects([])
+        setSelectedProjectId(null)
+        setError('Nicht eingeloggt')
+        setIsLoading(false)
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [loadProjects])
 
   // Projekt wechseln

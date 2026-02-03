@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Invoice as DBInvoice, CustomerProject } from '@/types'
 
-export type InvoiceFilterType = 'all' | 'deposit' | 'final' | 'partial'
+export type InvoiceFilterType = 'all' | 'deposit' | 'final' | 'partial' | 'credit'
 export type InvoiceFilterStatus = 'all' | 'paid' | 'sent'
 
 /**

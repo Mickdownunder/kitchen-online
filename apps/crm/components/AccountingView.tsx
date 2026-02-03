@@ -67,7 +67,7 @@ interface InvoiceData {
   paidDate?: string
   projectId: string
   orderNumber: string
-  type: 'partial' | 'final'
+  type: 'partial' | 'final' | 'credit'
 }
 
 type AccountingTab = 'overview' | 'outgoing' | 'incoming' | 'bank'
@@ -1265,39 +1265,53 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredInvoices.length > 0 ? (
-                    filteredInvoices.map((invoice, index) => (
-                      <tr key={index} className="transition-colors hover:bg-slate-50">
-                        <td className="px-4 py-4 font-bold text-slate-900">
-                          {invoice.invoiceNumber}
-                        </td>
-                        <td className="px-4 py-4 text-slate-600">
-                          {new Date(invoice.date).toLocaleDateString('de-DE')}
-                        </td>
-                        <td className="px-4 py-4 text-slate-900">{invoice.customerName}</td>
-                        <td className="px-4 py-4 text-right text-slate-600">
-                          {formatCurrency(invoice.netAmount)} €
-                        </td>
-                        <td className="px-4 py-4 text-right text-slate-600">
-                          {formatCurrency(invoice.taxAmount)} €
-                        </td>
-                        <td className="px-4 py-4 text-right font-black text-slate-900">
-                          {formatCurrency(invoice.grossAmount)} €
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          {invoice.isPaid ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Bezahlt
+                    filteredInvoices.map((invoice, index) => {
+                      const isCredit = invoice.type === 'credit'
+                      return (
+                        <tr key={index} className={`transition-colors hover:bg-slate-50 ${isCredit ? 'bg-red-50/50' : ''}`}>
+                          <td className="px-4 py-4">
+                            <span className={`font-bold ${isCredit ? 'text-red-600' : 'text-slate-900'}`}>
+                              {invoice.invoiceNumber}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
-                              <AlertCircle className="h-3 w-3" />
-                              Offen
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                            {isCredit && (
+                              <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase text-red-600">
+                                Storno
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-slate-600">
+                            {new Date(invoice.date).toLocaleDateString('de-DE')}
+                          </td>
+                          <td className="px-4 py-4 text-slate-900">{invoice.customerName}</td>
+                          <td className={`px-4 py-4 text-right ${isCredit ? 'text-red-600' : 'text-slate-600'}`}>
+                            {formatCurrency(invoice.netAmount)} €
+                          </td>
+                          <td className={`px-4 py-4 text-right ${isCredit ? 'text-red-600' : 'text-slate-600'}`}>
+                            {formatCurrency(invoice.taxAmount)} €
+                          </td>
+                          <td className={`px-4 py-4 text-right font-black ${isCredit ? 'text-red-600' : 'text-slate-900'}`}>
+                            {formatCurrency(invoice.grossAmount)} €
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            {isCredit ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700">
+                                Storno
+                              </span>
+                            ) : invoice.isPaid ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Bezahlt
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
+                                <AlertCircle className="h-3 w-3" />
+                                Offen
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
                   ) : (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-slate-400">

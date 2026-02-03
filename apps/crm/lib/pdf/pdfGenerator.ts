@@ -26,7 +26,7 @@ export interface InvoiceInput {
   amount: number
   date: string
   description?: string
-  type?: 'deposit' | 'final' | 'partial'
+  type?: 'deposit' | 'final' | 'partial' | 'credit'
   dueDate?: string
   isPaid?: boolean
   paidDate?: string
@@ -145,13 +145,15 @@ async function generateInvoicePDF(
 ): Promise<GeneratedPDF> {
   // Determine invoice type
   const invoiceType =
-    invoice.type === 'deposit' || invoice.type === 'partial'
-      ? 'deposit'
-      : invoice.type === 'final'
-        ? 'final'
-        : invoice.invoiceNumber?.includes('A')
-          ? 'deposit'
-          : 'final'
+    invoice.type === 'credit'
+      ? 'credit'
+      : invoice.type === 'deposit' || invoice.type === 'partial'
+        ? 'deposit'
+        : invoice.type === 'final'
+          ? 'final'
+          : invoice.invoiceNumber?.includes('A')
+            ? 'deposit'
+            : 'final'
 
   // For final invoices, load prior partial invoices from DB if not provided
   let priorPayments = priorInvoices || []

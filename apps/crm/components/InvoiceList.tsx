@@ -17,6 +17,7 @@ import {
   ReminderPreviewModal,
   type ReminderPreviewData,
 } from './invoices/ReminderPreviewModal'
+import { CreditNoteModal } from './invoices/CreditNoteModal'
 import { useToast } from '@/components/providers/ToastProvider'
 import { logger } from '@/lib/utils/logger'
 
@@ -28,7 +29,7 @@ interface InvoiceListProps {
 const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) => {
   const { success, error: showError } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'deposit' | 'final'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'deposit' | 'final' | 'credit'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'sent'>('all')
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth() + 1)
@@ -52,6 +53,9 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   const [showDuePayments, setShowDuePayments] = useState(false)
   const [dbInvoices, setDbInvoices] = useState<DBInvoice[]>([])
   const [loadingInvoices, setLoadingInvoices] = useState(true)
+  // Storno-Dialog State
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [invoiceToCancel, setInvoiceToCancel] = useState<ListInvoice | null>(null)
 
   // Lade Rechnungen aus der Datenbank
   // silent=true: Kein Lade-Spinner, Liste bleibt sichtbar (für Live-Updates bei Status-Änderung)
@@ -160,6 +164,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   const { groupedInvoices, expandedGroups, toggleGroup } = useGroupedInvoices(filteredInvoices)
 
   const stats = useMemo(() => {
+    // Stornos haben negative Beträge, werden automatisch subtrahiert
     const total = filteredInvoices.reduce((acc, inv) => acc + inv.amount, 0)
     const paid = filteredInvoices
       .filter(inv => inv.isPaid)
@@ -168,12 +173,17 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     // 'partial' in neuer DB-Struktur = 'deposit' in UI
     const depositCount = filteredInvoices.filter(inv => inv.type === 'partial').length
     const finalCount = filteredInvoices.filter(inv => inv.type === 'final').length
+    const creditCount = filteredInvoices.filter(inv => inv.type === 'credit').length
     const invoicedRevenue = filteredInvoices
       .filter(inv => inv.type === 'final')
       .reduce((acc, inv) => acc + inv.amount, 0)
     const depositRevenue = filteredInvoices
       .filter(inv => inv.type === 'partial')
       .reduce((acc, inv) => acc + inv.amount, 0)
+    // Storno-Summe (negativer Betrag, daher Math.abs für Anzeige)
+    const creditAmount = filteredInvoices
+      .filter(inv => inv.type === 'credit')
+      .reduce((acc, inv) => acc + Math.abs(inv.amount), 0)
 
     return {
       total,
@@ -181,9 +191,11 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       outstanding,
       depositCount,
       finalCount,
+      creditCount,
       totalCount: filteredInvoices.length,
       invoicedRevenue,
       depositRevenue,
+      creditAmount,
     }
   }, [filteredInvoices])
 
@@ -406,6 +418,10 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
           onSetPaidDateInput={setPaidDateInput}
           onSetReminderDropdownOpen={setReminderDropdownOpen}
           onSendReminder={handleOpenReminderPreview}
+          onCancelInvoice={(invoice) => {
+            setInvoiceToCancel(invoice)
+            setCancelModalOpen(true)
+          }}
           onLoadMore={() => setVisibleRows(v => v + 400)}
         />
       </div>
@@ -432,6 +448,21 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
         previewData={reminderPreviewData}
         loading={reminderPreviewLoading}
         onSend={handleConfirmSendReminder}
+      />
+
+      {/* Storno-Dialog */}
+      <CreditNoteModal
+        isOpen={cancelModalOpen}
+        invoice={invoiceToCancel}
+        onClose={() => {
+          setCancelModalOpen(false)
+          setInvoiceToCancel(null)
+        }}
+        onSuccess={async () => {
+          success('Stornorechnung erfolgreich erstellt')
+          await loadInvoices(true)
+          if (onProjectUpdate) onProjectUpdate()
+        }}
       />
     </div>
   )

@@ -145,7 +145,11 @@ export async function POST(request: NextRequest) {
 
     if (documentType === 'invoice' && invoice) {
       // Generate invoice PDF
-      const invoiceType = invoice.type === 'partial' ? 'deposit' : 'final'
+      const invoiceType = invoice.type === 'credit' 
+        ? 'credit' 
+        : invoice.type === 'partial' 
+          ? 'deposit' 
+          : 'final'
 
       // For final invoices, load prior partial invoices
       let priorInvoices: {
@@ -214,7 +218,11 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       pdfBuffer = await renderToBuffer(pdfElement as any)
       
-      const invoiceTypeLabel = invoice.type === 'partial' ? 'Teilrechnung' : 'Schlussrechnung'
+      const invoiceTypeLabel = invoice.type === 'credit' 
+        ? 'Stornorechnung' 
+        : invoice.type === 'partial' 
+          ? 'Teilrechnung' 
+          : 'Schlussrechnung'
       fileName = `${invoiceTypeLabel}_${invoice.invoiceNumber.replace(/\//g, '-')}.pdf`
       portalType = 'RECHNUNGEN'
 

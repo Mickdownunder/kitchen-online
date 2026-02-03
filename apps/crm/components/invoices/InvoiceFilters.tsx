@@ -6,8 +6,8 @@ import { Search, Calendar } from 'lucide-react'
 interface InvoiceFiltersProps {
   searchTerm: string
   setSearchTerm: (value: string) => void
-  filterType: 'all' | 'deposit' | 'final'
-  setFilterType: (value: 'all' | 'deposit' | 'final') => void
+  filterType: 'all' | 'deposit' | 'final' | 'credit'
+  setFilterType: (value: 'all' | 'deposit' | 'final' | 'credit') => void
   filterStatus: 'all' | 'paid' | 'sent'
   setFilterStatus: (value: 'all' | 'paid' | 'sent') => void
   selectedYear: number | 'all'
@@ -119,6 +119,16 @@ export const InvoiceFilters: React.FC<InvoiceFiltersProps> = ({
           }`}
         >
           Schluss
+        </button>
+        <button
+          onClick={() => setFilterType('credit')}
+          className={`whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+            filterType === 'credit'
+              ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg'
+              : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'
+          }`}
+        >
+          Storno
         </button>
       </div>
 
