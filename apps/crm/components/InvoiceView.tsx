@@ -16,7 +16,8 @@ interface InvoiceViewProps {
 }
 
 const formatCurrency = (amount: number): string => {
-  return `${amount.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  // \u00A0 = Non-Breaking Space verhindert Zeilenumbruch zwischen Betrag und €
+  return `${amount.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`
 }
 
 const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack }) => {
