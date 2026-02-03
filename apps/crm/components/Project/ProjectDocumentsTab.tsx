@@ -521,6 +521,7 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
 
         if (!currentInvoice) {
           logger.error('[ProjectDocumentsTab] No invoice data available for PDF', { component: 'ProjectDocumentsTab' })
+          alert('Rechnungsdaten konnten nicht geladen werden. Bitte versuchen Sie es erneut.')
           return
         }
 
@@ -657,6 +658,7 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
 
         if (!currentInvoice) {
           logger.error('[ProjectDocumentsTab] No invoice data available for PDF preview', { component: 'ProjectDocumentsTab' })
+          alert('Rechnungsdaten konnten nicht geladen werden. Bitte versuchen Sie es erneut.')
           return
         }
 
