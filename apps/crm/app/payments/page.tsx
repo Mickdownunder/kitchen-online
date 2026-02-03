@@ -110,17 +110,19 @@ function PaymentsPageContent() {
   )
 
   const handlePercentChange = useCallback(
-    (value: string) => {
+    (value: string, fromAmountField?: boolean) => {
       setPercentInput(value)
+      // Nur Betrag neu berechnen wenn User im PROZENT-Feld tippt – nicht wenn wir Prozent aus Betrag ableiten
+      if (fromAmountField) return
       const percent = parseFloat(value) || 0
       if (!isNaN(percent) && percent >= 0 && percent <= 100 && calculations.grossTotal > 0) {
         const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)
-        setNewPaymentForm({ ...newPaymentForm, amount })
+        setNewPaymentForm(prev => ({ ...prev, amount }))
       } else if (value === '' || value === '.') {
-        setNewPaymentForm({ ...newPaymentForm, amount: undefined })
+        setNewPaymentForm(prev => ({ ...prev, amount: undefined }))
       }
     },
-    [calculations.grossTotal, newPaymentForm]
+    [calculations.grossTotal]
   )
 
   const handlePercentBlur = useCallback(() => {
@@ -135,8 +137,9 @@ function PaymentsPageContent() {
   }, [percentInput])
 
   const handleEditingPercentChange = useCallback(
-    (value: string) => {
+    (value: string, fromAmountField?: boolean) => {
       setEditingPercentInput(value)
+      if (fromAmountField) return
       const percent = parseFloat(value) || 0
       if (!isNaN(percent) && percent >= 0 && percent <= 100 && calculations.grossTotal > 0) {
         const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)

@@ -29,7 +29,7 @@ interface AppContextType {
   // Projects
   projects: CustomerProject[]
   setProjects: React.Dispatch<React.SetStateAction<CustomerProject[]>>
-  refreshProjects: () => Promise<void>
+  refreshProjects: (force?: boolean, silent?: boolean) => Promise<void>
   isLoading: boolean
 
   // Delivery Notes (cached globally)
@@ -77,10 +77,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hasInitialLoad = useRef(false)
 
   // Load projects from Supabase - with smart caching
+  // silent=true: Kein globaler Lade-Spinner (für Live-Updates z.B. nach Rechnungs-Status-Änderung)
   const refreshProjects = useCallback(
-    async (force = false) => {
+    async (force = false, silent = false) => {
       await refreshProjectsWithCache({
         force,
+        silent,
         lastRefresh: lastProjectsRefresh,
         setLastRefresh: setLastProjectsRefresh,
         isRefreshingRef: isRefreshingProjects,
@@ -207,7 +209,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         refreshAppointments: () => refreshAppointments(true),
         handleFunctionCall,
         addDocumentToProject,
-        refreshProjects: () => refreshProjects(true), // Force refresh when explicitly called
+        refreshProjects: (force = true, silent = false) => refreshProjects(force, silent),
         isLoading,
         // Delivery notes
         supplierDeliveryNotes,

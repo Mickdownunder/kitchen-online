@@ -10,7 +10,7 @@ interface PaymentFormProps {
   percentInput: string
   grossTotal: number
   onFormChange: (data: Partial<PartialPayment>) => void
-  onPercentChange: (value: string) => void
+  onPercentChange: (value: string, fromAmountField?: boolean) => void
   onPercentBlur: () => void
   onQuickPercent: (percent: number) => void
   onSave: () => void
@@ -32,10 +32,11 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
     initialValue: formData.amount,
     onValueChange: value => {
       onFormChange({ ...formData, amount: value })
+      // Prozent nur zur Anzeige – nicht Betrag neu berechnen (sonst würde 8000 → 7999,55)
       if (grossTotal > 0 && value != null && value > 0) {
-        onPercentChange(((value / grossTotal) * 100).toFixed(1))
+        onPercentChange(((value / grossTotal) * 100).toFixed(1), true)
       } else {
-        onPercentChange('')
+        onPercentChange('', true)
       }
     },
     allowEmpty: true,

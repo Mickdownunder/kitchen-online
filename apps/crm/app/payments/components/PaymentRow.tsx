@@ -17,7 +17,7 @@ interface PaymentRowProps {
   onCancel: () => void
   onDelete: () => void
   onFormChange: (data: Partial<PartialPayment>) => void
-  onPercentChange: (value: string) => void
+  onPercentChange: (value: string, fromAmountField?: boolean) => void
   onPercentBlur: () => void
   onQuickPercent: (percent: number) => void
   onMarkAsPaid: (paidDate: string) => void
@@ -53,10 +53,11 @@ export const PaymentRow: React.FC<PaymentRowProps> = ({
     onValueChange: value => {
       if (!paymentData) return
       onFormChange({ ...paymentData, amount: value })
+      // Prozent nur zur Anzeige – nicht Betrag neu berechnen
       if (grossTotal > 0 && value != null && value > 0) {
-        onPercentChange(((value / grossTotal) * 100).toFixed(1))
+        onPercentChange(((value / grossTotal) * 100).toFixed(1), true)
       } else {
-        onPercentChange('')
+        onPercentChange('', true)
       }
     },
     allowEmpty: true,

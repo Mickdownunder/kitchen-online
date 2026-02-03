@@ -61,7 +61,10 @@ function InvoicesPageContent() {
   // Standard: Rechnungsliste anzeigen
   return (
     <>
-      <InvoiceList projects={projects} onProjectUpdate={refreshProjects} />
+      <InvoiceList
+        projects={projects}
+        onProjectUpdate={() => refreshProjects(true, true)}
+      />
       <AIAgentButton />
     </>
   )

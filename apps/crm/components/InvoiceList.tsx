@@ -43,15 +43,16 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   const [loadingInvoices, setLoadingInvoices] = useState(true)
 
   // Lade Rechnungen aus der Datenbank
-  const loadInvoices = useCallback(async () => {
-    setLoadingInvoices(true)
+  // silent=true: Kein Lade-Spinner, Liste bleibt sichtbar (für Live-Updates bei Status-Änderung)
+  const loadInvoices = useCallback(async (silent = false) => {
+    if (!silent) setLoadingInvoices(true)
     try {
       const invoices = await getInvoicesWithProject()
       setDbInvoices(invoices)
     } catch (error) {
       logger.error('Error loading invoices', { component: 'InvoiceList' }, error as Error)
     } finally {
-      setLoadingInvoices(false)
+      if (!silent) setLoadingInvoices(false)
     }
   }, [])
 
@@ -110,8 +111,8 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     try {
       await markInvoicePaid(invoice.id, paidDateInput)
       setMarkingPaidId(null)
-      // Neu laden
-      await loadInvoices()
+      // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
+      await loadInvoices(true)
       if (onProjectUpdate) onProjectUpdate()
     } catch (error) {
       logger.error('Error marking as paid', { component: 'InvoiceList' }, error as Error)
@@ -125,8 +126,8 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     setSaving(true)
     try {
       await markInvoiceUnpaid(invoice.id)
-      // Neu laden
-      await loadInvoices()
+      // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
+      await loadInvoices(true)
       if (onProjectUpdate) onProjectUpdate()
     } catch (error) {
       logger.error('Error unmarking as paid', { component: 'InvoiceList' }, error as Error)
