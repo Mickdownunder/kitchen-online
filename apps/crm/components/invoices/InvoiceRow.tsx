@@ -185,13 +185,15 @@ export const InvoiceRow = React.memo(function InvoiceRow({
           <div className="flex min-w-[90px] flex-col items-center gap-0.5">
             <span
               className={`text-xs font-medium ${
-                overdueDays !== null && overdueDays > 0
-                  ? 'text-red-600'
-                  : overdueDays !== null && overdueDays <= 0 && overdueDays >= -7
-                    ? 'text-amber-600'
-                    : overdueDays !== null && overdueDays < -7
-                      ? 'text-emerald-600'
-                      : 'text-slate-500'
+                invoice.isPaid
+                  ? 'text-slate-500'
+                  : overdueDays !== null && overdueDays > 0
+                    ? 'text-red-600'
+                    : overdueDays !== null && overdueDays <= 0 && overdueDays >= -7
+                      ? 'text-amber-600'
+                      : overdueDays !== null && overdueDays < -7
+                        ? 'text-emerald-600'
+                        : 'text-slate-500'
               }`}
             >
               {new Date(dueDate).toLocaleDateString('de-DE', {
@@ -200,12 +202,12 @@ export const InvoiceRow = React.memo(function InvoiceRow({
                 year: '2-digit',
               })}
             </span>
-            {overdueDays !== null && overdueDays > 0 && (
+            {!invoice.isPaid && overdueDays !== null && overdueDays > 0 && (
               <span className="text-[9px] font-bold text-red-600">
                 {overdueDays} Tag{overdueDays !== 1 ? 'e' : ''} überfällig
               </span>
             )}
-            {overdueDays !== null && overdueDays <= 0 && overdueDays >= -7 && (
+            {!invoice.isPaid && overdueDays !== null && overdueDays <= 0 && overdueDays >= -7 && (
               <span className="text-[9px] font-medium text-amber-600">
                 In {Math.abs(overdueDays)} Tag{Math.abs(overdueDays) !== 1 ? 'en' : ''}
               </span>

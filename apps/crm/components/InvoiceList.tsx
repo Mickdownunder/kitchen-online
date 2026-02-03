@@ -13,6 +13,10 @@ import { getCompanySettings } from '@/lib/supabase/services/company'
 import { InvoiceFilters } from './invoices/InvoiceFilters'
 import { InvoiceStatsCards } from './invoices/InvoiceStatsCards'
 import { InvoiceTable } from './invoices/InvoiceTable'
+import {
+  ReminderPreviewModal,
+  type ReminderPreviewData,
+} from './invoices/ReminderPreviewModal'
 import { useToast } from '@/components/providers/ToastProvider'
 import { logger } from '@/lib/utils/logger'
 
@@ -37,6 +41,13 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null)
   const [reminderDropdownOpen, setReminderDropdownOpen] = useState<string | null>(null)
   const [sendingReminder, setSendingReminder] = useState<string | null>(null)
+  const [reminderModalOpen, setReminderModalOpen] = useState(false)
+  const [reminderPreviewData, setReminderPreviewData] = useState<ReminderPreviewData | null>(null)
+  const [reminderPreviewLoading, setReminderPreviewLoading] = useState(false)
+  const [reminderModalInvoice, setReminderModalInvoice] = useState<ListInvoice | null>(null)
+  const [reminderModalType, setReminderModalType] = useState<'first' | 'second' | 'final' | null>(
+    null
+  )
   const [activeTab, setActiveTab] = useState<'invoices' | 'reminders'>('invoices')
   const [showDuePayments, setShowDuePayments] = useState(false)
   const [dbInvoices, setDbInvoices] = useState<DBInvoice[]>([])
@@ -187,16 +198,20 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     setTimeout(() => window.print(), 500)
   }
 
-  const handleSendReminder = async (
+  // Vorschau laden und Modal öffnen – keine E-Mail wird gesendet
+  const handleOpenReminderPreview = async (
     invoice: ListInvoice,
     reminderType: 'first' | 'second' | 'final'
   ) => {
-    setSendingReminder(invoice.id)
     setReminderDropdownOpen(null)
+    setReminderModalInvoice(invoice)
+    setReminderModalType(reminderType)
+    setReminderPreviewData(null)
+    setReminderModalOpen(true)
+    setReminderPreviewLoading(true)
 
     try {
-      // Verwende die Invoice-ID direkt (neue Struktur)
-      const response = await fetch('/api/reminders/send', {
+      const response = await fetch('/api/reminders/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -205,24 +220,66 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
           reminderType,
         }),
       })
-
       const data = await response.json()
 
+      if (!response.ok) {
+        throw new Error(data.error || 'Vorschau konnte nicht geladen werden')
+      }
+      setReminderPreviewData(data)
+    } catch (error: unknown) {
+      logger.error('Error loading reminder preview', { component: 'InvoiceList' }, error as Error)
+      showError(
+        error instanceof Error ? error.message : 'Vorschau konnte nicht geladen werden'
+      )
+      setReminderModalOpen(false)
+    } finally {
+      setReminderPreviewLoading(false)
+    }
+  }
+
+  // Nach Prüfung in Modal: E-Mail tatsächlich senden
+  const handleConfirmSendReminder = async (payload: {
+    recipientEmail: string
+    subject: string
+    text: string
+    html: string
+  }) => {
+    if (!reminderModalInvoice || !reminderModalType) return
+
+    setSendingReminder(reminderModalInvoice.id)
+    try {
+      const response = await fetch('/api/reminders/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: reminderModalInvoice.projectId,
+          invoiceId: reminderModalInvoice.id,
+          reminderType: reminderModalType,
+          recipientEmail: payload.recipientEmail,
+          subject: payload.subject,
+          html: payload.html,
+          text: payload.text,
+        }),
+      })
+
+      const data = await response.json()
       if (!response.ok) {
         throw new Error(data.error || 'Fehler beim Senden der Mahnung')
       }
 
       success(
-        `${reminderType === 'first' ? '1.' : reminderType === 'second' ? '2.' : 'Letzte'} Mahnung erfolgreich gesendet!`
+        `${reminderModalType === 'first' ? '1.' : reminderModalType === 'second' ? '2.' : 'Letzte'} Mahnung erfolgreich gesendet!`
       )
-      if (onProjectUpdate) onProjectUpdate()
-    } catch (error: unknown) {
-      logger.error('Error sending reminder', { component: 'InvoiceList' }, error as Error)
-      showError(
-        `Fehler beim Senden der Mahnung: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
-      )
-    } finally {
+      setReminderModalOpen(false)
+      setReminderModalInvoice(null)
+      setReminderModalType(null)
+      setReminderPreviewData(null)
       setSendingReminder(null)
+      if (onProjectUpdate) onProjectUpdate()
+      await loadInvoices(true)
+    } catch (err) {
+      setSendingReminder(null)
+      throw err
     }
   }
 
@@ -348,7 +405,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
           onSetMarkingPaidId={setMarkingPaidId}
           onSetPaidDateInput={setPaidDateInput}
           onSetReminderDropdownOpen={setReminderDropdownOpen}
-          onSendReminder={handleSendReminder}
+          onSendReminder={handleOpenReminderPreview}
           onLoadMore={() => setVisibleRows(v => v + 400)}
         />
       </div>
@@ -363,6 +420,19 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
           </button>
         </div>
       )}
+
+      <ReminderPreviewModal
+        isOpen={reminderModalOpen}
+        onClose={() => {
+          setReminderModalOpen(false)
+          setReminderModalInvoice(null)
+          setReminderModalType(null)
+          setReminderPreviewData(null)
+        }}
+        previewData={reminderPreviewData}
+        loading={reminderPreviewLoading}
+        onSend={handleConfirmSendReminder}
+      />
     </div>
   )
 }

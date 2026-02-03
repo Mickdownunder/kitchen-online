@@ -10,6 +10,19 @@ import { Reminder } from '@/types'
 import { generatePDF } from '@/lib/pdf/pdfGenerator'
 import { getCompanySettings } from '@/lib/supabase/services/company'
 
+function textToHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  return escaped.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('')
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+}
+
 /**
  * API-Route: Mahnung per E-Mail mit PDF versenden
  *
@@ -55,7 +68,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { projectId, invoiceId, reminderType, recipientEmail } = body
+    const {
+      projectId,
+      invoiceId,
+      reminderType,
+      recipientEmail: bodyRecipientEmail,
+      subject: customSubject,
+      html: customHtml,
+      text: customText,
+    } = body
 
     if (!projectId || !invoiceId || !reminderType) {
       apiLogger.error(new Error('Missing required fields'), 400)
@@ -133,8 +154,8 @@ export async function POST(request: NextRequest) {
     const dueDate = invoiceForReminder.dueDate || invoiceForReminder.date
     const overdueDays = calculateOverdueDays(dueDate) || 0
 
-    // Bestimme E-Mail-Adresse
-    const email = recipientEmail || project.email
+    // Bestimme E-Mail-Adresse (Vorschau-Bestätigung kann eigene Adresse übergeben)
+    const email = bodyRecipientEmail || project.email
     if (!email) {
       return NextResponse.json(
         {
@@ -143,6 +164,29 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
+    }
+
+    // E-Mail-Inhalt: Vorschau-Overrides oder generiertes Template
+    const companyName =
+      companySettings?.displayName || companySettings?.companyName || 'Ihr Unternehmen'
+    let subject: string
+    let html: string
+    let text: string
+    if (customSubject != null && (customHtml != null || customText != null)) {
+      subject = customSubject
+      html = customHtml ?? textToHtml(customText ?? '')
+      text = customText ?? stripHtml(customHtml ?? '')
+    } else {
+      const emailTemplate = reminderTemplate(
+        project,
+        invoiceForReminder,
+        reminderType as 'first' | 'second' | 'final',
+        overdueDays,
+        companyName
+      )
+      subject = emailTemplate.subject
+      html = emailTemplate.html
+      text = emailTemplate.text
     }
 
     // Generiere Mahnungs-PDF
@@ -167,26 +211,13 @@ export async function POST(request: NextRequest) {
       // Weiter ohne PDF
     }
 
-    // Hole Company Name für Email-Template
-    const companyName =
-      companySettings?.displayName || companySettings?.companyName || 'Ihr Unternehmen'
-
-    // Generiere E-Mail-Template
-    const emailTemplate = reminderTemplate(
-      project,
-      invoiceForReminder,
-      reminderType as 'first' | 'second' | 'final',
-      overdueDays,
-      companyName
-    )
-
-    // Versende E-Mail
+    // Versende E-Mail (subject/html/text aus Vorschau oder Template)
     try {
       await sendEmail({
         to: email,
-        subject: emailTemplate.subject,
-        html: emailTemplate.html,
-        text: emailTemplate.text,
+        subject,
+        html,
+        text,
         attachments: pdfBase64
           ? [
               {
