@@ -288,16 +288,20 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
           <div className="mb-8 border-b border-slate-200 pb-6">
             <div className="flex items-end justify-between">
               <div>
-                <h1 className={`text-3xl font-black tracking-tight ${isCredit ? 'text-red-600' : 'text-slate-900'}`}>
+                <span className={`inline-block rounded border-2 px-4 py-2 text-2xl font-black tracking-tight ${
+                  isCredit 
+                    ? 'border-red-500 bg-red-50 text-red-600' 
+                    : 'border-amber-500 bg-amber-50 text-slate-900'
+                }`}>
                   {isCredit ? 'STORNORECHNUNG' : isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
-                </h1>
+                </span>
                 {isCredit && invoice.originalInvoiceNumber && (
-                  <p className="mt-1 font-semibold text-red-500">
+                  <p className="mt-2 font-semibold text-red-500">
                     Korrektur zu Rechnung {invoice.originalInvoiceNumber}
                   </p>
                 )}
                 {invoice.description && (
-                  <p className="mt-1 text-slate-600">{invoice.description}</p>
+                  <p className="mt-2 text-slate-600">{invoice.description}</p>
                 )}
               </div>
               <div className="text-right">
