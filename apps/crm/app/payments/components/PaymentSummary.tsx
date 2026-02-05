@@ -43,18 +43,22 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
 
   return (
     <>
-      {/* Summary Section */}
-      {partialPayments.length > 0 && (
+      {/* Summary Section – bei Anzahlungen oder wenn direkt Schlussrechnung möglich */}
+      {(partialPayments.length > 0 || (remaining > 0 && !finalInvoice)) && (
         <div className="mt-6 rounded-xl border-2 border-slate-200 bg-slate-50 p-6">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-bold text-slate-700">Teilzahlungen gesamt:</span>
-            <span className="text-lg font-black text-slate-900">
-              {totalPartial.toLocaleString('de-AT')} €
-            </span>
-          </div>
+          {partialPayments.length > 0 && (
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-700">Teilzahlungen gesamt:</span>
+              <span className="text-lg font-black text-slate-900">
+                {totalPartial.toLocaleString('de-AT')} €
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-slate-700">
-              Verbleibend für Schlussrechnung:
+              {partialPayments.length === 0
+                ? 'Auftragswert (direkt Schlussrechnung):'
+                : 'Verbleibend für Schlussrechnung:'}
             </span>
             <span className="text-xl font-black text-amber-600">
               {remaining.toLocaleString('de-AT')} €
@@ -151,7 +155,6 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
           </div>
         </div>
       ) : (
-        partialPayments.length > 0 &&
         remaining > 0 && (
           <div className="mt-6 rounded-xl border-2 border-purple-200 bg-purple-50/50 p-6">
             <div className="mb-4">
@@ -181,11 +184,18 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
               <ReceiptText className="h-5 w-5" />
               {hasUnpaidPayments
                 ? 'Schlussrechnung (erst nach Bezahlung aller Anzahlungen möglich)'
-                : `Schlussrechnung erzeugen (${remaining.toLocaleString('de-AT')} €)`}
+                : partialPayments.length === 0
+                  ? `Direkt Schlussrechnung (ohne Anzahlung) – ${remaining.toLocaleString('de-AT')} €`
+                  : `Schlussrechnung erzeugen (${remaining.toLocaleString('de-AT')} €)`}
             </button>
             {hasUnpaidPayments && (
               <p className="mt-2 text-center text-xs text-amber-600">
                 ⚠️ Bitte markieren Sie zuerst alle Anzahlungen als bezahlt
+              </p>
+            )}
+            {partialPayments.length === 0 && !hasUnpaidPayments && (
+              <p className="mt-2 text-center text-xs text-slate-500">
+                Für kleine Aufträge ohne Anzahlungsplan
               </p>
             )}
           </div>

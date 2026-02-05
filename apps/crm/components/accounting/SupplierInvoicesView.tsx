@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Plus,
   Search,
-  Filter,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -400,6 +399,16 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
     return { tax, gross }
   }, [formData.netAmount, formData.taxRate])
 
+  // Skonto-Betrag neu berechnen – ab 5 aufrunden, bis 4 abrunden (456,657 → 456,66; 456,654 → 456,65)
+  React.useEffect(() => {
+    const pct = formData.skontoPercent
+    const gross = calculatedAmounts.gross
+    if (pct != null && pct > 0 && gross > 0) {
+      const amount = Math.round(gross * (pct / 100) * 100) / 100
+      setFormData(prev => (prev.skontoAmount === amount ? prev : { ...prev, skontoAmount: amount }))
+    }
+  }, [calculatedAmounts.gross, formData.skontoPercent])
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -456,47 +465,52 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-col gap-3 lg:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 transform text-slate-400" />
           <input
             type="text"
             placeholder="Suche nach Lieferant oder Rechnungsnummer..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-12 pr-4 text-sm font-medium transition-all focus:border-amber-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 transform rounded p-1 hover:bg-slate-100"
+            >
+              <X className="h-4 w-4 text-slate-400" />
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="h-5 w-5 text-slate-400" />
-          <select
-            value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value)}
-            className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold focus:border-amber-500 focus:outline-none"
-          >
-            <option value="all">Alle Kategorien</option>
-            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-            {customCategories.map(c => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value as 'all' | 'paid' | 'open' | 'overdue')}
-            className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold focus:border-amber-500 focus:outline-none"
-          >
-            <option value="all">Alle Status</option>
-            <option value="paid">Bezahlt</option>
-            <option value="open">Offen</option>
-            <option value="overdue">Überfällig</option>
-          </select>
-        </div>
+        <select
+          value={filterCategory}
+          onChange={e => setFilterCategory(e.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+        >
+          <option value="all">Alle Kategorien</option>
+          {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+          {customCategories.map(c => (
+            <option key={c.id} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value as 'all' | 'paid' | 'open' | 'overdue')}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+        >
+          <option value="all">Alle Status</option>
+          <option value="paid">Bezahlt</option>
+          <option value="open">Offen</option>
+          <option value="overdue">Überfällig</option>
+        </select>
       </div>
 
       {/* Invoice List */}
@@ -944,14 +958,21 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                       max="100"
                       step="0.01"
                       value={formData.skontoPercent ?? ''}
-                      onChange={e =>
+                      onChange={e => {
+                        const pct = e.target.value ? parseFloat(e.target.value) : undefined
+                        const gross = calculatedAmounts.gross
+                        const amount =
+                          pct != null && gross > 0
+                            ? Math.round(gross * (pct / 100) * 100) / 100
+                            : undefined
                         setFormData({
                           ...formData,
-                          skontoPercent: e.target.value ? parseFloat(e.target.value) : undefined,
+                          skontoPercent: pct,
+                          skontoAmount: amount,
                         })
-                      }
+                      }}
                       className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 font-medium transition-all focus:border-amber-500 focus:outline-none"
-                      placeholder="z. B. 2"
+                      placeholder="z. B. 6"
                     />
                   </div>
                   <div>

@@ -551,8 +551,8 @@ function PaymentsPageContent() {
                     )}
                   </div>
 
-                  {/* Summary and Final Invoice */}
-                  {partialPayments.length > 0 && (
+                  {/* Summary and Final Invoice – auch bei 0 Anzahlungen (Direkt Schlussrechnung) */}
+                  {calculations.grossTotal > 0 && (
                     <PaymentSummary
                       partialPayments={partialPayments.map(inv => ({
                         id: inv.id,
