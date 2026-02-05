@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { DeliveryNote, CustomerProject } from '@/types'
 import { getDeliveryNotes, getProjects } from '@/lib/supabase/services'
 import { logger } from '@/lib/utils/logger'
-import { Package, Search, Upload, CheckCircle2, AlertCircle, Clock, FileText } from 'lucide-react'
+import { Package, Search, Upload, CheckCircle2, AlertCircle, Clock, FileText, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import DeliveryNoteDetail from './DeliveryNoteDetail'
 import DeliveryNoteUpload from './DeliveryNoteUpload'
 
@@ -47,6 +47,20 @@ export default function DeliveryNoteList() {
     const matchesStatus = statusFilter === 'all' || note.status === statusFilter
 
     return matchesSearch && matchesStatus
+  })
+
+  const sortedNotes = [...filteredNotes].sort((a, b) => {
+    let cmp = 0
+    if (sortField === 'supplierName') {
+      cmp = (a.supplierName || '').localeCompare(b.supplierName || '')
+    } else if (sortField === 'number') {
+      cmp = (a.supplierDeliveryNoteNumber || '').localeCompare(b.supplierDeliveryNoteNumber || '')
+    } else if (sortField === 'date') {
+      cmp = new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime()
+    } else {
+      cmp = (a.status || '').localeCompare(b.status || '')
+    }
+    return sortDirection === 'asc' ? cmp : -cmp
   })
 
   const getStatusIcon = (status: string) => {
@@ -133,6 +147,33 @@ export default function DeliveryNoteList() {
           <option value="processed">Verarbeitet</option>
           <option value="completed">Abgeschlossen</option>
         </select>
+        <div className="flex items-center gap-2">
+          {(['date', 'supplierName', 'number', 'status'] as const).map(field => (
+            <button
+              key={field}
+              onClick={() => handleSort(field)}
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                sortField === field
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+              }`}
+            >
+              {field === 'date' && 'Datum'}
+              {field === 'supplierName' && 'Lieferant'}
+              {field === 'number' && 'Nummer'}
+              {field === 'status' && 'Status'}
+              {sortField === field ? (
+                sortDirection === 'asc' ? (
+                  <ArrowUp className="h-3 w-3" />
+                ) : (
+                  <ArrowDown className="h-3 w-3" />
+                )
+              ) : (
+                <ArrowUpDown className="h-3 w-3 text-slate-400" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* List */}
@@ -144,7 +185,7 @@ export default function DeliveryNoteList() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {filteredNotes.map(note => {
+            {sortedNotes.map(note => {
               const project = note.matchedProjectId
                 ? projects.find(p => p.id === note.matchedProjectId)
                 : null

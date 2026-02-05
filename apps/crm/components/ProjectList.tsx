@@ -19,6 +19,9 @@ import {
   Package,
   UserPlus,
   Briefcase,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import {
   CustomerProject,
@@ -81,6 +84,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const [isScanning, setIsScanning] = useState(false)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [visibleRows, setVisibleRows] = useState(200)
+  type ProjectSortField = 'customerName' | 'orderNumber' | 'date' | 'totalAmount'
+  const [sortField, setSortField] = useState<ProjectSortField>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   // ==========================================================================
   // Data State
@@ -181,12 +187,43 @@ const ProjectList: React.FC<ProjectListProps> = ({
     selectedMonth,
   })
 
+  const handleSort = (field: ProjectSortField) => {
+    if (sortField === field) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedProjects = useMemo(() => {
+    const sorted = [...filteredProjects]
+    const getProjectDate = (p: CustomerProject) =>
+      p.orderDate || p.measurementDate || p.offerDate || p.createdAt || ''
+    sorted.sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'customerName') {
+        cmp = (a.customerName || '').localeCompare(b.customerName || '')
+      } else if (sortField === 'orderNumber') {
+        cmp = (a.orderNumber || '').localeCompare(b.orderNumber || '')
+      } else if (sortField === 'date') {
+        const da = new Date(getProjectDate(a)).getTime()
+        const db = new Date(getProjectDate(b)).getTime()
+        cmp = da - db
+      } else if (sortField === 'totalAmount') {
+        cmp = (a.totalAmount || 0) - (b.totalAmount || 0)
+      }
+      return sortDirection === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }, [filteredProjects, sortField, sortDirection])
+
   // Keep rendering fast with large datasets: paginate rendered rows
   useEffect(() => {
     setVisibleRows(200)
-  }, [searchTerm, filterType, selectedYear, selectedMonth])
+  }, [searchTerm, filterType, selectedYear, selectedMonth, sortField, sortDirection])
 
-  const { groupedProjects, expandedGroups, toggleGroup } = useGroupedProjects(filteredProjects)
+  const { groupedProjects, expandedGroups, toggleGroup } = useGroupedProjects(sortedProjects)
 
   // ==========================================================================
   // Memoized stats calculations for Stats Cards (performance optimization)
@@ -834,20 +871,76 @@ const ProjectList: React.FC<ProjectListProps> = ({
                         <table className="w-full">
                           <thead className="border-t border-slate-100 bg-slate-50/50">
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                                Kunde
+                              <th
+                                className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                                onClick={() => handleSort('customerName')}
+                              >
+                                <div className="flex items-center gap-2">
+                                  Kunde
+                                  {sortField === 'customerName' ? (
+                                    sortDirection === 'asc' ? (
+                                      <ArrowUp className="h-3 w-3 text-amber-500" />
+                                    ) : (
+                                      <ArrowDown className="h-3 w-3 text-amber-500" />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                                  )}
+                                </div>
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                                Auftragsnummer
+                              <th
+                                className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                                onClick={() => handleSort('orderNumber')}
+                              >
+                                <div className="flex items-center gap-2">
+                                  Auftragsnummer
+                                  {sortField === 'orderNumber' ? (
+                                    sortDirection === 'asc' ? (
+                                      <ArrowUp className="h-3 w-3 text-amber-500" />
+                                    ) : (
+                                      <ArrowDown className="h-3 w-3 text-amber-500" />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                                  )}
+                                </div>
                               </th>
                               <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
                                 Status
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                                Datum
+                              <th
+                                className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                                onClick={() => handleSort('date')}
+                              >
+                                <div className="flex items-center gap-2">
+                                  Datum
+                                  {sortField === 'date' ? (
+                                    sortDirection === 'asc' ? (
+                                      <ArrowUp className="h-3 w-3 text-amber-500" />
+                                    ) : (
+                                      <ArrowDown className="h-3 w-3 text-amber-500" />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                                  )}
+                                </div>
                               </th>
-                              <th className="px-6 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                                Betrag
+                              <th
+                                className="cursor-pointer px-6 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                                onClick={() => handleSort('totalAmount')}
+                              >
+                                <div className="flex items-end justify-end gap-2">
+                                  Betrag
+                                  {sortField === 'totalAmount' ? (
+                                    sortDirection === 'asc' ? (
+                                      <ArrowUp className="h-3 w-3 text-amber-500" />
+                                    ) : (
+                                      <ArrowDown className="h-3 w-3 text-amber-500" />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                                  )}
+                                </div>
                               </th>
                               <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
                                 Workflow

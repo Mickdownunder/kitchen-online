@@ -1,10 +1,29 @@
 'use client'
 
 import React from 'react'
-import { ChevronDown, ChevronRight, ReceiptText } from 'lucide-react'
+import { ChevronDown, ChevronRight, ReceiptText, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import type { ListInvoice } from '@/hooks/useInvoiceFilters'
 import type { CompanySettings } from '@/types'
 import { InvoiceRow } from './InvoiceRow'
+
+export type InvoiceSortField = 'invoiceNumber' | 'customer' | 'amount' | 'date'
+
+const SortIcon = ({
+  field,
+  sortField,
+  sortDirection,
+}: {
+  field: InvoiceSortField
+  sortField: InvoiceSortField
+  sortDirection: 'asc' | 'desc'
+}) => {
+  if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-slate-400" />
+  return sortDirection === 'asc' ? (
+    <ArrowUp className="h-3 w-3 text-amber-500" />
+  ) : (
+    <ArrowDown className="h-3 w-3 text-amber-500" />
+  )
+}
 
 interface InvoiceTableProps {
   groupedInvoices: [string, ListInvoice[]][]
@@ -17,6 +36,9 @@ interface InvoiceTableProps {
   saving: boolean
   sendingReminder: string | null
   reminderDropdownOpen: string | null
+  sortField: InvoiceSortField
+  sortDirection: 'asc' | 'desc'
+  onSort: (field: InvoiceSortField) => void
   onView: (invoice: ListInvoice) => void
   onPrint: (invoice: ListInvoice) => void
   onMarkAsPaid: (invoice: ListInvoice) => void
@@ -40,6 +62,9 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
   saving,
   sendingReminder,
   reminderDropdownOpen,
+  sortField,
+  sortDirection,
+  onSort,
   onView,
   onPrint,
   onMarkAsPaid,
@@ -107,23 +132,47 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 <table className="w-full">
                   <thead className="border-t border-slate-100 bg-slate-50/50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                        Rechnungsnummer
+                      <th
+                        className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => onSort('invoiceNumber')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Rechnungsnummer
+                          <SortIcon field="invoiceNumber" sortField={sortField} sortDirection={sortDirection} />
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                        Kunde / Auftrag
+                      <th
+                        className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => onSort('customer')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Kunde / Auftrag
+                          <SortIcon field="customer" sortField={sortField} sortDirection={sortDirection} />
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
                         Typ
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                        Betrag
+                      <th
+                        className="cursor-pointer px-6 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => onSort('amount')}
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          Betrag
+                          <SortIcon field="amount" sortField={sortField} sortDirection={sortDirection} />
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Datum
+                      <th
+                        className="cursor-pointer px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => onSort('date')}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          Datum
+                          <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
+                        </div>
                       </th>
                       <th className="whitespace-nowrap px-3 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
                         Fälligkeitsdatum

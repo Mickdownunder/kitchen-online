@@ -15,15 +15,7 @@ export function useGroupedInvoices(filteredInvoices: ListInvoice[]) {
       groups.get(key)!.push(invoice)
     })
 
-    // Sort invoices within each group by date (newest first)
-    groups.forEach(invoices => {
-      invoices.sort((a, b) => {
-        const dateA = a.invoiceDate || a.date
-        const dateB = b.invoiceDate || b.date
-        return new Date(dateB).getTime() - new Date(dateA).getTime()
-      })
-    })
-
+    // Order within each group = order in input (caller sorts before grouping)
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filteredInvoices])
 

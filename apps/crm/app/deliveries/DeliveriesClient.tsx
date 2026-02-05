@@ -8,6 +8,8 @@ import {
   Search,
   Filter,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   FolderOpen,
   Upload,
   Eye,
@@ -40,9 +42,31 @@ export default function DeliveriesClient() {
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth() + 1)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<
-    'date_desc' | 'date_asc' | 'number_asc' | 'number_desc' | 'status_asc' | 'status_desc'
-  >('date_desc')
+  type DeliverySortField = 'date' | 'number' | 'status'
+  const [sortField, setSortField] = useState<DeliverySortField>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  const handleSort = (field: DeliverySortField) => {
+    if (sortField === field) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sort: 'date_desc' | 'date_asc' | 'number_asc' | 'number_desc' | 'status_asc' | 'status_desc' =
+    sortField === 'date'
+      ? sortDirection === 'desc'
+        ? 'date_desc'
+        : 'date_asc'
+      : sortField === 'number'
+        ? sortDirection === 'asc'
+          ? 'number_asc'
+          : 'number_desc'
+        : sortDirection === 'asc'
+          ? 'status_asc'
+          : 'status_desc'
 
   const [showUpload, setShowUpload] = useState(false)
   const [visibleCount, setVisibleCount] = useState(120)
@@ -75,7 +99,7 @@ export default function DeliveriesClient() {
   // Reset pagination when switching tabs or filters
   useEffect(() => {
     setVisibleCount(120)
-  }, [activeTab, selectedYear, selectedMonth, statusFilter, sort, search])
+  }, [activeTab, selectedYear, selectedMonth, statusFilter, sortField, sortDirection, search])
 
   const yearsAvailable = useMemo(() => {
     const years = new Set<number>()
@@ -435,30 +459,30 @@ export default function DeliveriesClient() {
           </select>
 
           <div className="flex items-center gap-2">
-            <ArrowUpDown className="h-4 w-4 text-slate-400" />
-            <select
-              value={sort}
-              onChange={e =>
-                setSort(
-                  e.target.value as
-                    | 'date_desc'
-                    | 'date_asc'
-                    | 'number_asc'
-                    | 'number_desc'
-                    | 'status_asc'
-                    | 'status_desc'
-                )
-              }
-              className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
-              title="Sortierung"
-            >
-              <option value="date_desc">Datum: neu → alt</option>
-              <option value="date_asc">Datum: alt → neu</option>
-              <option value="number_asc">Nummer: A → Z</option>
-              <option value="number_desc">Nummer: Z → A</option>
-              <option value="status_asc">Status: A → Z</option>
-              <option value="status_desc">Status: Z → A</option>
-            </select>
+            {(['date', 'number', 'status'] as const).map(field => (
+              <button
+                key={field}
+                onClick={() => handleSort(field)}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                  sortField === field
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                }`}
+              >
+                {field === 'date' && 'Datum'}
+                {field === 'number' && 'Nummer'}
+                {field === 'status' && 'Status'}
+                {sortField === field ? (
+                  sortDirection === 'asc' ? (
+                    <ArrowUp className="h-3 w-3" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3" />
+                  )
+                ) : (
+                  <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </div>

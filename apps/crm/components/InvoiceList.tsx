@@ -28,6 +28,8 @@ interface InvoiceListProps {
 
 const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) => {
   const { success, error: showError } = useToast()
+  const [sortField, setSortField] = useState<'invoiceNumber' | 'customer' | 'amount' | 'date'>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'deposit' | 'final' | 'credit'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'sent'>('all')
@@ -161,7 +163,38 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     selectedMonth,
   })
 
-  const { groupedInvoices, expandedGroups, toggleGroup } = useGroupedInvoices(filteredInvoices)
+  const handleInvoiceSort = (field: 'invoiceNumber' | 'customer' | 'amount' | 'date') => {
+    if (sortField === field) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedInvoices = useMemo(() => {
+    const sorted = [...filteredInvoices]
+    sorted.sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'invoiceNumber') {
+        cmp = (a.invoiceNumber || '').localeCompare(b.invoiceNumber || '')
+      } else if (sortField === 'customer') {
+        const nameA = a.project?.customerName || ''
+        const nameB = b.project?.customerName || ''
+        cmp = nameA.localeCompare(nameB)
+      } else if (sortField === 'amount') {
+        cmp = (a.amount || 0) - (b.amount || 0)
+      } else {
+        const da = new Date(a.invoiceDate || a.date || 0).getTime()
+        const db = new Date(b.invoiceDate || b.date || 0).getTime()
+        cmp = da - db
+      }
+      return sortDirection === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }, [filteredInvoices, sortField, sortDirection])
+
+  const { groupedInvoices, expandedGroups, toggleGroup } = useGroupedInvoices(sortedInvoices)
 
   const stats = useMemo(() => {
     // Stornos haben negative Beträge, werden automatisch subtrahiert
@@ -410,6 +443,9 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
           saving={saving}
           sendingReminder={sendingReminder}
           reminderDropdownOpen={reminderDropdownOpen}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleInvoiceSort}
           onView={handleViewInvoice}
           onPrint={handlePrintInvoice}
           onMarkAsPaid={handleMarkAsPaid}
