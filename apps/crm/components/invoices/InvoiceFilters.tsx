@@ -68,25 +68,6 @@ export const InvoiceFilters: React.FC<InvoiceFiltersProps> = ({
         </select>
       </div>
 
-      {/* Month Filter */}
-      {selectedYear !== 'all' && (
-        <div className="glass flex items-center gap-2 rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
-          <select
-            value={selectedMonth}
-            onChange={e =>
-              setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))
-            }
-            className="cursor-pointer border-none bg-transparent px-3 py-2 text-sm font-bold text-slate-900 outline-none"
-          >
-            <option value="all">Alle Monate</option>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => (
-              <option key={month} value={month}>
-                {new Date(2000, month - 1).toLocaleDateString('de-DE', { month: 'long' })}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Type Filter */}
       <div className="glass scrollbar-hide flex items-center gap-2 overflow-x-auto rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">

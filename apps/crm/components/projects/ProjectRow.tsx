@@ -36,6 +36,9 @@ export const ProjectRow = React.memo(function ProjectRow(props: {
   // Invoice status indicators (nur Rechnungsvorhandenheit, kein Projektstatus)
   hasPartialInvoice?: boolean
   hasFinalInvoice?: boolean
+  // Styling props für bessere Zeilentrennung
+  className?: string
+  rowSeparator?: boolean
 }) {
   const { project: p } = props
   const statusTriggerRef = useRef<HTMLButtonElement>(null)
@@ -56,7 +59,10 @@ export const ProjectRow = React.memo(function ProjectRow(props: {
   }, [props.isDropdownOpen])
 
   return (
-    <tr className="cursor-pointer transition-colors hover:bg-slate-50/50" onClick={props.onOpen}>
+    <tr 
+      className={`cursor-pointer transition-colors hover:bg-amber-50/50 ${props.rowSeparator ? 'border-b-2 border-slate-200' : 'border-b border-slate-100'} ${props.className || ''}`} 
+      onClick={props.onOpen}
+    >
       {/* Kunde */}
       <td className="px-6 py-4">
         <div className="flex flex-col">

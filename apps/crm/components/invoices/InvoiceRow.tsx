@@ -29,6 +29,9 @@ interface InvoiceRowProps {
   onSetReminderDropdownOpen: (id: string | null) => void
   onSendReminder: (type: 'first' | 'second' | 'final') => void
   onCancelInvoice?: () => void
+  // Styling props für bessere Zeilentrennung
+  className?: string
+  rowSeparator?: boolean
 }
 
 /**
@@ -52,6 +55,8 @@ export const InvoiceRow = React.memo(function InvoiceRow({
   onSetReminderDropdownOpen,
   onSendReminder,
   onCancelInvoice,
+  className,
+  rowSeparator,
 }: InvoiceRowProps) {
   const isCredit = invoice.type === 'credit'
   // Neue Struktur: Daten direkt aus der Invoice
@@ -95,7 +100,7 @@ export const InvoiceRow = React.memo(function InvoiceRow({
   const isReminding = sendingReminder === invoice.id
 
   return (
-    <tr className="transition-colors hover:bg-slate-50/50">
+    <tr className={`transition-colors hover:bg-amber-50/50 ${rowSeparator ? 'border-b-2 border-slate-200' : 'border-b border-slate-100'} ${className || ''}`}>
       <td className="px-6 py-4">
         <p className="font-black text-slate-900">{invoice.invoiceNumber}</p>
       </td>

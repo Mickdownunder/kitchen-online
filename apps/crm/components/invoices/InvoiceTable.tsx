@@ -130,7 +130,7 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
             {isExpanded && (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="border-t border-slate-100 bg-slate-50/50">
+                  <thead className="border-y-2 border-slate-200 bg-slate-50/50">
                     <tr>
                       <th
                         className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
@@ -185,8 +185,8 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {groupInvoicesToRender.map(invoice => (
+                  <tbody>
+                    {groupInvoicesToRender.map((invoice, idx) => (
                       <InvoiceRow
                         key={invoice.id}
                         invoice={invoice}
@@ -205,6 +205,8 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                         onSetReminderDropdownOpen={onSetReminderDropdownOpen}
                         onSendReminder={type => onSendReminder(invoice, type)}
                         onCancelInvoice={onCancelInvoice ? () => onCancelInvoice(invoice) : undefined}
+                        className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}
+                        rowSeparator
                       />
                     ))}
                   </tbody>

@@ -242,6 +242,50 @@ const ProjectList: React.FC<ProjectListProps> = ({
     setVisibleRows(200)
   }, [searchTerm, filterType, selectedYear, selectedMonth, sortField, sortDirection])
 
+  // Gruppiere nach Monat für die horizontalen Tabs
+  const projectsByMonth = useMemo(() => {
+    const months: Map<number, CustomerProject[]> = new Map()
+    // Initialisiere alle 12 Monate
+    for (let i = 1; i <= 12; i++) {
+      months.set(i, [])
+    }
+    // Füge Projekte hinzu (nur wenn ein Jahr gewählt ist)
+    if (selectedYear !== 'all') {
+      sortedProjects.forEach(project => {
+        const projectDate = project.orderDate || project.measurementDate || project.offerDate || project.createdAt
+        const date = projectDate ? new Date(projectDate) : new Date()
+        if (date.getFullYear() === selectedYear) {
+          const month = date.getMonth() + 1
+          months.get(month)!.push(project)
+        }
+      })
+    }
+    return months
+  }, [sortedProjects, selectedYear])
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
+
+  // Reset pagination when month changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedMonth, selectedYear])
+
+  // Projekte für den aktuellen Monat mit Pagination
+  const currentMonthProjects = useMemo(() => {
+    if (selectedYear === 'all') return sortedProjects
+    if (selectedMonth === 'all') return sortedProjects
+    return projectsByMonth.get(selectedMonth as number) || []
+  }, [projectsByMonth, selectedMonth, selectedYear, sortedProjects])
+
+  const totalPages = Math.ceil(currentMonthProjects.length / itemsPerPage)
+  const paginatedProjects = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return currentMonthProjects.slice(start, start + itemsPerPage)
+  }, [currentMonthProjects, currentPage, itemsPerPage])
+
+  // Legacy grouped projects for "all" mode
   const { groupedProjects, expandedGroups, toggleGroup } = useGroupedProjects(sortedProjects)
 
   // ==========================================================================
@@ -735,25 +779,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
           </div>
         )}
 
-        {/* Month Filter - only for Orders tab and if year selected */}
-        {activeTab === 'orders' && selectedYear !== 'all' && (
-          <div className="glass flex items-center gap-2 rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
-            <select
-              value={selectedMonth}
-              onChange={e =>
-                setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))
-              }
-              className="cursor-pointer border-none bg-transparent px-3 py-2 text-sm font-bold text-slate-900 outline-none"
-            >
-              <option value="all">Alle Monate</option>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => (
-                <option key={month} value={month}>
-                  {new Date(2000, month - 1).toLocaleDateString('de-DE', { month: 'long' })}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* Status Filter - only for Orders tab */}
         {activeTab === 'orders' && (
@@ -785,6 +810,48 @@ const ProjectList: React.FC<ProjectListProps> = ({
           </div>
         )}
       </div>
+
+      {/* Horizontale Monatstabs - nur für Orders und wenn ein Jahr gewählt ist */}
+      {activeTab === 'orders' && selectedYear !== 'all' && (
+        <div className="glass flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
+          <button
+            onClick={() => setSelectedMonth('all')}
+            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+              selectedMonth === 'all'
+                ? 'bg-slate-900 text-white shadow-lg'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Alle
+          </button>
+          <div className="mx-2 h-6 w-px bg-slate-200" />
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(monthNum => {
+            const monthProjects = projectsByMonth.get(monthNum) || []
+            const count = monthProjects.length
+            const isSelected = typeof selectedMonth === 'number' && selectedMonth === monthNum
+            const monthName = new Date(2000, monthNum - 1).toLocaleDateString('de-DE', { month: 'long' })
+            
+            return (
+              <button
+                key={monthNum}
+                onClick={() => setSelectedMonth(monthNum)}
+                className={`relative flex min-w-[6rem] flex-col items-center rounded-xl px-3 py-2 transition-all ${
+                  isSelected
+                    ? 'bg-amber-500 shadow-lg'
+                    : 'hover:bg-slate-100'
+                }`}
+              >
+                <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                  {monthName}
+                </span>
+                <span className={`text-[10px] font-bold ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Leads Table - only shown when activeTab is 'leads' */}
       {activeTab === 'leads' && (
@@ -854,135 +921,276 @@ const ProjectList: React.FC<ProjectListProps> = ({
       {/* Projects Table - only shown when activeTab is 'orders' */}
       {activeTab === 'orders' && (
       <div className="glass overflow-hidden rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/30 shadow-xl">
-        {groupedProjects.length > 0 ? (
+        {(selectedYear !== 'all' && selectedMonth !== 'all') ? (
+          /* Einzelner Monat ausgewählt - Einfache Tabelle mit Pagination */
+          currentMonthProjects.length > 0 ? (
+            <div>
+              {/* Header mit Monatszusammenfassung */}
+              <div className="border-b border-slate-200 bg-slate-50/80 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">
+                      {new Date(2000, (selectedMonth as number) - 1).toLocaleDateString('de-DE', { month: 'long' })} {selectedYear}
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      {currentMonthProjects.length} Auftrag{currentMonthProjects.length !== 1 ? 'e' : ''} • {formatCurrency(currentMonthProjects.reduce((sum, p) => sum + p.totalAmount, 0))} €
+                    </p>
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="text-sm text-slate-500">
+                      Seite {currentPage} von {totalPages}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b-2 border-slate-200 bg-slate-50/50">
+                    <tr>
+                      <th
+                        className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => handleSort('customerName')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Kunde
+                          {sortField === 'customerName' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => handleSort('orderNumber')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Auftragsnummer
+                          {sortField === 'orderNumber' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">Status</th>
+                      <th
+                        className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => handleSort('date')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Datum
+                          {sortField === 'date' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        className="cursor-pointer px-6 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
+                        onClick={() => handleSort('totalAmount')}
+                      >
+                        <div className="flex items-end justify-end gap-2">
+                          Betrag
+                          {sortField === 'totalAmount' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">Workflow</th>
+                      <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedProjects.map((project, idx) => {
+                      const p = getProjectWithLocalUpdates(project)
+                      return (
+                        <ProjectRow
+                          key={project.id}
+                          project={p}
+                          isDropdownOpen={openDropdownId === project.id}
+                          onOpen={() => modals.openProjectModal(project)}
+                          onEdit={e => { e.stopPropagation(); modals.openProjectModal(project) }}
+                          onToggleDropdown={e => { e.stopPropagation(); setOpenDropdownId(openDropdownId === project.id ? null : project.id) }}
+                          onSelectStatus={(e, s) => { e.stopPropagation(); quickUpdateStatus(project, { status: s }); setOpenDropdownId(null) }}
+                          onOpenMeasurementModal={e => {
+                            e.stopPropagation()
+                            const currentProject = getProjectWithLocalUpdates(project)
+                            if (currentProject.measurementDate) toggleStep(project, 'measured', e)
+                            else modals.openMeasurementModal(project)
+                          }}
+                          onToggleOrdered={e => toggleStep(project, 'ordered', e)}
+                          onOpenDeliveryNote={async e => { e.stopPropagation(); await modals.openDeliveryNoteModal(project) }}
+                          onOpenInstallationModal={e => {
+                            e.stopPropagation()
+                            const currentProject = getProjectWithLocalUpdates(project)
+                            if (currentProject.installationDate) toggleStep(project, 'installation', e)
+                            else modals.openInstallationModal(project)
+                          }}
+                          onOpenAbholungModal={p.deliveryType === 'pickup' ? e => { e.stopPropagation(); modals.openAbholungModal(project) } : undefined}
+                          onToggleCompleted={e => toggleStep(project, 'completed', e)}
+                          formatCurrency={formatCurrency}
+                          formatDate={formatDate}
+                          getStatusColor={getStatusColor}
+                          complaintCount={complaintsByProject.get(project.id)}
+                          hasPartialInvoice={invoicesByProject.get(project.id)?.hasPartial}
+                          hasFinalInvoice={invoicesByProject.get(project.id)?.hasFinal}
+                          className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}
+                          rowSeparator
+                        />
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t-2 border-slate-200 bg-slate-50/80 px-6 py-4">
+                  <div className="text-sm text-slate-600">
+                    Zeige {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, currentMonthProjects.length)} von {currentMonthProjects.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      ««
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      «
+                    </button>
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum: number
+                      if (totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i
+                      } else {
+                        pageNum = currentPage - 2 + i
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`rounded-lg px-3 py-2 text-sm font-bold transition-all ${
+                            currentPage === pageNum
+                              ? 'bg-amber-500 text-white shadow-md'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      »
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      »»
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-20 text-center">
+              <AlertCircle className="mx-auto mb-4 h-16 w-16 text-slate-200" />
+              <h3 className="text-xl font-black uppercase tracking-tighter text-slate-300">
+                Keine Aufträge in {new Date(2000, (selectedMonth as number) - 1).toLocaleDateString('de-DE', { month: 'long' })}
+              </h3>
+              <p className="mt-2 text-sm text-slate-400">
+                Wählen Sie einen anderen Monat oder erstellen Sie einen neuen Auftrag
+              </p>
+            </div>
+          )
+        ) : groupedProjects.length > 0 ? (
+          /* "Alle" ausgewählt - Gruppierte Ansicht mit Akkordeons */
           <div className="divide-y divide-slate-100">
             {(() => {
               let remaining = visibleRows
               return groupedProjects.map(([groupKey, groupProjects]) => {
                 const [year, month] = groupKey.split('-')
-                const monthName = new Date(2000, parseInt(month) - 1).toLocaleDateString('de-DE', {
-                  month: 'long',
-                })
+                const monthName = new Date(2000, parseInt(month) - 1).toLocaleDateString('de-DE', { month: 'long' })
                 const isExpanded = expandedGroups.has(groupKey)
                 const totalAmount = groupProjects.reduce((sum, p) => sum + p.totalAmount, 0)
-                const renderCount = isExpanded
-                  ? Math.min(groupProjects.length, Math.max(0, remaining))
-                  : 0
+                const renderCount = isExpanded ? Math.min(groupProjects.length, Math.max(0, remaining)) : 0
                 const groupProjectsToRender = isExpanded ? groupProjects.slice(0, renderCount) : []
                 remaining -= renderCount
 
                 return (
                   <div key={groupKey} className="bg-white/50">
-                    {/* Group Header */}
                     <button
                       onClick={() => toggleGroup(groupKey)}
                       className="flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-slate-50/50"
                     >
                       <div className="flex items-center gap-4">
-                        {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 text-slate-400" />
-                        ) : (
-                          <ChevronRight className="h-5 w-5 text-slate-400" />
-                        )}
+                        {isExpanded ? <ChevronDown className="h-5 w-5 text-slate-400" /> : <ChevronRight className="h-5 w-5 text-slate-400" />}
                         <div className="text-left">
-                          <h3 className="text-lg font-black text-slate-900">
-                            {monthName} {year}
-                          </h3>
+                          <h3 className="text-lg font-black text-slate-900">{monthName} {year}</h3>
                           <p className="text-xs text-slate-500">
-                            {groupProjects.length} Auftrag{groupProjects.length !== 1 ? 'e' : ''} •{' '}
-                            {formatCurrency(totalAmount)} €
+                            {groupProjects.length} Auftrag{groupProjects.length !== 1 ? 'e' : ''} • {formatCurrency(totalAmount)} €
                           </p>
                         </div>
                       </div>
                     </button>
 
-                    {/* Group Content */}
                     {isExpanded && (
                       <div className="overflow-x-auto">
                         <table className="w-full">
-                          <thead className="border-t border-slate-100 bg-slate-50/50">
+                          <thead className="border-y-2 border-slate-200 bg-slate-50/50">
                             <tr>
-                              <th
-                                className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
-                                onClick={() => handleSort('customerName')}
-                              >
+                              <th className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50" onClick={() => handleSort('customerName')}>
                                 <div className="flex items-center gap-2">
                                   Kunde
-                                  {sortField === 'customerName' ? (
-                                    sortDirection === 'asc' ? (
-                                      <ArrowUp className="h-3 w-3 text-amber-500" />
-                                    ) : (
-                                      <ArrowDown className="h-3 w-3 text-amber-500" />
-                                    )
-                                  ) : (
-                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                                  )}
+                                  {sortField === 'customerName' ? (sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />) : <ArrowUpDown className="h-3 w-3 text-slate-400" />}
                                 </div>
                               </th>
-                              <th
-                                className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
-                                onClick={() => handleSort('orderNumber')}
-                              >
+                              <th className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50" onClick={() => handleSort('orderNumber')}>
                                 <div className="flex items-center gap-2">
                                   Auftragsnummer
-                                  {sortField === 'orderNumber' ? (
-                                    sortDirection === 'asc' ? (
-                                      <ArrowUp className="h-3 w-3 text-amber-500" />
-                                    ) : (
-                                      <ArrowDown className="h-3 w-3 text-amber-500" />
-                                    )
-                                  ) : (
-                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                                  )}
+                                  {sortField === 'orderNumber' ? (sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />) : <ArrowUpDown className="h-3 w-3 text-slate-400" />}
                                 </div>
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                                Status
-                              </th>
-                              <th
-                                className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
-                                onClick={() => handleSort('date')}
-                              >
+                              <th className="px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">Status</th>
+                              <th className="cursor-pointer px-6 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50" onClick={() => handleSort('date')}>
                                 <div className="flex items-center gap-2">
                                   Datum
-                                  {sortField === 'date' ? (
-                                    sortDirection === 'asc' ? (
-                                      <ArrowUp className="h-3 w-3 text-amber-500" />
-                                    ) : (
-                                      <ArrowDown className="h-3 w-3 text-amber-500" />
-                                    )
-                                  ) : (
-                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                                  )}
+                                  {sortField === 'date' ? (sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />) : <ArrowUpDown className="h-3 w-3 text-slate-400" />}
                                 </div>
                               </th>
-                              <th
-                                className="cursor-pointer px-6 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50"
-                                onClick={() => handleSort('totalAmount')}
-                              >
+                              <th className="cursor-pointer px-6 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-100/50" onClick={() => handleSort('totalAmount')}>
                                 <div className="flex items-end justify-end gap-2">
                                   Betrag
-                                  {sortField === 'totalAmount' ? (
-                                    sortDirection === 'asc' ? (
-                                      <ArrowUp className="h-3 w-3 text-amber-500" />
-                                    ) : (
-                                      <ArrowDown className="h-3 w-3 text-amber-500" />
-                                    )
-                                  ) : (
-                                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                                  )}
+                                  {sortField === 'totalAmount' ? (sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 text-amber-500" /> : <ArrowDown className="h-3 w-3 text-amber-500" />) : <ArrowUpDown className="h-3 w-3 text-slate-400" />}
                                 </div>
                               </th>
-                              <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                                Workflow
-                              </th>
-                              <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                                Aktionen
-                              </th>
+                              <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">Workflow</th>
+                              <th className="px-6 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">Aktionen</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {groupProjectsToRender.map(project => {
+                          <tbody>
+                            {groupProjectsToRender.map((project, idx) => {
                               const p = getProjectWithLocalUpdates(project)
                               return (
                                 <ProjectRow
@@ -990,54 +1198,24 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                   project={p}
                                   isDropdownOpen={openDropdownId === project.id}
                                   onOpen={() => modals.openProjectModal(project)}
-                                  onEdit={e => {
-                                    e.stopPropagation()
-                                    modals.openProjectModal(project)
-                                  }}
-                                  onToggleDropdown={e => {
-                                    e.stopPropagation()
-                                    setOpenDropdownId(
-                                      openDropdownId === project.id ? null : project.id
-                                    )
-                                  }}
-                                  onSelectStatus={(e, s) => {
-                                    e.stopPropagation()
-                                    quickUpdateStatus(project, { status: s })
-                                    setOpenDropdownId(null)
-                                  }}
+                                  onEdit={e => { e.stopPropagation(); modals.openProjectModal(project) }}
+                                  onToggleDropdown={e => { e.stopPropagation(); setOpenDropdownId(openDropdownId === project.id ? null : project.id) }}
+                                  onSelectStatus={(e, s) => { e.stopPropagation(); quickUpdateStatus(project, { status: s }); setOpenDropdownId(null) }}
                                   onOpenMeasurementModal={e => {
                                     e.stopPropagation()
                                     const currentProject = getProjectWithLocalUpdates(project)
-                                    if (currentProject.measurementDate) {
-                                      // If date exists, toggle behavior
-                                      toggleStep(project, 'measured', e)
-                                    } else {
-                                      // If no date, open modal
-                                      modals.openMeasurementModal(project)
-                                    }
+                                    if (currentProject.measurementDate) toggleStep(project, 'measured', e)
+                                    else modals.openMeasurementModal(project)
                                   }}
                                   onToggleOrdered={e => toggleStep(project, 'ordered', e)}
-                                  onOpenDeliveryNote={async e => {
-                                    e.stopPropagation()
-                                    await modals.openDeliveryNoteModal(project)
-                                  }}
+                                  onOpenDeliveryNote={async e => { e.stopPropagation(); await modals.openDeliveryNoteModal(project) }}
                                   onOpenInstallationModal={e => {
                                     e.stopPropagation()
                                     const currentProject = getProjectWithLocalUpdates(project)
-                                    if (currentProject.installationDate) {
-                                      toggleStep(project, 'installation', e)
-                                    } else {
-                                      modals.openInstallationModal(project)
-                                    }
+                                    if (currentProject.installationDate) toggleStep(project, 'installation', e)
+                                    else modals.openInstallationModal(project)
                                   }}
-                                  onOpenAbholungModal={
-                                    p.deliveryType === 'pickup'
-                                      ? e => {
-                                          e.stopPropagation()
-                                          modals.openAbholungModal(project)
-                                        }
-                                      : undefined
-                                  }
+                                  onOpenAbholungModal={p.deliveryType === 'pickup' ? e => { e.stopPropagation(); modals.openAbholungModal(project) } : undefined}
                                   onToggleCompleted={e => toggleStep(project, 'completed', e)}
                                   formatCurrency={formatCurrency}
                                   formatDate={formatDate}
@@ -1045,6 +1223,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                   complaintCount={complaintsByProject.get(project.id)}
                                   hasPartialInvoice={invoicesByProject.get(project.id)?.hasPartial}
                                   hasFinalInvoice={invoicesByProject.get(project.id)?.hasFinal}
+                                  className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}
+                                  rowSeparator
                                 />
                               )
                             })}
@@ -1054,17 +1234,10 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                 <td colSpan={7} className="px-6 py-4">
                                   <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                                     <div className="text-sm text-slate-600">
-                                      Noch{' '}
-                                      <span className="font-black text-slate-900">
-                                        {groupProjects.length - groupProjectsToRender.length}
-                                      </span>{' '}
-                                      weitere in {monthName} {year}
+                                      Noch <span className="font-black text-slate-900">{groupProjects.length - groupProjectsToRender.length}</span> weitere in {monthName} {year}
                                     </div>
                                     <button
-                                      onClick={e => {
-                                        e.stopPropagation()
-                                        setVisibleRows(v => v + 200)
-                                      }}
+                                      onClick={e => { e.stopPropagation(); setVisibleRows(v => v + 200) }}
                                       className="rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-slate-800"
                                     >
                                       Mehr laden
@@ -1085,27 +1258,13 @@ const ProjectList: React.FC<ProjectListProps> = ({
         ) : (
           <div className="py-20 text-center">
             <AlertCircle className="mx-auto mb-4 h-16 w-16 text-slate-200" />
-            <h3 className="text-xl font-black uppercase tracking-tighter text-slate-300">
-              Keine Aufträge gefunden
-            </h3>
-            <p className="mt-2 text-sm text-slate-400">
-              Passen Sie die Filter an oder erstellen Sie einen neuen Auftrag
-            </p>
+            <h3 className="text-xl font-black uppercase tracking-tighter text-slate-300">Keine Aufträge gefunden</h3>
+            <p className="mt-2 text-sm text-slate-400">Passen Sie die Filter an oder erstellen Sie einen neuen Auftrag</p>
           </div>
         )}
       </div>
       )}
 
-      {activeTab === 'orders' && filteredProjects.length > visibleRows && (
-        <div className="flex items-center justify-center">
-          <button
-            onClick={() => setVisibleRows(v => v + 400)}
-            className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-900 shadow-sm transition-all hover:shadow-md"
-          >
-            Mehr Aufträge laden ({Math.min(400, filteredProjects.length - visibleRows)} weitere)
-          </button>
-        </div>
-      )}
 
       {/* Modal */}
       {(modals.project.editingProject || modals.project.isAdding) && (

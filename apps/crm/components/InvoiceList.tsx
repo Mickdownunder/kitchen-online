@@ -15,6 +15,7 @@ import { getCompanySettings } from '@/lib/supabase/services/company'
 import { InvoiceFilters } from './invoices/InvoiceFilters'
 import { InvoiceStatsCards } from './invoices/InvoiceStatsCards'
 import { InvoiceTable } from './invoices/InvoiceTable'
+import { InvoiceTableSimple } from './invoices/InvoiceTableSimple'
 import {
   ReminderPreviewModal,
   type ReminderPreviewData,
@@ -198,6 +199,49 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   }, [filteredInvoices, sortField, sortDirection])
 
   const { groupedInvoices, expandedGroups, toggleGroup } = useGroupedInvoices(sortedInvoices)
+
+  // Gruppiere nach Monat für die horizontalen Tabs
+  const invoicesByMonth = useMemo(() => {
+    const months: Map<number, ListInvoice[]> = new Map()
+    // Initialisiere alle 12 Monate
+    for (let i = 1; i <= 12; i++) {
+      months.set(i, [])
+    }
+    // Füge Rechnungen hinzu (nur wenn ein Jahr gewählt ist)
+    if (selectedYear !== 'all') {
+      sortedInvoices.forEach(invoice => {
+        const dateStr = invoice.invoiceDate || invoice.date
+        const date = dateStr ? new Date(dateStr) : new Date()
+        if (date.getFullYear() === selectedYear) {
+          const month = date.getMonth() + 1
+          months.get(month)!.push(invoice)
+        }
+      })
+    }
+    return months
+  }, [sortedInvoices, selectedYear])
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
+
+  // Reset pagination when month changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedMonth, selectedYear])
+
+  // Rechnungen für den aktuellen Monat mit Pagination
+  const currentMonthInvoices = useMemo(() => {
+    if (selectedYear === 'all') return sortedInvoices
+    if (selectedMonth === 'all') return sortedInvoices
+    return invoicesByMonth.get(selectedMonth as number) || []
+  }, [invoicesByMonth, selectedMonth, selectedYear, sortedInvoices])
+
+  const totalPages = Math.ceil(currentMonthInvoices.length / itemsPerPage)
+  const paginatedInvoices = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return currentMonthInvoices.slice(start, start + itemsPerPage)
+  }, [currentMonthInvoices, currentPage, itemsPerPage])
 
   const stats = useMemo(() => {
     // Stornos haben negative Beträge, werden automatisch subtrahiert
@@ -488,47 +532,114 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
         availableYears={availableYears}
       />
 
-      <div className="glass overflow-hidden rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/30 shadow-xl">
-        <InvoiceTable
-          groupedInvoices={groupedInvoices}
-          expandedGroups={expandedGroups}
-          toggleGroup={toggleGroup}
-          visibleRows={visibleRows}
-          companySettings={companySettings}
-          markingPaidId={markingPaidId}
-          paidDateInput={paidDateInput}
-          saving={saving}
-          sendingReminder={sendingReminder}
-          reminderDropdownOpen={reminderDropdownOpen}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleInvoiceSort}
-          onView={handleViewInvoice}
-          onPrint={handlePrintInvoice}
-          onMarkAsPaid={handleMarkAsPaid}
-          onUnmarkAsPaid={handleUnmarkAsPaid}
-          onSetMarkingPaidId={setMarkingPaidId}
-          onSetPaidDateInput={setPaidDateInput}
-          onSetReminderDropdownOpen={setReminderDropdownOpen}
-          onSendReminder={handleOpenReminderPreview}
-          onCancelInvoice={(invoice) => {
-            setInvoiceToCancel(invoice)
-            setCancelModalOpen(true)
-          }}
-          onLoadMore={() => setVisibleRows(v => v + 400)}
-        />
-      </div>
-
-      {filteredInvoices.length > visibleRows && (
-        <div className="flex items-center justify-center">
+      {/* Horizontale Monatstabs - nur wenn ein Jahr gewählt ist */}
+      {selectedYear !== 'all' && (
+        <div className="glass flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
           <button
-            onClick={() => setVisibleRows(v => v + 400)}
-            className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-900 shadow-sm transition-all hover:shadow-md"
+            onClick={() => setSelectedMonth('all')}
+            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+              selectedMonth === 'all'
+                ? 'bg-slate-900 text-white shadow-lg'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
           >
-            Mehr Rechnungen laden ({Math.min(400, filteredInvoices.length - visibleRows)} weitere)
+            Alle
           </button>
+          <div className="mx-2 h-6 w-px bg-slate-200" />
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(monthNum => {
+            const monthInvoices = invoicesByMonth.get(monthNum) || []
+            const count = monthInvoices.length
+            const isSelected = typeof selectedMonth === 'number' && selectedMonth === monthNum
+            const monthName = new Date(2000, monthNum - 1).toLocaleDateString('de-DE', { month: 'long' })
+            
+            return (
+              <button
+                key={monthNum}
+                onClick={() => setSelectedMonth(monthNum)}
+                className={`relative flex min-w-[6rem] flex-col items-center rounded-xl px-3 py-2 transition-all ${
+                  isSelected
+                    ? 'bg-amber-500 shadow-lg'
+                    : 'hover:bg-slate-100'
+                }`}
+              >
+                <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                  {monthName}
+                </span>
+                <span className={`text-[10px] font-bold ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
+
+      <div className="glass overflow-hidden rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/30 shadow-xl">
+        {(selectedYear !== 'all' && selectedMonth !== 'all') ? (
+          /* Einzelner Monat ausgewählt - Tabelle mit Pagination */
+          <InvoiceTableSimple
+            invoices={paginatedInvoices}
+            allInvoices={currentMonthInvoices}
+            selectedMonth={selectedMonth as number}
+            selectedYear={selectedYear as number}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            companySettings={companySettings}
+            markingPaidId={markingPaidId}
+            paidDateInput={paidDateInput}
+            saving={saving}
+            sendingReminder={sendingReminder}
+            reminderDropdownOpen={reminderDropdownOpen}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleInvoiceSort}
+            onView={handleViewInvoice}
+            onPrint={handlePrintInvoice}
+            onMarkAsPaid={handleMarkAsPaid}
+            onUnmarkAsPaid={handleUnmarkAsPaid}
+            onSetMarkingPaidId={setMarkingPaidId}
+            onSetPaidDateInput={setPaidDateInput}
+            onSetReminderDropdownOpen={setReminderDropdownOpen}
+            onSendReminder={handleOpenReminderPreview}
+            onCancelInvoice={(invoice) => {
+              setInvoiceToCancel(invoice)
+              setCancelModalOpen(true)
+            }}
+          />
+        ) : (
+          /* "Alle" Ansicht - Gruppierte Akkordeon-Ansicht */
+          <InvoiceTable
+            groupedInvoices={groupedInvoices}
+            expandedGroups={expandedGroups}
+            toggleGroup={toggleGroup}
+            visibleRows={visibleRows}
+            companySettings={companySettings}
+            markingPaidId={markingPaidId}
+            paidDateInput={paidDateInput}
+            saving={saving}
+            sendingReminder={sendingReminder}
+            reminderDropdownOpen={reminderDropdownOpen}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleInvoiceSort}
+            onView={handleViewInvoice}
+            onPrint={handlePrintInvoice}
+            onMarkAsPaid={handleMarkAsPaid}
+            onUnmarkAsPaid={handleUnmarkAsPaid}
+            onSetMarkingPaidId={setMarkingPaidId}
+            onSetPaidDateInput={setPaidDateInput}
+            onSetReminderDropdownOpen={setReminderDropdownOpen}
+            onSendReminder={handleOpenReminderPreview}
+            onCancelInvoice={(invoice) => {
+              setInvoiceToCancel(invoice)
+              setCancelModalOpen(true)
+            }}
+            onLoadMore={() => setVisibleRows(v => v + 400)}
+          />
+        )}
+      </div>
 
       <ReminderPreviewModal
         isOpen={reminderModalOpen}
