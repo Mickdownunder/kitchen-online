@@ -264,9 +264,16 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     const depositCount = filteredInvoices.filter(inv => inv.type === 'partial').length
     const finalCount = filteredInvoices.filter(inv => inv.type === 'final').length
     const creditCount = filteredInvoices.filter(inv => inv.type === 'credit').length
+    // Buchhalterischer Umsatz = Auftragswert (project.totalAmount), nicht Restbetrag (inv.amount)
     const invoicedRevenue = filteredInvoices
       .filter(inv => inv.type === 'final')
-      .reduce((acc, inv) => acc + inv.amount, 0)
+      .reduce(
+        (acc, inv) =>
+          acc + (inv.project?.totalAmount != null && inv.project.totalAmount > 0
+            ? inv.project.totalAmount
+            : inv.amount),
+        0
+      )
     const depositRevenue = filteredInvoices
       .filter(inv => inv.type === 'partial')
       .reduce((acc, inv) => acc + inv.amount, 0)

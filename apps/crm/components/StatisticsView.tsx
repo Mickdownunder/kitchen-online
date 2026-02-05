@@ -9,13 +9,13 @@ import {
   exportStatisticsToExcel,
   exportTabToExcel,
 } from '@/components/statistics/exports/ExcelExporter'
-import { getCompanySettings, getInvoices } from '@/lib/supabase/services'
+import { getCompanySettings, getInvoicesWithProject } from '@/lib/supabase/services'
 import {
   DateFilter,
   calculateSoldRevenue,
   calculateProjectStats,
-  // New invoice-based functions
-  calculateInvoicedRevenueFromInvoices,
+  // Buchhalterischer Umsatz = nur Schlussrechnungen
+  calculateFinalInvoiceRevenue,
   calculateReceivedMoneyFromInvoices,
   calculateOutstandingFromInvoices,
   calculateInvoiceStatsFromInvoices,
@@ -81,7 +81,7 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
   const loadInvoices = useCallback(async () => {
     try {
       setLoadingInvoices(true)
-      const data = await getInvoices()
+      const data = await getInvoicesWithProject()
       setInvoices(data)
     } catch (error) {
       logger.error('Error loading invoices for statistics', { component: 'StatisticsView' }, error as Error)
@@ -174,8 +174,8 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
     // Sold revenue from projects (order-based)
     const soldRevenue = calculateSoldRevenue(projects, dateFilter)
 
-    // Invoice-based calculations from invoices table
-    const invoicedRevenue = calculateInvoicedRevenueFromInvoices(invoices, dateFilter)
+    // Buchhalterischer Umsatz = nur Schlussrechnungen (nach Rechnungsdatum)
+    const invoicedRevenue = calculateFinalInvoiceRevenue(invoices, dateFilter)
     const receivedMoney = calculateReceivedMoneyFromInvoices(invoices, dateFilter)
     const outstanding = calculateOutstandingFromInvoices(invoices)
     const projectStats = calculateProjectStats(projects, dateFilter)

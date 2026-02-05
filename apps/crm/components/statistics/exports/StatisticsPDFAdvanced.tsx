@@ -45,6 +45,7 @@ interface StatisticsPDFAdvancedProps {
   // Invoices data
   invoiceStats?: {
     invoicedRevenue: number
+    accountingRevenue?: number
     depositRevenue: number
     totalPaid: number
     totalOutstanding: number
@@ -314,7 +315,7 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
                 <View style={styles.metricCard}>
                   <Text style={styles.metricLabel}>Buchhalterischer Umsatz</Text>
                   <Text style={styles.metricValue}>{formatCurrency(invoicedRevenue)} €</Text>
-                  <Text style={styles.metricSubtext}>Fakturierter Umsatz</Text>
+                  <Text style={styles.metricSubtext}>Nur Schlussrechnungen</Text>
                 </View>
               )}
               {receivedMoney !== undefined && (
@@ -453,7 +454,7 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
                   {formatCurrency(invoiceStats.invoicedRevenue)} €
                 </Text>
                 <Text style={styles.metricSubtext}>
-                  {invoiceStats.finalCount} Schlussrechnungen
+                  Nur Schlussrechnungen
                 </Text>
               </View>
               <View style={styles.metricCard}>

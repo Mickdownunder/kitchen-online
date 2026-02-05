@@ -14,11 +14,11 @@ import { CustomerProject, Invoice } from '@/types'
 import {
   calculateSoldRevenue,
   DateFilter,
-  calculateInvoicedRevenueFromInvoices,
+  calculateFinalInvoiceRevenue,
   calculateReceivedMoneyFromInvoices,
   calculateOutstandingFromInvoices,
   calculateMonthlySoldFromProjects,
-  calculateMonthlyInvoicedFromInvoices,
+  calculateMonthlyFinalInvoiceFromInvoices,
   calculateMonthlyReceivedFromInvoices,
 } from './utils/revenueCalculations'
 import {
@@ -59,11 +59,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
   }
 
-  // Current period metrics - using invoice-based functions
+  // Current period metrics - Buchhalterischer Umsatz = nur Schlussrechnungen (nach Rechnungsdatum)
   const currentMetrics = useMemo(() => {
     return {
       soldRevenue: calculateSoldRevenue(projects, filter),
-      invoicedRevenue: calculateInvoicedRevenueFromInvoices(invoices, filter),
+      invoicedRevenue: calculateFinalInvoiceRevenue(invoices, filter),
       receivedMoney: calculateReceivedMoneyFromInvoices(invoices, filter),
       outstanding: calculateOutstandingFromInvoices(invoices),
     }
@@ -81,7 +81,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     }
     return {
       soldRevenue: calculateSoldRevenue(projects, previousFilter),
-      invoicedRevenue: calculateInvoicedRevenueFromInvoices(invoices, previousFilter),
+      invoicedRevenue: calculateFinalInvoiceRevenue(invoices, previousFilter),
       receivedMoney: calculateReceivedMoneyFromInvoices(invoices, previousFilter),
       outstanding: calculateOutstandingFromInvoices(invoices),
     }
@@ -123,9 +123,9 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     const year =
       filter.year === 'all' ? new Date().getFullYear() : filter.year || new Date().getFullYear()
 
-    // Get monthly data from projects (sold) and invoices (invoiced, received)
+    // Get monthly data: sold from projects, invoiced = nur Schlussrechnungen (Buchhalterischer Umsatz)
     const monthlySold = calculateMonthlySoldFromProjects(projects, year)
-    const monthlyInvoiced = calculateMonthlyInvoicedFromInvoices(invoices, year)
+    const monthlyInvoiced = calculateMonthlyFinalInvoiceFromInvoices(invoices, year)
     const monthlyReceived = calculateMonthlyReceivedFromInvoices(invoices, year)
 
     return monthNames.map((month, index) => ({
@@ -209,7 +209,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             <p className="mb-1 text-3xl font-black text-slate-900">
               {formatCurrency(currentMetrics.invoicedRevenue)} €
             </p>
-            <p className="text-xs text-slate-500">Fakturierte Rechnungen</p>
+            <p className="text-xs text-slate-500">Nur Schlussrechnungen</p>
             {compareWithPrevious && previousMetrics.invoicedRevenue > 0 && (
               <p className="mt-1 text-xs text-slate-400">
                 Vorperiode: {formatCurrency(previousMetrics.invoicedRevenue)} €
@@ -317,7 +317,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
               Umsatz-Vergleich
             </h3>
-            <p className="mt-1 text-sm text-slate-500">Verkauft vs. Fakturiert vs. Eingegangen</p>
+            <p className="mt-1 text-sm text-slate-500">Verkauft vs. Schlussrechnungen vs. Eingegangen</p>
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -356,7 +356,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 />
                 <Legend />
                 <Bar dataKey="sold" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Verkauft" />
-                <Bar dataKey="invoiced" fill="#8b5cf6" radius={[8, 8, 0, 0]} name="Fakturiert" />
+                <Bar dataKey="invoiced" fill="#8b5cf6" radius={[8, 8, 0, 0]} name="Schlussrechnungen" />
                 <Bar dataKey="received" fill="#10b981" radius={[8, 8, 0, 0]} name="Eingegangen" />
               </ComposedChart>
             </ResponsiveContainer>

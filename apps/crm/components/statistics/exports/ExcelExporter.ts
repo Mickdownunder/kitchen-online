@@ -51,6 +51,7 @@ export interface StatisticsExcelData {
   // Invoices
   invoiceStats?: {
     invoicedRevenue: number
+    accountingRevenue?: number
     depositRevenue: number
     totalPaid: number
     totalOutstanding: number

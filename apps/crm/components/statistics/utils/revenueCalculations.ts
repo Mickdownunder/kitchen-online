@@ -56,8 +56,27 @@ export function matchesDateFilter(dateStr: string | undefined, filter: DateFilte
 // ============================================
 
 /**
- * Buchhalterischer Umsatz (Fakturierter Umsatz) - Alle Rechnungen
- * Summe aller Rechnungen basierend auf Rechnungsdatum
+ * Buchhalterischer Umsatz – nur bezahlte Schlussrechnungen
+ * Anzahlungen zählen nicht; unbezahlte Schlussrechnungen auch nicht.
+ * Datum = Bezahldatum (wann der Umsatz realisiert wurde)
+ */
+export function calculateAccountingRevenueFromInvoices(
+  invoices: Invoice[],
+  filter: DateFilter
+): number {
+  return invoices
+    .filter(
+      inv =>
+        inv.type === 'final' &&
+        inv.isPaid &&
+        matchesDateFilter(inv.paidDate, filter)
+    )
+    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
+}
+
+/**
+ * @deprecated Verwende calculateAccountingRevenueFromInvoices für Buchhalterischen Umsatz
+ * Fakturierter Umsatz (alle Rechnungen) – nur für Legacy/andere Zwecke
  */
 export function calculateInvoicedRevenueFromInvoices(
   invoices: Invoice[],
@@ -69,12 +88,26 @@ export function calculateInvoicedRevenueFromInvoices(
 }
 
 /**
- * Schlussrechnungs-Umsatz
+ * Hilfsfunktion: Auftragswert für Schlussrechnung ermitteln.
+ * Die Schlussrechnung zeigt am Ende nur den Restbetrag; der Auftragswert steht am Anfang.
+ * Buchhalterischer Umsatz = Summe der Auftragswerte aller gestellten Schlussrechnungen.
+ */
+function getOrderValueForFinalInvoice(inv: Invoice): number {
+  if (inv.project?.totalAmount != null && inv.project.totalAmount > 0) {
+    return inv.project.totalAmount
+  }
+  return inv.amount || 0
+}
+
+/**
+ * Buchhalterischer Umsatz – Summe der Auftragswerte aller gestellten Schlussrechnungen.
+ * Verwendet project.totalAmount (Auftragswert), nicht inv.amount (Restbetrag).
+ * Invoices müssen project-Daten enthalten (z.B. via getInvoicesWithProject).
  */
 export function calculateFinalInvoiceRevenue(invoices: Invoice[], filter: DateFilter): number {
   return invoices
     .filter(inv => inv.type === 'final' && matchesDateFilter(inv.invoiceDate, filter))
-    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
+    .reduce((sum, inv) => sum + getOrderValueForFinalInvoice(inv), 0)
 }
 
 /**
@@ -110,13 +143,23 @@ export function calculateOutstandingFromInvoices(invoices: Invoice[]): number {
 
 /**
  * Berechnet Rechnungs-Statistiken aus invoices-Tabelle
+ * accountingRevenue = Buchhalterischer Umsatz (nur bezahlte Schlussrechnungen, nach Bezahldatum)
  */
 export function calculateInvoiceStatsFromInvoices(invoices: Invoice[], filter: DateFilter) {
   const filtered = invoices.filter(inv => matchesDateFilter(inv.invoiceDate, filter))
 
+  const accountingRevenue = invoices
+    .filter(
+      inv =>
+        inv.type === 'final' &&
+        inv.isPaid &&
+        matchesDateFilter(inv.paidDate, filter)
+    )
+    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
+
   const invoicedRevenue = filtered
     .filter(inv => inv.type === 'final')
-    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
+    .reduce((sum, inv) => sum + getOrderValueForFinalInvoice(inv), 0)
 
   const depositRevenue = filtered
     .filter(inv => inv.type === 'partial')
@@ -137,6 +180,7 @@ export function calculateInvoiceStatsFromInvoices(invoices: Invoice[], filter: D
 
   return {
     invoicedRevenue,
+    accountingRevenue,
     depositRevenue,
     totalPaid,
     totalOutstanding,
@@ -179,7 +223,7 @@ export function calculateMonthlyInvoiceDataFromInvoices(invoices: Invoice[], yea
       const month = invoiceDate.getMonth()
 
       if (inv.type === 'final') {
-        monthly[month].invoiced += inv.amount || 0
+        monthly[month].invoiced += getOrderValueForFinalInvoice(inv)
       } else if (inv.type === 'partial') {
         monthly[month].deposit += inv.amount || 0
       }
@@ -224,7 +268,8 @@ export function calculateMonthlyReceivedFromInvoices(invoices: Invoice[], year: 
 }
 
 /**
- * Berechnet monatliche fakturierte Beträge aus invoices-Tabelle
+ * Berechnet monatliche fakturierte Beträge aus invoices-Tabelle (alle Rechnungstypen)
+ * @deprecated Für Buchhalterischen Umsatz calculateMonthlyFinalInvoiceFromInvoices verwenden
  */
 export function calculateMonthlyInvoicedFromInvoices(invoices: Invoice[], year: number) {
   const monthly: { [key: number]: number } = {}
@@ -237,6 +282,28 @@ export function calculateMonthlyInvoicedFromInvoices(invoices: Invoice[], year: 
     if (invoiceDate.getFullYear() === year) {
       const month = invoiceDate.getMonth()
       monthly[month] += inv.amount || 0
+    }
+  })
+
+  return monthly
+}
+
+/**
+ * Berechnet monatliche Schlussrechnungs-Beträge (Buchhalterischer Umsatz)
+ * Nur type === 'final', Auftragswert (nicht Restbetrag), gefiltert nach Rechnungsdatum
+ */
+export function calculateMonthlyFinalInvoiceFromInvoices(invoices: Invoice[], year: number) {
+  const monthly: { [key: number]: number } = {}
+  for (let i = 0; i < 12; i++) {
+    monthly[i] = 0
+  }
+
+  invoices.forEach(inv => {
+    if (inv.type !== 'final') return
+    const invoiceDate = new Date(inv.invoiceDate)
+    if (invoiceDate.getFullYear() === year) {
+      const month = invoiceDate.getMonth()
+      monthly[month] += getOrderValueForFinalInvoice(inv)
     }
   })
 
