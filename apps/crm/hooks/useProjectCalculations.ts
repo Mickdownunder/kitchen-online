@@ -11,15 +11,22 @@ import {
 interface UseProjectCalculationsProps {
   formData: Partial<CustomerProject>
   setFormData: React.Dispatch<React.SetStateAction<Partial<CustomerProject>>>
+  /** Wareneinsatz aus verknüpften Eingangsrechnungen – hat Vorrang vor EK pro Position */
+  supplierInvoiceTotal?: number
 }
 
 /**
  * Hook für Preisberechnungen für Projekte
  *
- * Berechnet Netto, Brutto, MwSt, Gewinn und Marge basierend auf Items
- * Aktualisiert automatisch formData.totalAmount wenn sich grossTotal ändert
+ * Berechnet Netto, Brutto, MwSt, Gewinn und Marge basierend auf Items.
+ * Wenn supplierInvoiceTotal > 0: Wareneinsatz aus Eingangsrechnungen (genauer).
+ * Sonst: Wareneinsatz aus purchasePricePerUnit pro Position.
  */
-export function useProjectCalculations({ formData, setFormData }: UseProjectCalculationsProps) {
+export function useProjectCalculations({
+  formData,
+  setFormData,
+  supplierInvoiceTotal = 0,
+}: UseProjectCalculationsProps) {
   // Calculations - verwendet zentrale Utility-Funktionen
   const calculations = useMemo(() => {
     const items = formData.items || []
@@ -27,8 +34,9 @@ export function useProjectCalculations({ formData, setFormData }: UseProjectCalc
     // Verwende zentrale Utility-Funktion für Projekt-Gesamtwerte
     const { netTotal, taxTotal, grossTotal, taxByRate } = calculateProjectTotals(items)
 
-    // Verwende zentrale Utility-Funktion für Einkaufspreis-Gesamt
-    const totalPurchaseNet = calculateTotalPurchaseNet(items)
+    // Wareneinsatz: Eingangsrechnungen haben Vorrang, sonst EK pro Position
+    const totalPurchaseNet =
+      supplierInvoiceTotal > 0 ? supplierInvoiceTotal : calculateTotalPurchaseNet(items)
 
     // Gewinn und Marge nur wenn EK erfasst (sonst null, um 100%-Verfälschung zu vermeiden)
     const { profitNet, marginPercent } = calculateProfitAndMargin(netTotal, totalPurchaseNet)
@@ -42,7 +50,7 @@ export function useProjectCalculations({ formData, setFormData }: UseProjectCalc
       marginPercent,
       taxByRate,
     }
-  }, [formData.items])
+  }, [formData.items, supplierInvoiceTotal])
 
   // Aktualisiere formData.totalAmount wenn sich grossTotal ändert
   useEffect(() => {

@@ -659,7 +659,10 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
 
       {/* Tab: Eingangsrechnungen */}
       {activeTab === 'incoming' && (
-        <SupplierInvoicesView onStatsChange={() => loadSupplierInvoices()} />
+        <SupplierInvoicesView
+          projects={projects}
+          onStatsChange={() => loadSupplierInvoices()}
+        />
       )}
 
       {/* Tab: Overview (UVA) */}

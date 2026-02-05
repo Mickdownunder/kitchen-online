@@ -78,6 +78,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     addArticleAsItem,
     // Employees
     employees,
+    fromSupplierInvoices,
   } = useProjectForm(project, existingCustomers)
 
   const { handleSubmit } = useProjectSubmit({
@@ -203,7 +204,11 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
           )}
 
           {activeTab === 'controlling' && (
-            <ProjectControllingTab formData={formData} calculations={calculations} />
+            <ProjectControllingTab
+              formData={formData}
+              calculations={calculations}
+              fromSupplierInvoices={fromSupplierInvoices}
+            />
           )}
 
           {activeTab === 'docs' && (

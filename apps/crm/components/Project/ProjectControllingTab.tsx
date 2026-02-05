@@ -15,9 +15,14 @@ interface ProjectControllingTabProps {
     marginPercent: number | null
     taxByRate: Record<number, number>
   }
+  /** true wenn Wareneinsatz aus verknüpften Eingangsrechnungen stammt */
+  fromSupplierInvoices?: boolean
 }
 
-export function ProjectControllingTab({ calculations }: ProjectControllingTabProps) {
+export function ProjectControllingTab({
+  calculations,
+  fromSupplierInvoices = false,
+}: ProjectControllingTabProps) {
   return (
     <div className="animate-in fade-in slide-in-from-right-4 space-y-10">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -28,6 +33,9 @@ export function ProjectControllingTab({ calculations }: ProjectControllingTabPro
           <p className="text-3xl font-black text-slate-900">
             {calculations.totalPurchaseNet.toLocaleString('de-AT')} €
           </p>
+          {fromSupplierInvoices && (
+            <p className="mt-1 text-xs text-slate-500">aus Eingangsrechnungen</p>
+          )}
         </div>
         <div className="rounded-[2.5rem] border border-slate-100 bg-slate-50 p-8">
           <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">

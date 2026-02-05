@@ -18,7 +18,7 @@ import {
   FileCheck,
   ExternalLink,
 } from 'lucide-react'
-import { SupplierInvoice, SupplierInvoiceCategory, PaymentMethod } from '@/types'
+import { SupplierInvoice, SupplierInvoiceCategory, PaymentMethod, CustomerProject } from '@/types'
 import {
   getSupplierInvoices,
   createSupplierInvoice,
@@ -65,10 +65,11 @@ function getCategoryColor(category: string): string {
 }
 
 interface SupplierInvoicesViewProps {
+  projects?: CustomerProject[]
   onStatsChange?: (stats: { totalTax: number; count: number }) => void
 }
 
-export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoicesViewProps) {
+export default function SupplierInvoicesView({ projects = [], onStatsChange }: SupplierInvoicesViewProps) {
   const [invoices, setInvoices] = useState<SupplierInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -86,6 +87,7 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
     netAmount: 0,
     taxRate: 20,
     category: 'material',
+    projectId: undefined,
   })
   const [saving, setSaving] = useState(false)
   const [scanStatus, setScanStatus] = useState<'idle' | 'uploading' | 'analyzing' | 'done' | 'error'>('idle')
@@ -173,6 +175,7 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
     return {
       total: filteredInvoices.reduce((sum, inv) => sum + inv.grossAmount, 0),
       totalTax: filteredInvoices.reduce((sum, inv) => sum + inv.taxAmount, 0),
+      totalSkonto: filteredInvoices.reduce((sum, inv) => sum + (inv.skontoAmount ?? 0), 0),
       paidAmount: paid.reduce((sum, inv) => sum + inv.grossAmount, 0),
       openAmount: open.reduce((sum, inv) => sum + inv.grossAmount, 0),
       overdueAmount: overdue.reduce((sum, inv) => sum + inv.grossAmount, 0),
@@ -185,6 +188,11 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
   const formatCurrency = (value: number) => {
     return value.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
+
+  const projectMap = useMemo(
+    () => new Map(projects.map(p => [p.id, p])),
+    [projects]
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -216,6 +224,7 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
       netAmount: 0,
       taxRate: 20,
       category: 'material',
+      projectId: undefined,
       skontoPercent: undefined,
       skontoAmount: undefined,
     })
@@ -329,6 +338,7 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
       netAmount: invoice.netAmount,
       taxRate: invoice.taxRate,
       category: invoice.category,
+      projectId: invoice.projectId,
       skontoPercent: invoice.skontoPercent,
       skontoAmount: invoice.skontoAmount,
       notes: invoice.notes,
@@ -439,7 +449,7 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Gesamt</p>
           <p className="text-2xl font-black text-slate-900">{formatCurrency(stats.total)} €</p>
@@ -449,6 +459,11 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
           <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Vorsteuer</p>
           <p className="text-2xl font-black text-emerald-700">{formatCurrency(stats.totalTax)} €</p>
           <p className="text-xs text-emerald-600">Abzugsfähig</p>
+        </div>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Skonto gesamt</p>
+          <p className="text-2xl font-black text-blue-700">{formatCurrency(stats.totalSkonto)} €</p>
+          <p className="text-xs text-blue-600">Für Steuerberater</p>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-amber-600">Offen</p>
@@ -531,6 +546,9 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                 <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
                   Kategorie
                 </th>
+                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                  Auftrag
+                </th>
                 <th className="px-6 py-4 text-right text-xs font-black uppercase tracking-wider text-slate-500">
                   Netto
                 </th>
@@ -551,7 +569,7 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
             <tbody className="divide-y divide-slate-100">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={10} className="px-6 py-12 text-center text-slate-400">
                     {invoices.length === 0
                       ? 'Noch keine Eingangsrechnungen erfasst'
                       : 'Keine Rechnungen gefunden'}
@@ -600,6 +618,18 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                         >
                           {getCategoryLabel(invoice.category)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {invoice.projectId ? (
+                          <span className="text-xs font-medium text-slate-600">
+                            {projectMap.get(invoice.projectId)?.orderNumber ?? '—'}{' '}
+                            <span className="text-slate-400">
+                              ({projectMap.get(invoice.projectId)?.customerName ?? ''})
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-slate-700">
                         {formatCurrency(invoice.netAmount)} €
@@ -942,6 +972,42 @@ export default function SupplierInvoicesView({ onStatsChange }: SupplierInvoices
                   </button>
                 </div>
               </div>
+
+              {/* Auftrag (für Marge-Berechnung) */}
+              {projects.length > 0 && (
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-slate-700">
+                    Auftrag zuordnen
+                  </label>
+                  <select
+                    value={formData.projectId ?? ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        projectId: e.target.value || undefined,
+                      })
+                    }
+                    className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 font-medium transition-all focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="">Kein Auftrag</option>
+                    {projects
+                      .slice()
+                      .sort((a, b) =>
+                        (b.orderDate || b.createdAt || '').localeCompare(
+                          a.orderDate || a.createdAt || ''
+                        )
+                      )
+                      .map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.orderNumber} – {p.customerName}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Verknüpfung ermöglicht automatische Marge-Berechnung aus Wareneinsatz
+                  </p>
+                </div>
+              )}
 
               {/* Skonto (für Steuerberater separat) */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">

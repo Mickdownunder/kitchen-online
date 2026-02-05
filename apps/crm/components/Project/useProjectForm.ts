@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CustomerProject, ProjectStatus } from '@/types'
 import type { Customer } from '@/types'
 import { peekNextOrderNumber } from '@/lib/supabase/services/company'
+import { getSupplierInvoices } from '@/lib/supabase/services/supplierInvoices'
 import { parseAddressFromDB } from '@/lib/utils/addressFormatter'
 import { useCustomerSelection } from '@/hooks/useCustomerSelection'
 import { useAddressAutocomplete } from '@/hooks/useAddressAutocomplete'
@@ -86,10 +87,26 @@ export function useProjectForm(
     setFormData,
   })
 
-  // Project-Calculations Hook
+  // Wareneinsatz aus verknüpften Eingangsrechnungen (für Marge)
+  const [supplierInvoiceTotal, setSupplierInvoiceTotal] = useState(0)
+  useEffect(() => {
+    if (!formData.id) {
+      setSupplierInvoiceTotal(0)
+      return
+    }
+    getSupplierInvoices(formData.id)
+      .then(invoices => {
+        const total = invoices.reduce((sum, inv) => sum + inv.netAmount, 0)
+        setSupplierInvoiceTotal(total)
+      })
+      .catch(() => setSupplierInvoiceTotal(0))
+  }, [formData.id])
+
+  // Project-Calculations Hook (nutzt Eingangsrechnungen wenn verknüpft)
   const { calculations } = useProjectCalculations({
     formData,
     setFormData,
+    supplierInvoiceTotal,
   })
 
   // Employees Hook
@@ -141,6 +158,7 @@ export function useProjectForm(
   return {
     formData,
     setFormData,
+    fromSupplierInvoices: supplierInvoiceTotal > 0,
     // Customer Selection
     customers: customerSelection.customers,
     selectedCustomerId: customerSelection.selectedCustomerId,
