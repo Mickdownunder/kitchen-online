@@ -34,6 +34,9 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
   const [paidDateInput, setPaidDateInput] = useState(
     () => new Date().toISOString().split('T')[0]
   )
+  const [finalInvoiceDate, setFinalInvoiceDate] = useState(
+    () => new Date().toISOString().split('T')[0]
+  )
   const totalPartial = partialPayments.reduce((sum, p) => sum + p.amount, 0)
   const remaining = grossTotal - totalPartial
   const hasUnpaidPayments = partialPayments.some(p => !p.isPaid)
