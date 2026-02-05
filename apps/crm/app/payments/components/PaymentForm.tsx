@@ -9,10 +9,13 @@ interface PaymentFormProps {
   formData: Partial<PartialPayment>
   percentInput: string
   grossTotal: number
+  invoiceNumber: string
+  suggestedInvoiceNumber: string
   onFormChange: (data: Partial<PartialPayment>) => void
   onPercentChange: (value: string, fromAmountField?: boolean) => void
   onPercentBlur: () => void
   onQuickPercent: (percent: number) => void
+  onInvoiceNumberChange: (value: string) => void
   onSave: () => void
   onCancel: () => void
 }
@@ -21,10 +24,13 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   formData,
   percentInput,
   grossTotal,
+  invoiceNumber,
+  suggestedInvoiceNumber,
   onFormChange,
   onPercentChange,
   onPercentBlur,
   onQuickPercent,
+  onInvoiceNumberChange,
   onSave,
   onCancel,
 }) => {
@@ -57,17 +63,36 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       </div>
 
       <div className="space-y-4">
-        <div>
-          <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
-            Beschreibung
-          </label>
-          <input
-            type="text"
-            placeholder="z.B. 40% Anzahlung, 40% vor Lieferung, 20% bei Lieferung"
-            className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
-            value={formData.description || ''}
-            onChange={e => onFormChange({ ...formData, description: e.target.value })}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
+              Rechnungsnummer
+            </label>
+            <input
+              type="text"
+              placeholder={suggestedInvoiceNumber || 'R-2026-0001'}
+              className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
+              value={invoiceNumber}
+              onChange={e => onInvoiceNumberChange(e.target.value)}
+            />
+            {invoiceNumber !== suggestedInvoiceNumber && suggestedInvoiceNumber && (
+              <p className="mt-1 text-xs text-amber-600">
+                Vorschlag: {suggestedInvoiceNumber}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
+              Beschreibung
+            </label>
+            <input
+              type="text"
+              placeholder="z.B. 40% Anzahlung, 40% vor Lieferung, 20% bei Lieferung"
+              className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-amber-500"
+              value={formData.description || ''}
+              onChange={e => onFormChange({ ...formData, description: e.target.value })}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">

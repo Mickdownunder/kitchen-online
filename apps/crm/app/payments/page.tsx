@@ -9,7 +9,9 @@ import {
   markInvoicePaid,
   markInvoiceUnpaid,
   getInvoices,
+  getInvoiceByNumber,
 } from '@/lib/supabase/services'
+import { peekNextInvoiceNumber } from '@/lib/supabase/services/company'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 import { CustomerProject, Invoice } from '@/types'
 import { CreditCard, Plus, ArrowLeft } from 'lucide-react'
@@ -38,6 +40,8 @@ function PaymentsPageContent() {
   const [editingPercentInput, setEditingPercentInput] = useState('')
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loadingInvoices, setLoadingInvoices] = useState(false)
+  const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [suggestedInvoiceNumber, setSuggestedInvoiceNumber] = useState('')
 
   // Lade Rechnungen für das ausgewählte Projekt
   const loadProjectInvoices = useCallback(async (projectId: string) => {
@@ -78,6 +82,8 @@ function PaymentsPageContent() {
     setNewPaymentForm(null)
     setPercentInput('')
     setEditingPercentInput('')
+    setInvoiceNumber('')
+    setSuggestedInvoiceNumber('')
   }, [])
 
   // Auto-select project if projectId is in URL
@@ -179,6 +185,15 @@ function PaymentsPageContent() {
           invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
         })
       } else {
+        // Prüfe ob die Rechnungsnummer bereits existiert
+        if (invoiceNumber) {
+          const existingInvoice = await getInvoiceByNumber(invoiceNumber)
+          if (existingInvoice) {
+            alert(`Die Rechnungsnummer "${invoiceNumber}" ist bereits vergeben. Bitte wählen Sie eine andere Nummer.`)
+            return
+          }
+        }
+        
         // Neue Anzahlungsrechnung erstellen
         await createInvoice({
           projectId,
@@ -186,6 +201,7 @@ function PaymentsPageContent() {
           amount: amountRounded,
           invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
           description: newPaymentForm.description,
+          invoiceNumber: invoiceNumber || undefined,
         })
       }
 
@@ -319,9 +335,15 @@ function PaymentsPageContent() {
     }
   }
 
-  const startNewPayment = () => {
+  const startNewPayment = async () => {
     if (!selectedProject) return
     const paymentCount = partialPayments.length
+    
+    // Lade die vorgeschlagene Rechnungsnummer
+    const suggested = await peekNextInvoiceNumber()
+    setSuggestedInvoiceNumber(suggested)
+    setInvoiceNumber(suggested)
+    
     setNewPaymentForm({
       description: `Anzahlung ${paymentCount + 1}`,
       amount: undefined,
@@ -453,10 +475,13 @@ function PaymentsPageContent() {
                       formData={newPaymentForm}
                       percentInput={percentInput}
                       grossTotal={calculations.grossTotal}
+                      invoiceNumber={invoiceNumber}
+                      suggestedInvoiceNumber={suggestedInvoiceNumber}
                       onFormChange={setNewPaymentForm}
                       onPercentChange={handlePercentChange}
                       onPercentBlur={handlePercentBlur}
                       onQuickPercent={handleQuickPercent}
+                      onInvoiceNumberChange={setInvoiceNumber}
                       onSave={() => handleSavePayment(selectedProject.id)}
                       onCancel={resetForm}
                     />

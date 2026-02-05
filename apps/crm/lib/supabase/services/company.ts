@@ -199,6 +199,10 @@ function parseInvoiceNumberSegment(year: number, invoiceNumber: string): number 
 /**
  * Generiert die nächste freie Rechnungsnummer (füllt Lücken: gelöschte Nummern werden wiederverwendet).
  * Format: {prefix}{jahr}-{nummer} z.B. "R-2026-0001"
+ * 
+ * HINWEIS: Diese Funktion "reserviert" keine Nummer - sie berechnet nur den Vorschlag.
+ * Die tatsächliche Nummer wird erst beim Speichern der Rechnung vergeben.
+ * Falls keine Rechnungen existieren, wird der Fallback-Wert aus company_settings verwendet.
  */
 export async function getNextInvoiceNumber(): Promise<string> {
   const user = await getCurrentUser()
@@ -249,18 +253,8 @@ export async function getNextInvoiceNumber(): Promise<string> {
 
   const invoiceNumber = `${prefix}${year}-${String(n).padStart(4, '0')}`
 
-  const nextCounter = Math.max(settings.next_invoice_number || 1, n + 1)
-  const { error: updateError } = await supabase
-    .from('company_settings')
-    .update({
-      next_invoice_number: nextCounter,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', settings.id)
-
-  if (updateError) {
-    throw new Error('Fehler beim Aktualisieren des Rechnungszählers: ' + updateError.message)
-  }
+  // Hinweis: Zähler wird NICHT mehr aktualisiert - die nächste Nummer wird immer
+  // aus den tatsächlich gespeicherten Rechnungen abgeleitet (MAX + 1)
 
   return invoiceNumber
 }
