@@ -167,6 +167,16 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     selectedMonth,
   })
 
+  // Für Monats-Tab-Counts: Rechnungen nur nach Jahr filtern (nicht nach Monat)
+  const { filteredInvoices: invoicesForMonthCounts } = useInvoiceFilters({
+    invoices,
+    searchTerm,
+    filterType,
+    filterStatus,
+    selectedYear,
+    selectedMonth: 'all',
+  })
+
   const handleInvoiceSort = (field: 'invoiceNumber' | 'customer' | 'amount' | 'date') => {
     if (sortField === field) {
       setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
@@ -534,10 +544,10 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
 
       {/* Horizontale Monatstabs - nur wenn ein Jahr gewählt ist */}
       {selectedYear !== 'all' && (
-        <div className="glass flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
+        <div className="glass grid grid-cols-[auto_1fr] gap-2 rounded-2xl border border-white/50 bg-gradient-to-r from-white to-slate-50/30 p-2 shadow-lg">
           <button
             onClick={() => setSelectedMonth('all')}
-            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+            className={`flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
               selectedMonth === 'all'
                 ? 'bg-slate-900 text-white shadow-lg'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -545,32 +555,26 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
           >
             Alle
           </button>
-          <div className="mx-2 h-6 w-px bg-slate-200" />
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(monthNum => {
-            const monthInvoices = invoicesByMonth.get(monthNum) || []
-            const count = monthInvoices.length
-            const isSelected = typeof selectedMonth === 'number' && selectedMonth === monthNum
-            const monthName = new Date(2000, monthNum - 1).toLocaleDateString('de-DE', { month: 'long' })
-            
-            return (
-              <button
-                key={monthNum}
-                onClick={() => setSelectedMonth(monthNum)}
-                className={`relative flex min-w-[6rem] flex-col items-center rounded-xl px-3 py-2 transition-all ${
-                  isSelected
-                    ? 'bg-amber-500 shadow-lg'
-                    : 'hover:bg-slate-100'
-                }`}
-              >
-                <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
-                  {monthName}
-                </span>
-                <span className={`text-[10px] font-bold ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>
-                  {count}
-                </span>
-              </button>
-            )
-          })}
+          <div className="grid grid-cols-6 gap-0.5">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(monthNum => {
+              const monthInvoices = invoicesByMonth.get(monthNum) || []
+              const count = monthInvoices.length
+              const isSelected = typeof selectedMonth === 'number' && selectedMonth === monthNum
+              const monthName = new Date(2000, monthNum - 1).toLocaleDateString('de-DE', { month: 'short' })
+              return (
+                <button
+                  key={monthNum}
+                  onClick={() => setSelectedMonth(monthNum)}
+                  className={`flex flex-col items-center rounded-lg px-2 py-1.5 transition-all ${
+                    isSelected ? 'bg-amber-500 shadow-lg' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>{monthName}</span>
+                  <span className={`text-[10px] font-bold ${isSelected ? 'text-white/90' : 'text-slate-500'}`}>{count}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 

@@ -70,6 +70,8 @@ export default function DeliveriesClient() {
 
   const [showUpload, setShowUpload] = useState(false)
   const [visibleCount, setVisibleCount] = useState(120)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
   const [expandedYears, setExpandedYears] = useState<Set<number>>(
     () => new Set([new Date().getFullYear()])
   )
@@ -99,6 +101,7 @@ export default function DeliveriesClient() {
   // Reset pagination when switching tabs or filters
   useEffect(() => {
     setVisibleCount(120)
+    setCurrentPage(1)
   }, [activeTab, selectedYear, selectedMonth, statusFilter, sortField, sortDirection, search])
 
   const yearsAvailable = useMemo(() => {
@@ -174,6 +177,22 @@ export default function DeliveriesClient() {
       )
   }, [supplierDeliveryNotes, search, selectedYear, selectedMonth, statusFilter, sort])
 
+  // Für Monats-Tab-Counts: ohne Monat-Filter
+  const filteredSupplierForCounts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return supplierDeliveryNotes.filter(n => {
+      const d = new Date(n.deliveryDate)
+      if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
+      if (statusFilter !== 'all' && n.status !== statusFilter) return false
+      if (!q) return true
+      return (
+        n.supplierName?.toLowerCase().includes(q) ||
+        n.supplierDeliveryNoteNumber?.toLowerCase().includes(q) ||
+        (n.matchedProjectId || '').toLowerCase().includes(q)
+      )
+    })
+  }, [supplierDeliveryNotes, search, selectedYear, statusFilter])
+
   const filteredCustomer = useMemo(() => {
     const q = search.trim().toLowerCase()
     return customerDeliveryNotes
@@ -212,6 +231,53 @@ export default function DeliveriesClient() {
     sort,
     projectsIndex,
   ])
+
+  // Für Monats-Tab-Counts: ohne Monat-Filter
+  const filteredCustomerForCounts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return customerDeliveryNotes.filter(n => {
+      const d = new Date(n.deliveryDate)
+      if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
+      if (statusFilter !== 'all' && n.status !== statusFilter) return false
+      if (!q) return true
+      const project = projectsIndex.get(n.projectId)
+      const customerName = project?.customerName?.toLowerCase() || ''
+      return (
+        n.deliveryNoteNumber?.toLowerCase().includes(q) ||
+        (n.projectId || '').toLowerCase().includes(q) ||
+        customerName.includes(q)
+      )
+    })
+  }, [customerDeliveryNotes, search, selectedYear, statusFilter, projectsIndex])
+
+  // Monatszahlen für horizontale Tabs
+  const deliveriesByMonth = useMemo(() => {
+    const months: Map<number, (DeliveryNote | CustomerDeliveryNote)[]> = new Map()
+    for (let i = 1; i <= 12; i++) months.set(i, [])
+    const list = activeTab === 'supplier' ? filteredSupplierForCounts : filteredCustomerForCounts
+    if (selectedYear !== 'all') {
+      list.forEach((n: DeliveryNote | CustomerDeliveryNote) => {
+        const d = new Date(n.deliveryDate)
+        if (d.getFullYear() === selectedYear) {
+          const month = d.getMonth() + 1
+          months.get(month)!.push(n)
+        }
+      })
+    }
+    return months
+  }, [activeTab, filteredSupplierForCounts, filteredCustomerForCounts, selectedYear])
+
+  // Flache Monatsansicht: Lieferscheine des gewählten Monats (bereits gefiltert)
+  const currentMonthDeliveries = useMemo(() => {
+    if (selectedYear === 'all' || selectedMonth === 'all') return []
+    return activeTab === 'supplier' ? filteredSupplier : filteredCustomer
+  }, [activeTab, filteredSupplier, filteredCustomer, selectedYear, selectedMonth])
+
+  const totalPages = Math.ceil(currentMonthDeliveries.length / itemsPerPage)
+  const paginatedDeliveries = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return currentMonthDeliveries.slice(start, start + itemsPerPage)
+  }, [currentMonthDeliveries, currentPage, itemsPerPage])
 
   const grouped = useMemo(() => {
     const list = (activeTab === 'supplier' ? filteredSupplier : filteredCustomer).slice(
@@ -398,92 +464,120 @@ export default function DeliveriesClient() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:flex-row md:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={
-              activeTab === 'supplier'
-                ? 'Suche: Lieferant, Nummer, Projekt-ID…'
-                : 'Suche: Kunde, Nummer, Projekt-ID…'
-            }
-            className="w-full rounded-xl border-2 border-slate-200 py-3 pl-12 pr-4 text-sm outline-none focus:border-blue-500"
-          />
+      {/* Filters - 3 Zeilen Layout */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+        {/* Zeile 1: Suche + Jahr + Status */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={
+                activeTab === 'supplier'
+                  ? 'Suche: Lieferant, Nummer, Projekt-ID…'
+                  : 'Suche: Kunde, Nummer, Projekt-ID…'
+              }
+              className="w-full rounded-xl border-2 border-slate-200 py-3 pl-12 pr-4 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-slate-400" />
+            <select
+              value={selectedYear}
+              onChange={e => {
+                setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))
+                if (e.target.value === 'all') setSelectedMonth('all')
+              }}
+              className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+            >
+              <option value="all">Alle Jahre</option>
+              {yearsAvailable.map(y => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+            >
+              {(activeTab === 'supplier' ? supplierStatuses : customerStatuses).map(s => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="h-5 w-5 text-slate-400" />
-          <select
-            value={selectedYear}
-            onChange={e =>
-              setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))
-            }
-            className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
-          >
-            <option value="all">Alle Jahre</option>
-            {yearsAvailable.map(y => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedMonth}
-            onChange={e =>
-              setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))
-            }
-            className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
-          >
-            <option value="all">Alle Monate</option>
-            {monthOptions.map(m => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
-          >
-            {(activeTab === 'supplier' ? supplierStatuses : customerStatuses).map(s => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-2">
-            {(['date', 'number', 'status'] as const).map(field => (
-              <button
-                key={field}
-                onClick={() => handleSort(field)}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
-                  sortField === field
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                }`}
-              >
-                {field === 'date' && 'Datum'}
-                {field === 'number' && 'Nummer'}
-                {field === 'status' && 'Status'}
-                {sortField === field ? (
-                  sortDirection === 'asc' ? (
-                    <ArrowUp className="h-3 w-3" />
-                  ) : (
-                    <ArrowDown className="h-3 w-3" />
-                  )
-                ) : (
-                  <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                )}
-              </button>
-            ))}
+        {/* Zeile 2: Monatstabs - nur wenn Jahr gewählt */}
+        {selectedYear !== 'all' && (
+          <div className="grid grid-cols-[auto_1fr] gap-2 rounded-xl border-2 border-slate-200 bg-white p-2">
+            <button
+              onClick={() => setSelectedMonth('all')}
+              className={`flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                selectedMonth === 'all'
+                  ? 'bg-slate-900 text-white shadow-lg'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Alle
+            </button>
+            <div className="grid grid-cols-6 gap-0.5">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(monthNum => {
+                const monthItems = deliveriesByMonth.get(monthNum) || []
+                const count = monthItems.length
+                const isSelected = typeof selectedMonth === 'number' && selectedMonth === monthNum
+                const monthName = new Date(2000, monthNum - 1).toLocaleDateString('de-DE', { month: 'short' })
+                return (
+                  <button
+                    key={monthNum}
+                    onClick={() => setSelectedMonth(monthNum)}
+                    className={`flex flex-col items-center rounded-lg px-2 py-1.5 transition-all ${
+                      isSelected
+                        ? activeTab === 'supplier'
+                          ? 'bg-amber-500 shadow-lg'
+                          : 'bg-blue-600 shadow-lg'
+                        : 'hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>{monthName}</span>
+                    <span className={`text-[10px] font-bold ${isSelected ? 'text-white/90' : 'text-slate-500'}`}>{count}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
+        )}
+
+        {/* Zeile 3: Sort-Buttons */}
+        <div className="flex items-center gap-2">
+          {(['date', 'number', 'status'] as const).map(field => (
+            <button
+              key={field}
+              onClick={() => handleSort(field)}
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                sortField === field
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+              }`}
+            >
+              {field === 'date' && 'Datum'}
+              {field === 'number' && 'Nummer'}
+              {field === 'status' && 'Status'}
+              {sortField === field ? (
+                sortDirection === 'asc' ? (
+                  <ArrowUp className="h-3 w-3" />
+                ) : (
+                  <ArrowDown className="h-3 w-3" />
+                )
+              ) : (
+                <ArrowUpDown className="h-3 w-3 text-slate-400" />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -491,6 +585,213 @@ export default function DeliveriesClient() {
       {loading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
+        </div>
+      ) : selectedYear !== 'all' && selectedMonth !== 'all' ? (
+        /* Flache Monatsansicht mit Pagination */
+        <div className="space-y-6">
+          {currentMonthDeliveries.length === 0 ? (
+            <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-16 text-center">
+              <FolderOpen className="mx-auto mb-4 h-16 w-16 text-slate-300" />
+              <p className="text-lg font-black text-slate-600">
+                Keine Lieferscheine in {new Date(2000, (selectedMonth as number) - 1).toLocaleDateString('de-DE', { month: 'long' })} {selectedYear}
+              </p>
+              <p className="mt-2 text-sm text-slate-400">Wählen Sie einen anderen Monat oder passen Sie die Filter an.</p>
+            </div>
+          ) : (
+            <>
+              {/* Monats-Header */}
+              <div className="rounded-2xl border-2 border-slate-200 bg-slate-50/80 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">
+                      {new Date(2000, (selectedMonth as number) - 1).toLocaleDateString('de-DE', { month: 'long' })} {selectedYear}
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      {currentMonthDeliveries.length} Lieferschein{currentMonthDeliveries.length !== 1 ? 'e' : ''}
+                    </p>
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="text-sm text-slate-500">
+                      Seite {currentPage} von {totalPages}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Flache Karten-Liste mit Zeilentrennung */}
+              <div className="space-y-0 divide-y-2 divide-slate-200">
+                {activeTab === 'supplier'
+                  ? (paginatedDeliveries as DeliveryNote[]).map((n, idx) => (
+                      <div
+                        key={n.id}
+                        className={`rounded-none p-6 transition-all hover:border-amber-300 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-4">
+                            <div className="rounded-xl border border-amber-200 bg-amber-100 p-3 text-amber-700">
+                              <Package className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-lg font-black text-slate-900">
+                                  {n.supplierDeliveryNoteNumber}
+                                </div>
+                                <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-black uppercase tracking-wider text-slate-700">
+                                  {n.status}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-sm text-slate-600">
+                                <strong>{n.supplierName}</strong> ·{' '}
+                                {new Date(n.deliveryDate).toLocaleDateString('de-DE')}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                Projekt:{' '}
+                                {n.matchedProjectId ? (
+                                  <button
+                                    onClick={() => openProject(n.matchedProjectId)}
+                                    className="font-bold text-blue-600 underline underline-offset-2 hover:bg-blue-700"
+                                    title="Auftrag öffnen"
+                                  >
+                                    {projectsIndex.get(n.matchedProjectId)?.customerName
+                                      ? `${projectsIndex.get(n.matchedProjectId)!.customerName} öffnen`
+                                      : 'öffnen'}
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-400">nicht zugeordnet</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedSupplierNote(n)}
+                              className="rounded-xl bg-slate-100 p-2 text-slate-700 transition-all hover:bg-slate-200"
+                              title="Ansehen"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  : (paginatedDeliveries as CustomerDeliveryNote[]).map((n, idx) => (
+                      <div
+                        key={n.id}
+                        className={`rounded-none p-6 transition-all hover:border-blue-300 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-4">
+                            <div className="rounded-xl border border-blue-200 bg-blue-100 p-3 text-blue-700">
+                              <Truck className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-lg font-black text-slate-900">
+                                  {n.deliveryNoteNumber}
+                                </div>
+                                <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-black uppercase tracking-wider text-slate-700">
+                                  {n.status}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-sm text-slate-600">
+                                <strong>
+                                  {projectsIndex.get(n.projectId)?.customerName || 'Kunde'}
+                                </strong>
+                                {' · '}
+                                {new Date(n.deliveryDate).toLocaleDateString('de-DE')}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                Auftrag:{' '}
+                                {n.projectId ? (
+                                  <button
+                                    onClick={() => openProject(n.projectId)}
+                                    className="font-bold text-blue-600 underline underline-offset-2 hover:bg-blue-700"
+                                    title="Auftrag öffnen"
+                                  >
+                                    {projectsIndex.get(n.projectId)?.orderNumber
+                                      ? `${projectsIndex.get(n.projectId)!.orderNumber} öffnen`
+                                      : 'öffnen'}
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-400">unbekannt</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedCustomerNote(n)}
+                              className="rounded-xl bg-slate-100 p-2 text-slate-700 transition-all hover:bg-slate-200"
+                              title="Ansehen"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between rounded-2xl border-2 border-slate-200 bg-slate-50/80 px-6 py-4">
+                  <div className="text-sm text-slate-600">
+                    Zeige {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, currentMonthDeliveries.length)} von {currentMonthDeliveries.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      ««
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      «
+                    </button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum: number
+                      if (totalPages <= 5) pageNum = i + 1
+                      else if (currentPage <= 3) pageNum = i + 1
+                      else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i
+                      else pageNum = currentPage - 2 + i
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`rounded-lg px-3 py-2 text-sm font-bold transition-all ${
+                            currentPage === pageNum
+                              ? 'bg-amber-500 text-white shadow-md'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      »
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      »»
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
@@ -537,12 +838,12 @@ export default function DeliveriesClient() {
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-1 gap-4">
+                          <div className="grid grid-cols-1 gap-0 divide-y-2 divide-slate-200">
                             {activeTab === 'supplier'
-                              ? (group.items as DeliveryNote[]).map(n => (
+                              ? (group.items as DeliveryNote[]).map((n, idx) => (
                                   <div
                                     key={n.id}
-                                    className="rounded-2xl border-2 border-slate-200 bg-white p-6 transition-all hover:border-amber-300"
+                                    className={`rounded-none p-6 transition-all hover:border-amber-300 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
                                   >
                                     <div className="flex items-start justify-between gap-4">
                                       <div className="flex items-start gap-4">
@@ -594,10 +895,10 @@ export default function DeliveriesClient() {
                                     </div>
                                   </div>
                                 ))
-                              : (group.items as CustomerDeliveryNote[]).map(n => (
+                              : (group.items as CustomerDeliveryNote[]).map((n, idx) => (
                                   <div
                                     key={n.id}
-                                    className="rounded-2xl border-2 border-slate-200 bg-white p-6 transition-all hover:border-blue-300"
+                                    className={`rounded-none p-6 transition-all hover:border-blue-300 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
                                   >
                                     <div className="flex items-start justify-between gap-4">
                                       <div className="flex items-start gap-4">
