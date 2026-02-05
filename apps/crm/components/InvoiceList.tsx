@@ -9,6 +9,8 @@ import { useGroupedInvoices } from '@/hooks/useGroupedInvoices'
 import { PaymentReminderBanner } from './PaymentReminderBanner'
 import { DueSecondPaymentsList } from './DueSecondPaymentsList'
 import { RemindersTab } from './RemindersTab'
+import { MissingInvoicesList } from './MissingInvoicesList'
+import { useApp } from '@/app/providers'
 import { getCompanySettings } from '@/lib/supabase/services/company'
 import { InvoiceFilters } from './invoices/InvoiceFilters'
 import { InvoiceStatsCards } from './invoices/InvoiceStatsCards'
@@ -28,6 +30,7 @@ interface InvoiceListProps {
 
 const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) => {
   const { success, error: showError } = useToast()
+  const { customerDeliveryNotes } = useApp()
   const [sortField, setSortField] = useState<'invoiceNumber' | 'customer' | 'amount' | 'date'>('date')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [searchTerm, setSearchTerm] = useState('')
@@ -51,7 +54,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   const [reminderModalType, setReminderModalType] = useState<'first' | 'second' | 'final' | null>(
     null
   )
-  const [activeTab, setActiveTab] = useState<'invoices' | 'reminders'>('invoices')
+  const [activeTab, setActiveTab] = useState<'invoices' | 'reminders' | 'missing'>('invoices')
   const [showDuePayments, setShowDuePayments] = useState(false)
   const [dbInvoices, setDbInvoices] = useState<DBInvoice[]>([])
   const [loadingInvoices, setLoadingInvoices] = useState(true)
@@ -347,6 +350,48 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     )
   }
 
+  if (activeTab === 'missing') {
+    return (
+      <div className="animate-in slide-in-from-bottom-4 space-y-6 duration-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="mb-2 text-5xl font-black tracking-tighter text-slate-900">Rechnungen</h2>
+            <p className="font-medium text-slate-500">
+              Projekte mit fehlenden Rechnungen
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-inner">
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className="rounded-xl px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-900"
+          >
+            Rechnungen
+          </button>
+          <button
+            onClick={() => setActiveTab('missing')}
+            className="rounded-xl bg-red-500 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-lg transition-all"
+          >
+            Nicht erfasst
+          </button>
+          <button
+            onClick={() => setActiveTab('reminders')}
+            className="rounded-xl px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-900"
+          >
+            Mahnungen
+          </button>
+        </div>
+
+        <MissingInvoicesList
+          projects={projects}
+          invoices={dbInvoices}
+          customerDeliveryNotes={customerDeliveryNotes}
+        />
+      </div>
+    )
+  }
+
   if (activeTab === 'reminders') {
     return (
       <div className="animate-in slide-in-from-bottom-4 space-y-6 duration-700">
@@ -365,6 +410,12 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
             className="rounded-xl px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-900"
           >
             Rechnungen
+          </button>
+          <button
+            onClick={() => setActiveTab('missing')}
+            className="rounded-xl px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-900"
+          >
+            Nicht erfasst
           </button>
           <button
             onClick={() => setActiveTab('reminders')}
@@ -390,13 +441,19 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-inner">
+      {/* Tabs: Rechnungen | Nicht erfasst | Mahnungen */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-inner">
         <button
           onClick={() => setActiveTab('invoices')}
           className="rounded-xl bg-slate-900 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-lg transition-all"
         >
           Rechnungen
+        </button>
+        <button
+          onClick={() => setActiveTab('missing')}
+          className="rounded-xl px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-900"
+        >
+          Nicht erfasst
         </button>
         <button
           onClick={() => setActiveTab('reminders')}

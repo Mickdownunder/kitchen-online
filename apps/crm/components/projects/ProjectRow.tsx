@@ -33,6 +33,9 @@ export const ProjectRow = React.memo(function ProjectRow(props: {
   formatDate: (v?: string) => string
   getStatusColor: (s: ProjectStatus) => string
   complaintCount?: number
+  // Invoice status indicators (nur Rechnungsvorhandenheit, kein Projektstatus)
+  hasPartialInvoice?: boolean
+  hasFinalInvoice?: boolean
 }) {
   const { project: p } = props
   const statusTriggerRef = useRef<HTMLButtonElement>(null)
@@ -238,6 +241,46 @@ export const ProjectRow = React.memo(function ProjectRow(props: {
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
             </button>
+          </div>
+
+          {/* Separator */}
+          <div className="mx-1 h-4 w-px bg-slate-200" />
+
+          {/* Invoice indicators: AN (Anzahlung) und SC (Schlussrechnung) - nur Rechnungsstatus, kein Projektstatus */}
+          <div
+            className="relative flex flex-col items-center"
+            title={props.hasPartialInvoice ? 'Anzahlung vorhanden ✓' : 'Anzahlung fehlt'}
+          >
+            <span
+              className={`text-[11px] font-black ${
+                props.hasPartialInvoice ? 'text-emerald-600' : 'text-red-500'
+              }`}
+            >
+              AN
+            </span>
+            <div
+              className={`h-2 w-2 rounded-full ${
+                props.hasPartialInvoice ? 'bg-emerald-500' : 'bg-red-500'
+              }`}
+            />
+          </div>
+
+          <div
+            className="relative flex flex-col items-center"
+            title={props.hasFinalInvoice ? 'Schlussrechnung vorhanden ✓' : 'Schlussrechnung fehlt'}
+          >
+            <span
+              className={`text-[11px] font-black ${
+                props.hasFinalInvoice ? 'text-emerald-600' : 'text-red-500'
+              }`}
+            >
+              SC
+            </span>
+            <div
+              className={`h-2 w-2 rounded-full ${
+                props.hasFinalInvoice ? 'bg-emerald-500' : 'bg-red-500'
+              }`}
+            />
           </div>
         </div>
       </td>

@@ -33,7 +33,8 @@ import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
 import { calculateMarginOnlyWithPurchase } from '@/lib/utils/priceCalculations'
 import { logger } from '@/lib/utils/logger'
 import ProjectModal from './ProjectModal'
-import { getCustomers, getComplaints } from '@/lib/supabase/services'
+import { getCustomers, getComplaints, getInvoices } from '@/lib/supabase/services'
+import { Invoice } from '@/types'
 import CustomerDeliveryNoteModal from './CustomerDeliveryNoteModal'
 import MeasurementDateModal from './MeasurementDateModal'
 import InstallationDateModal from './InstallationDateModal'
@@ -66,6 +67,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const { success, error, warning } = useToast()
   const { refreshDeliveryNotes } = useApp()
   
+  // Invoice data for AN/SC indicators
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  
   // ==========================================================================
   // Modal State (consolidated in hook)
   // ==========================================================================
@@ -97,7 +101,22 @@ const ProjectList: React.FC<ProjectListProps> = ({
   useEffect(() => {
     loadCustomers()
     loadComplaints()
+    loadInvoices()
   }, [])
+
+  const loadInvoices = async () => {
+    try {
+      const data = await getInvoices()
+      setInvoices(data)
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : ''
+      const errName = err instanceof Error ? err.name : ''
+      if (errMessage.includes('aborted') || errName === 'AbortError') {
+        return
+      }
+      logger.error('Error loading invoices for indicators', { component: 'ProjectList' }, err as Error)
+    }
+  }
 
   const loadComplaints = async () => {
     try {
@@ -263,6 +282,18 @@ const ProjectList: React.FC<ProjectListProps> = ({
       projectCount: filteredProjects.length,
     }
   }, [filteredProjects])
+
+  // Maps for invoice/delivery note status indicators (AN/SC)
+  const invoicesByProject = useMemo(() => {
+    const map = new Map<string, { hasPartial: boolean; hasFinal: boolean }>()
+    for (const inv of invoices) {
+      const existing = map.get(inv.projectId) || { hasPartial: false, hasFinal: false }
+      if (inv.type === 'partial') existing.hasPartial = true
+      if (inv.type === 'final') existing.hasFinal = true
+      map.set(inv.projectId, existing)
+    }
+    return map
+  }, [invoices])
 
   // Lokaler State für sofortige UI-Updates
   const [localProjects, setLocalProjects] = useState<Map<string, Partial<CustomerProject>>>(
@@ -1012,6 +1043,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                   formatDate={formatDate}
                                   getStatusColor={getStatusColor}
                                   complaintCount={complaintsByProject.get(project.id)}
+                                  hasPartialInvoice={invoicesByProject.get(project.id)?.hasPartial}
+                                  hasFinalInvoice={invoicesByProject.get(project.id)?.hasFinal}
                                 />
                               )
                             })}

@@ -232,20 +232,11 @@ export async function getNextInvoiceNumber(): Promise<string> {
     if (num != null) used.add(num)
   }
 
-  // Finde die nächste freie Nummer:
-  // - Wenn Rechnungen existieren: Suche Lücken ab dem Minimum, oder maxUsed + 1
-  // - Wenn keine Rechnungen: Verwende next_invoice_number aus Einstellungen
+  // Finde die nächste Nummer: Immer höchste existierende + 1 (keine Lückenfüllung)
   let n: number
   if (used.size > 0) {
-    const minUsed = Math.min(...used)
     const maxUsed = Math.max(...used)
-    
-    // Suche nach Lücken zwischen minUsed und maxUsed
-    n = minUsed
-    while (n <= maxUsed && used.has(n)) n++
-    
-    // Wenn keine Lücke gefunden, nimm maxUsed + 1
-    if (n > maxUsed) n = maxUsed + 1
+    n = maxUsed + 1
   } else {
     // Keine Rechnungen vorhanden - verwende Zähler aus Einstellungen
     n = settings.next_invoice_number || 1
@@ -284,15 +275,11 @@ export async function peekNextInvoiceNumber(): Promise<string> {
     if (num != null) used.add(num)
   }
 
-  // Gleiche Logik wie getNextInvoiceNumber
+  // Immer höchste existierende + 1 (keine Lückenfüllung)
   let n: number
   if (used.size > 0) {
-    const minUsed = Math.min(...used)
     const maxUsed = Math.max(...used)
-    
-    n = minUsed
-    while (n <= maxUsed && used.has(n)) n++
-    if (n > maxUsed) n = maxUsed + 1
+    n = maxUsed + 1
   } else {
     n = settings.nextInvoiceNumber || 1
   }
@@ -347,15 +334,11 @@ export async function getNextOrderNumber(): Promise<string> {
     if (num != null) used.add(num)
   }
 
-  // Finde die nächste freie Nummer (gleiche Logik wie bei Rechnungsnummern)
+  // Immer höchste existierende + 1 (keine Lückenfüllung)
   let n: number
   if (used.size > 0) {
-    const minUsed = Math.min(...used)
     const maxUsed = Math.max(...used)
-    
-    n = minUsed
-    while (n <= maxUsed && used.has(n)) n++
-    if (n > maxUsed) n = maxUsed + 1
+    n = maxUsed + 1
   } else {
     n = settings.next_order_number || 1
   }
@@ -402,15 +385,11 @@ export async function peekNextOrderNumber(): Promise<string> {
     if (num != null) used.add(num)
   }
 
-  // Gleiche Logik wie getNextOrderNumber
+  // Immer höchste existierende + 1 (keine Lückenfüllung)
   let n: number
   if (used.size > 0) {
-    const minUsed = Math.min(...used)
     const maxUsed = Math.max(...used)
-    
-    n = minUsed
-    while (n <= maxUsed && used.has(n)) n++
-    if (n > maxUsed) n = maxUsed + 1
+    n = maxUsed + 1
   } else {
     n = settings.nextOrderNumber || 1
   }
@@ -423,8 +402,20 @@ export async function peekNextOrderNumber(): Promise<string> {
 // ============================================
 
 /**
- * Generiert die nächste fortlaufende Lieferscheinnummer und erhöht den Zähler.
+ * Extrahiert die laufende Nummer aus Lieferscheinnummern (LS2026-0001, LS-2026-0001, etc.).
+ */
+function parseDeliveryNoteNumberSegment(year: number, noteNumber: string): number | null {
+  if (!noteNumber?.trim()) return null
+  const match = noteNumber.match(new RegExp(`${year}-(\\d+)`))
+  if (!match) return null
+  const n = parseInt(match[1], 10)
+  return Number.isNaN(n) ? null : n
+}
+
+/**
+ * Generiert die nächste fortlaufende Lieferscheinnummer.
  * Format: {prefix}{jahr}-{nummer} z.B. "LS-2026-0001"
+ * Basiert auf der höchsten existierenden Nummer in der DB (keine Lückenfüllung).
  */
 export async function getNextDeliveryNoteNumber(): Promise<string> {
   const user = await getCurrentUser()
@@ -441,35 +432,66 @@ export async function getNextDeliveryNoteNumber(): Promise<string> {
   }
 
   const prefix = settings.delivery_note_prefix || 'LS-'
-  const currentNumber = settings.next_delivery_note_number || 1
   const year = new Date().getFullYear()
-  const deliveryNoteNumber = `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
 
-  const { error: updateError } = await supabase
-    .from('company_settings')
-    .update({
-      next_delivery_note_number: currentNumber + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', settings.id)
+  // Alle existierenden Lieferscheinnummern abfragen
+  const { data: existing } = await supabase
+    .from('delivery_notes')
+    .select('delivery_note_number')
+    .eq('user_id', user.id)
 
-  if (updateError) {
-    throw new Error('Fehler beim Aktualisieren des Lieferscheinzählers: ' + updateError.message)
+  const used = new Set<number>()
+  for (const row of existing || []) {
+    const num = parseDeliveryNoteNumberSegment(year, row.delivery_note_number ?? '')
+    if (num != null) used.add(num)
   }
 
-  return deliveryNoteNumber
+  // Immer höchste existierende + 1 (keine Lückenfüllung)
+  let n: number
+  if (used.size > 0) {
+    const maxUsed = Math.max(...used)
+    n = maxUsed + 1
+  } else {
+    n = settings.next_delivery_note_number || 1
+  }
+
+  return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }
 
 /**
- * Gibt die nächste Lieferscheinnummer zurück, ohne sie zu vergeben.
+ * Gibt die nächste Lieferscheinnummer zurück, ohne sie zu vergeben (Vorschau).
  */
 export async function peekNextDeliveryNoteNumber(): Promise<string> {
+  const user = await getCurrentUser()
+  if (!user) return 'LS-' + new Date().getFullYear() + '-0001'
+
   const settings = await getCompanySettings()
   if (!settings) return 'LS-' + new Date().getFullYear() + '-0001'
+
   const prefix = settings.deliveryNotePrefix || 'LS-'
-  const currentNumber = settings.nextDeliveryNoteNumber || 1
   const year = new Date().getFullYear()
-  return `${prefix}${year}-${String(currentNumber).padStart(4, '0')}`
+
+  const { data: existing } = await supabase
+    .from('delivery_notes')
+    .select('delivery_note_number')
+    .eq('user_id', user.id)
+
+  const used = new Set<number>()
+  for (const row of existing || []) {
+    const num = parseDeliveryNoteNumberSegment(year, row.delivery_note_number ?? '')
+    if (num != null) used.add(num)
+  }
+
+  // Immer höchste existierende + 1 (keine Lückenfüllung)
+  let n: number
+  if (used.size > 0) {
+    const maxUsed = Math.max(...used)
+    n = maxUsed + 1
+  } else {
+    n = settings.nextDeliveryNoteNumber || 1
+  }
+
+  return `${prefix}${year}-${String(n).padStart(4, '0')}`
 }
 
 // ============================================

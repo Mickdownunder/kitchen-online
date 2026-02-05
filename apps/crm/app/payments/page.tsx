@@ -248,7 +248,10 @@ function PaymentsPageContent() {
     }
   }
 
-  const handleGenerateFinalInvoice = async (projectId: string) => {
+  const handleGenerateFinalInvoice = async (invoiceDate: string) => {
+    if (!selectedProject) return
+    const projectId = selectedProject.id
+
     try {
       const project = projects.find(p => p.id === projectId)
       if (!project) return
@@ -275,12 +278,13 @@ function PaymentsPageContent() {
         return
       }
 
-      // Neue Schlussrechnung erstellen
+      // Neue Schlussrechnung erstellen (mit wählbarem Datum)
       await createInvoice({
         projectId,
         type: 'final',
         amount: remaining,
         description: 'Schlussrechnung',
+        invoiceDate: invoiceDate || new Date().toISOString().split('T')[0],
       })
 
       // Rechnungen neu laden
@@ -572,7 +576,7 @@ function PaymentsPageContent() {
                             }
                           : undefined
                       }
-                      onGenerateFinalInvoice={() => handleGenerateFinalInvoice(selectedProject.id)}
+                      onGenerateFinalInvoice={(invoiceDate) => handleGenerateFinalInvoice(invoiceDate)}
                       onMarkFinalInvoicePaid={handleMarkFinalInvoicePaid}
                       onUnmarkFinalInvoicePaid={handleUnmarkFinalInvoicePaid}
                       onDeleteFinalInvoice={handleDeleteFinalInvoice}

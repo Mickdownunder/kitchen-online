@@ -15,7 +15,7 @@ interface PaymentSummaryProps {
     isPaid: boolean
     paidDate?: string
   }
-  onGenerateFinalInvoice: () => void
+  onGenerateFinalInvoice: (invoiceDate: string) => void
   onMarkFinalInvoicePaid: (paidDate: string) => void
   onUnmarkFinalInvoicePaid: () => void
   onDeleteFinalInvoice: () => void
@@ -150,10 +150,21 @@ export const PaymentSummary: React.FC<PaymentSummaryProps> = ({
       ) : (
         partialPayments.length > 0 &&
         remaining > 0 && (
-          <div className="mt-6">
+          <div className="mt-6 rounded-xl border-2 border-purple-200 bg-purple-50/50 p-6">
+            <div className="mb-4">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-600">
+                Datum der Schlussrechnung
+              </label>
+              <input
+                type="date"
+                value={finalInvoiceDate}
+                onChange={e => setFinalInvoiceDate(e.target.value)}
+                className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-purple-500"
+              />
+            </div>
             <button
               type="button"
-              onClick={onGenerateFinalInvoice}
+              onClick={() => onGenerateFinalInvoice(finalInvoiceDate)}
               disabled={hasUnpaidPayments}
               className={`flex w-full items-center justify-center gap-3 rounded-xl px-6 py-4 text-sm font-black uppercase tracking-widest shadow-lg transition-all ${
                 hasUnpaidPayments
