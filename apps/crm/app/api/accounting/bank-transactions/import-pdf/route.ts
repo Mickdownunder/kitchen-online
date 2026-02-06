@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       bank_account_id: bankAccountId || null,
       transaction_date: t.date,
-      amount: Math.round(t.amount * 100) / 100,
+      amount: roundTo2Decimals(t.amount),
       reference: t.reference || null,
       counterparty_name: null,
       counterparty_iban: null,

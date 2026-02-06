@@ -1,4 +1,5 @@
 import { Reminder } from '@/types'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 /**
  * Generic invoice-like interface for calculations
@@ -188,5 +189,5 @@ export function calculateLatePaymentInterest(
   const dailyInterest = yearlyInterest / 365
   const totalInterest = dailyInterest * overdueDays
 
-  return Math.round(totalInterest * 100) / 100 // Auf 2 Dezimalstellen runden
+  return roundTo2Decimals(totalInterest)
 }

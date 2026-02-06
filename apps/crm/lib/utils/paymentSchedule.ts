@@ -1,4 +1,5 @@
 import { CustomerProject, PaymentSchedule, PartialPayment } from '@/types'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 /**
  * MIGRATION NOTE:
@@ -46,9 +47,9 @@ export function calculatePaymentAmounts(
   const total = project.totalAmount
 
   return {
-    first: Math.round(((total * schedule.firstPercent) / 100) * 100) / 100,
-    second: Math.round(((total * schedule.secondPercent) / 100) * 100) / 100,
-    final: Math.round(((total * schedule.finalPercent) / 100) * 100) / 100,
+    first: roundTo2Decimals((total * schedule.firstPercent) / 100),
+    second: roundTo2Decimals((total * schedule.secondPercent) / 100),
+    final: roundTo2Decimals((total * schedule.finalPercent) / 100),
   }
 }
 

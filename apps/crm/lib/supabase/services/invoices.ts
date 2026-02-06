@@ -293,8 +293,8 @@ export async function updateInvoice(
   if (updates.invoiceNumber !== undefined) updateData.invoice_number = updates.invoiceNumber
   if (updates.type !== undefined) updateData.type = updates.type
   if (updates.amount !== undefined) updateData.amount = roundTo2Decimals(updates.amount)
-  if (updates.netAmount !== undefined) updateData.net_amount = updates.netAmount
-  if (updates.taxAmount !== undefined) updateData.tax_amount = updates.taxAmount
+  if (updates.netAmount !== undefined) updateData.net_amount = roundTo2Decimals(updates.netAmount)
+  if (updates.taxAmount !== undefined) updateData.tax_amount = roundTo2Decimals(updates.taxAmount)
   if (updates.taxRate !== undefined) updateData.tax_rate = updates.taxRate
   if (updates.invoiceDate !== undefined) updateData.invoice_date = updates.invoiceDate
   if (updates.dueDate !== undefined) updateData.due_date = updates.dueDate

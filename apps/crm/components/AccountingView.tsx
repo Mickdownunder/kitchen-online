@@ -28,7 +28,7 @@ import {
   getSupplierInvoicesByDateRange,
   getInputTaxForUVA,
 } from '@/lib/supabase/services'
-import { calculateNetFromGross } from '@/lib/utils/priceCalculations'
+import { calculateNetFromGross, roundTo2Decimals } from '@/lib/utils/priceCalculations'
 import { logger } from '@/lib/utils/logger'
 import {
   exportUVAExcel,
@@ -323,11 +323,11 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
       entry.invoiceCount += 1
     })
 
-    // Round to 2 decimal places
+    // Round to 2 decimal places (Buchhaltungspräzision)
     Object.values(uva).forEach(entry => {
-      entry.netAmount = Math.round(entry.netAmount * 100) / 100
-      entry.taxAmount = Math.round(entry.taxAmount * 100) / 100
-      entry.grossAmount = Math.round(entry.grossAmount * 100) / 100
+      entry.netAmount = roundTo2Decimals(entry.netAmount)
+      entry.taxAmount = roundTo2Decimals(entry.taxAmount)
+      entry.grossAmount = roundTo2Decimals(entry.grossAmount)
     })
 
     return Object.values(uva)
@@ -361,8 +361,8 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
     const totalNet = inputTaxData.reduce((sum, entry) => sum + entry.netAmount, 0)
     const totalTax = inputTaxData.reduce((sum, entry) => sum + entry.taxAmount, 0)
     return {
-      totalNet: Math.round(totalNet * 100) / 100,
-      totalTax: Math.round(totalTax * 100) / 100,
+      totalNet: roundTo2Decimals(totalNet),
+      totalTax: roundTo2Decimals(totalTax),
       count: supplierInvoices.length,
     }
   }, [inputTaxData, supplierInvoices])
@@ -370,7 +370,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
   // UVA Zahllast (Umsatzsteuer - Vorsteuer)
   const zahllast = useMemo(() => {
     const result = totals.totalTax - inputTaxTotals.totalTax
-    return Math.round(result * 100) / 100
+    return roundTo2Decimals(result)
   }, [totals.totalTax, inputTaxTotals.totalTax])
 
   // Handle exports

@@ -44,7 +44,10 @@ interface AppContextType {
   refreshAppointments: () => Promise<void>
 
   // AI Functions
-  handleFunctionCall: (name: string, args: Record<string, unknown>) => Promise<string | void>
+  handleFunctionCall: (
+    name: string,
+    args: Record<string, unknown>
+  ) => Promise<string | void | import('./providers/ai/types/pendingEmail').PendingEmailAction>
   addDocumentToProject: (projectId: string, doc: ProjectDocument) => void
 
   // Data freshness
@@ -175,8 +178,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const handleFunctionCall = async (
     name: string,
     args: Record<string, unknown>
-  ): Promise<string | void> => {
-    return await handleFunctionCallImpl({ name, args, projects, setProjects, setAppointments })
+  ): Promise<
+    | string
+    | void
+    | import('./providers/ai/types/pendingEmail').PendingEmailAction
+  > => {
+    return await handleFunctionCallImpl({
+      name,
+      args,
+      projects,
+      setProjects,
+      setAppointments,
+    })
   }
 
   const addDocumentToProject = async (projectId: string, doc: ProjectDocument) => {

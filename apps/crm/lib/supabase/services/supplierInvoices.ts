@@ -6,6 +6,7 @@
 
 import { supabase } from '../client'
 import { SupplierInvoice, SupplierInvoiceCategory, PaymentMethod } from '@/types'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 // ============================================
 // Mapping: DB Schema (snake_case) <-> TypeScript (camelCase)
@@ -109,9 +110,17 @@ export async function createSupplierInvoice(
   if (!user) throw new Error('Nicht authentifiziert')
 
   const taxRate = input.taxRate ?? 20
-  const netAmount = input.netAmount
-  const taxAmount = input.taxAmount ?? Math.round(netAmount * (taxRate / 100) * 100) / 100
-  const grossAmount = input.grossAmount ?? Math.round((netAmount + taxAmount) * 100) / 100
+  const netAmountRounded = roundTo2Decimals(input.netAmount)
+  const taxAmount =
+    input.taxAmount !== undefined
+      ? roundTo2Decimals(input.taxAmount)
+      : roundTo2Decimals(netAmountRounded * (taxRate / 100))
+  const grossAmount =
+    input.grossAmount !== undefined
+      ? roundTo2Decimals(input.grossAmount)
+      : roundTo2Decimals(netAmountRounded + taxAmount)
+  const skontoAmount =
+    input.skontoAmount !== undefined ? roundTo2Decimals(input.skontoAmount) : null
 
   const { data, error } = await supabase
     .from('supplier_invoices')
@@ -123,13 +132,13 @@ export async function createSupplierInvoice(
       invoice_number: input.invoiceNumber,
       invoice_date: input.invoiceDate || new Date().toISOString().split('T')[0],
       due_date: input.dueDate || null,
-      net_amount: netAmount,
+      net_amount: netAmountRounded,
       tax_amount: taxAmount,
       gross_amount: grossAmount,
       tax_rate: taxRate,
       category: input.category || 'material',
       skonto_percent: input.skontoPercent ?? null,
-      skonto_amount: input.skontoAmount ?? null,
+      skonto_amount: skontoAmount,
       project_id: input.projectId || null,
       document_url: input.documentUrl || null,
       document_name: input.documentName || null,
@@ -266,16 +275,17 @@ export async function updateSupplierInvoice(
   if (input.invoiceNumber !== undefined) updateData.invoice_number = input.invoiceNumber
   if (input.invoiceDate !== undefined) updateData.invoice_date = input.invoiceDate
   if (input.dueDate !== undefined) updateData.due_date = input.dueDate || null
-  if (input.netAmount !== undefined) updateData.net_amount = input.netAmount
-  if (input.taxAmount !== undefined) updateData.tax_amount = input.taxAmount
-  if (input.grossAmount !== undefined) updateData.gross_amount = input.grossAmount
+  if (input.netAmount !== undefined) updateData.net_amount = roundTo2Decimals(input.netAmount)
+  if (input.taxAmount !== undefined) updateData.tax_amount = roundTo2Decimals(input.taxAmount)
+  if (input.grossAmount !== undefined) updateData.gross_amount = roundTo2Decimals(input.grossAmount)
   if (input.taxRate !== undefined) updateData.tax_rate = input.taxRate
   if (input.isPaid !== undefined) updateData.is_paid = input.isPaid
   if (input.paidDate !== undefined) updateData.paid_date = input.paidDate || null
   if (input.paymentMethod !== undefined) updateData.payment_method = input.paymentMethod || null
   if (input.category !== undefined) updateData.category = input.category
   if (input.skontoPercent !== undefined) updateData.skonto_percent = input.skontoPercent ?? null
-  if (input.skontoAmount !== undefined) updateData.skonto_amount = input.skontoAmount ?? null
+  if (input.skontoAmount !== undefined)
+    updateData.skonto_amount = roundTo2Decimals(input.skontoAmount)
   if (input.projectId !== undefined) updateData.project_id = input.projectId
   if (input.documentUrl !== undefined) updateData.document_url = input.documentUrl || null
   if (input.documentName !== undefined) updateData.document_name = input.documentName || null
@@ -504,7 +514,7 @@ export async function getInputTaxForUVA(
     .sort((a, b) => b[0] - a[0])
     .map(([taxRate, data]) => ({
       taxRate,
-      netAmount: Math.round(data.netAmount * 100) / 100,
-      taxAmount: Math.round(data.taxAmount * 100) / 100,
+      netAmount: roundTo2Decimals(data.netAmount),
+      taxAmount: roundTo2Decimals(data.taxAmount),
     }))
 }

@@ -1,6 +1,7 @@
 import type { CustomerProject, InvoiceItem } from '@/types'
 import { getProjects, updateProject } from '@/lib/supabase/services'
 import type { HandlerContext } from '../utils/handlerTypes'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 export async function handleAddItemToProject(ctx: HandlerContext): Promise<string> {
   const { args, findProject, setProjects } = ctx
@@ -61,9 +62,9 @@ export async function handleAddItemToProject(ctx: HandlerContext): Promise<strin
   const taxRate = [10, 13, 20].includes(rawTaxRate) ? rawTaxRate : 20
   const purchasePricePerUnit = Math.max(0, rawPurchasePrice || 0)
 
-  const netTotal = validQuantity * pricePerUnit
-  const taxAmount = netTotal * (taxRate / 100)
-  const grossTotal = netTotal + taxAmount
+  const netTotal = roundTo2Decimals(validQuantity * pricePerUnit)
+  const taxAmount = roundTo2Decimals(netTotal * (taxRate / 100))
+  const grossTotal = roundTo2Decimals(netTotal + taxAmount)
 
   const unit = (args.unit as string) || 'Stk'
   const manufacturer = args.manufacturer as string | undefined
@@ -96,10 +97,10 @@ export async function handleAddItemToProject(ctx: HandlerContext): Promise<strin
         grossTotalCalc += item.grossTotal
       else grossTotalCalc += (item.netTotal || 0) + (item.taxAmount || 0)
     })
-    grossTotalCalc = Math.round(grossTotalCalc * 100) / 100
+    grossTotalCalc = roundTo2Decimals(grossTotalCalc)
 
-    const totalNet = newItems.reduce((sum, i) => sum + (i.netTotal || 0), 0)
-    const totalTax = newItems.reduce((sum, i) => sum + (i.taxAmount || 0), 0)
+    const totalNet = roundTo2Decimals(newItems.reduce((sum, i) => sum + (i.netTotal || 0), 0))
+    const totalTax = roundTo2Decimals(newItems.reduce((sum, i) => sum + (i.taxAmount || 0), 0))
 
     const updated = await updateProject(currentProject.id, {
       items: newItems,
@@ -155,9 +156,9 @@ export async function handleUpdateItem(ctx: HandlerContext): Promise<string> {
       updatedItem.purchasePricePerUnit = args.purchasePricePerUnit as number
     if (args.taxRate !== undefined) updatedItem.taxRate = args.taxRate as 10 | 13 | 20
 
-    updatedItem.netTotal = updatedItem.quantity * updatedItem.pricePerUnit
-    updatedItem.taxAmount = updatedItem.netTotal * (updatedItem.taxRate / 100)
-    updatedItem.grossTotal = updatedItem.netTotal + updatedItem.taxAmount
+    updatedItem.netTotal = roundTo2Decimals(updatedItem.quantity * updatedItem.pricePerUnit)
+    updatedItem.taxAmount = roundTo2Decimals(updatedItem.netTotal * (updatedItem.taxRate / 100))
+    updatedItem.grossTotal = roundTo2Decimals(updatedItem.netTotal + updatedItem.taxAmount)
 
     const updatedItems = [...items]
     updatedItems[itemIdx] = updatedItem
@@ -171,10 +172,10 @@ export async function handleUpdateItem(ctx: HandlerContext): Promise<string> {
         grossTotalCalc += itemEntry.grossTotal
       else grossTotalCalc += (itemEntry.netTotal || 0) + (itemEntry.taxAmount || 0)
     })
-    grossTotalCalc = Math.round(grossTotalCalc * 100) / 100
+    grossTotalCalc = roundTo2Decimals(grossTotalCalc)
 
-    const totalNet = updatedItems.reduce((sum, i) => sum + (i.netTotal || 0), 0)
-    const totalTax = updatedItems.reduce((sum, i) => sum + (i.taxAmount || 0), 0)
+    const totalNet = roundTo2Decimals(updatedItems.reduce((sum, i) => sum + (i.netTotal || 0), 0))
+    const totalTax = roundTo2Decimals(updatedItems.reduce((sum, i) => sum + (i.taxAmount || 0), 0))
 
     const updated = await updateProject(project.id, {
       items: updatedItems,

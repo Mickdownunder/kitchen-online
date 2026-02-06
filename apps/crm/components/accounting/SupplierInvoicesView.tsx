@@ -30,6 +30,7 @@ import {
   addSupplierInvoiceCustomCategory,
   CreateSupplierInvoiceInput,
 } from '@/lib/supabase/services/supplierInvoices'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 // Kategorie-Labels
 const CATEGORY_LABELS: Record<SupplierInvoiceCategory, string> = {
@@ -199,10 +200,17 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
     setSaving(true)
 
     try {
+      const roundedData: CreateSupplierInvoiceInput = {
+        ...formData,
+        netAmount: roundTo2Decimals(formData.netAmount),
+        taxAmount: formData.taxAmount !== undefined ? roundTo2Decimals(formData.taxAmount) : undefined,
+        grossAmount: formData.grossAmount !== undefined ? roundTo2Decimals(formData.grossAmount) : undefined,
+        skontoAmount: formData.skontoAmount !== undefined ? roundTo2Decimals(formData.skontoAmount) : undefined,
+      }
       if (editingInvoice) {
-        await updateSupplierInvoice(editingInvoice.id, formData)
+        await updateSupplierInvoice(editingInvoice.id, roundedData)
       } else {
-        await createSupplierInvoice(formData)
+        await createSupplierInvoice(roundedData)
       }
       await loadInvoices()
       setShowForm(false)
@@ -404,8 +412,8 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
   const calculatedAmounts = useMemo(() => {
     const net = formData.netAmount || 0
     const rate = formData.taxRate || 20
-    const tax = Math.round(net * (rate / 100) * 100) / 100
-    const gross = Math.round((net + tax) * 100) / 100
+    const tax = roundTo2Decimals(net * (rate / 100))
+    const gross = roundTo2Decimals(net + tax)
     return { tax, gross }
   }, [formData.netAmount, formData.taxRate])
 
@@ -414,7 +422,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
     const pct = formData.skontoPercent
     const gross = calculatedAmounts.gross
     if (pct != null && pct > 0 && gross > 0) {
-      const amount = Math.round(gross * (pct / 100) * 100) / 100
+      const amount = roundTo2Decimals(gross * (pct / 100))
       setFormData(prev => (prev.skontoAmount === amount ? prev : { ...prev, skontoAmount: amount }))
     }
   }, [calculatedAmounts.gross, formData.skontoPercent])
@@ -1029,7 +1037,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
                         const gross = calculatedAmounts.gross
                         const amount =
                           pct != null && gross > 0
-                            ? Math.round(gross * (pct / 100) * 100) / 100
+                            ? roundTo2Decimals(gross * (pct / 100))
                             : undefined
                         setFormData({
                           ...formData,

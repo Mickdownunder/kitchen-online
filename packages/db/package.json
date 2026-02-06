@@ -8,6 +8,6 @@
     "reset": "supabase db reset"
   },
   "devDependencies": {
-    "supabase": "^1.200.0"
+    "supabase": "^2.75.1"
   }
 }

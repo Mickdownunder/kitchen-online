@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 interface UsePriceInputOptions {
   initialValue: number | undefined
@@ -115,7 +116,7 @@ export function usePriceInput({
       }
 
       // Callback mit geparstem Wert (immer auf 2 Dezimalen runden für Geldbeträge)
-      const rounded = Math.round(numValue * 100) / 100
+      const rounded = roundTo2Decimals(numValue)
       onValueChange(numValue > 0 || allowEmpty ? rounded : undefined)
     },
     [parseNumber, onValueChange, allowEmpty, min, max]
@@ -143,7 +144,7 @@ export function usePriceInput({
           setRawInput('')
           onValueChange(undefined)
         } else {
-          const rounded = Math.round(numValue * 100) / 100
+          const rounded = roundTo2Decimals(numValue)
           const formatted = formatNumber(rounded, true)
           setRawInput(formatted)
           onValueChange(rounded)
@@ -162,7 +163,7 @@ export function usePriceInput({
       if (rawInput === '' && allowEmpty) {
         onValueChange(undefined)
       } else {
-        onValueChange(Math.round(numValue * 100) / 100)
+        onValueChange(roundTo2Decimals(numValue))
       }
     }
   }, [rawInput, formatOnBlur, parseNumber, formatNumber, allowEmpty, onValueChange, initialValue])

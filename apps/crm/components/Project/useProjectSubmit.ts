@@ -1,6 +1,7 @@
 import { CustomerProject, ProjectStatus } from '@/types'
 import { logger } from '@/lib/utils/logger'
 import { formatAddressForDB } from '@/lib/utils/addressFormatter'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 interface UseProjectSubmitProps {
   formData: Partial<CustomerProject>
@@ -73,13 +74,14 @@ export function useProjectSubmit({
         orderNumber: formData.id ? formData.orderNumber : undefined, // Bei neuem Projekt: createProject nutzt getNextOrderNumber()
         status: formData.status || ProjectStatus.PLANNING,
         items: validItems,
-        totalAmount: calculations.grossTotal || 0,
-        netAmount: calculations.netTotal || 0,
-        taxAmount: calculations.taxTotal || 0,
-        depositAmount:
+        totalAmount: roundTo2Decimals(calculations.grossTotal || 0),
+        netAmount: roundTo2Decimals(calculations.netTotal || 0),
+        taxAmount: roundTo2Decimals(calculations.taxTotal || 0),
+        depositAmount: roundTo2Decimals(
           formData.partialPayments?.reduce((sum, p) => sum + p.amount, 0) ||
-          formData.depositAmount ||
-          0,
+            formData.depositAmount ||
+            0
+        ),
         isDepositPaid: formData.partialPayments?.every(p => p.isPaid) || !!formData.isDepositPaid,
         isFinalPaid: formData.finalInvoice?.isPaid || !!formData.isFinalPaid,
         partialPayments: formData.partialPayments || [],

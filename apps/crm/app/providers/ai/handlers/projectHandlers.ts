@@ -1,6 +1,7 @@
 import { ProjectStatus, type CustomerProject } from '@/types'
 import { createProject, getCustomers, updateProject } from '@/lib/supabase/services'
 import type { HandlerContext } from '../utils/handlerTypes'
+import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 export async function handleCreateProject(ctx: HandlerContext): Promise<string> {
   const { args, setProjects } = ctx
@@ -178,11 +179,13 @@ export async function handleUpdateFinancialAmounts(ctx: HandlerContext): Promise
       notes: `${project.notes}\n${timestamp}: KI aktualisierte Finanzbeträge.`,
     }
     if (totalAmount !== undefined) {
-      updates.totalAmount = totalAmount
-      updates.netAmount = totalAmount / 1.2
-      updates.taxAmount = totalAmount - totalAmount / 1.2
+      const amountRounded = roundTo2Decimals(totalAmount)
+      const netRounded = roundTo2Decimals(amountRounded / 1.2)
+      updates.totalAmount = amountRounded
+      updates.netAmount = netRounded
+      updates.taxAmount = roundTo2Decimals(amountRounded - netRounded)
     }
-    if (depositAmount !== undefined) updates.depositAmount = depositAmount
+    if (depositAmount !== undefined) updates.depositAmount = roundTo2Decimals(depositAmount)
 
     const updated = await updateProject(project.id, updates)
     setProjects(prev => prev.map(p => (p.id === project.id ? updated : p)))

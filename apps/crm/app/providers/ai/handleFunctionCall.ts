@@ -49,9 +49,13 @@ import { handleExecuteWorkflow, handleFindProjectsByCriteria } from './handlers/
 
 import { logFunctionCall } from '@/lib/ai/monitoring'
 import { logAudit } from '@/lib/utils/auditLogger'
+import { isPendingEmailAction, type PendingEmailAction } from './types/pendingEmail'
 
 // Handler registry - maps function names to their handlers
-const handlerRegistry: Record<string, (ctx: HandlerContext) => Promise<string | void>> = {
+const handlerRegistry: Record<
+  string,
+  (ctx: HandlerContext) => Promise<string | void | PendingEmailAction>
+> = {
   // Project handlers
   createProject: handleCreateProject,
   updateProjectDetails: handleUpdateProjectDetails,
@@ -114,7 +118,7 @@ export async function handleFunctionCallImpl(opts: {
   projects: CustomerProject[]
   setProjects: React.Dispatch<React.SetStateAction<CustomerProject[]>>
   setAppointments?: React.Dispatch<React.SetStateAction<PlanningAppointment[]>>
-}): Promise<string | void> {
+}): Promise<string | void | PendingEmailAction> {
   const { name, args, projects, setProjects, setAppointments } = opts
 
   // Check for blocked functions
@@ -140,14 +144,21 @@ export async function handleFunctionCallImpl(opts: {
     try {
       const result = await handler(context)
       const duration = Date.now() - start
-      logFunctionCall(name, args as Record<string, unknown>, result, duration)
+      const logResult = isPendingEmailAction(result)
+        ? 'pending: E-Mail-Bestätigung erforderlich'
+        : result
+      logFunctionCall(name, args as Record<string, unknown>, logResult, duration)
       logAudit({
         action: 'ai.assistant.function_called',
         entityType: 'ai_action',
         entityId: (args.projectId as string) || (args.customerId as string) || (args.articleId as string) || undefined,
         metadata: {
           functionName: name,
-          resultSummary: typeof result === 'string' ? result.slice(0, 300) : undefined,
+          resultSummary: isPendingEmailAction(result)
+            ? 'pendingEmail'
+            : typeof result === 'string'
+              ? result.slice(0, 300)
+              : undefined,
           durationMs: duration,
         },
       })

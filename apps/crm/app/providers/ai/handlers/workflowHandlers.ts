@@ -1,5 +1,10 @@
 import { monthlyInstallationDeliveryWorkflow, invoiceWorkflow } from '@/lib/ai/workflows'
 import { getProjects } from '@/lib/supabase/services'
+import {
+  getAllowedEmailRecipients,
+  isEmailAllowed,
+  formatWhitelistError,
+} from '@/lib/ai/emailWhitelist'
 import type { HandlerContext } from '../utils/handlerTypes'
 
 export async function handleExecuteWorkflow(ctx: HandlerContext): Promise<string> {
@@ -13,6 +18,20 @@ export async function handleExecuteWorkflow(ctx: HandlerContext): Promise<string
     if (workflowType === 'monthlyInstallationDelivery') {
       if (!workflowRecipientEmail) {
         return '❌ recipientEmail ist erforderlich für monthlyInstallationDelivery Workflow'
+      }
+
+      // Whitelist: recipientEmail muss Projekt- oder Mitarbeiter-E-Mail sein
+      const allProjects = await getProjects()
+      const allowedEmails = await getAllowedEmailRecipients({
+        projects: allProjects,
+        includeEmployees: true,
+      })
+      const { allowed, disallowed } = isEmailAllowed(
+        workflowRecipientEmail,
+        allowedEmails
+      )
+      if (!allowed) {
+        return formatWhitelistError(disallowed)
       }
 
       const result = await monthlyInstallationDeliveryWorkflow(workflowRecipientEmail)
@@ -33,6 +52,23 @@ export async function handleExecuteWorkflow(ctx: HandlerContext): Promise<string
         workflowProjectIds.length === 0
       ) {
         return '❌ projectIds ist erforderlich für invoiceWorkflow'
+      }
+
+      // Whitelist: recipientEmail muss aus betroffenen Projekten oder Mitarbeiter sein
+      const allProjects = await getProjects()
+      const workflowProjects = allProjects.filter(p =>
+        workflowProjectIds.includes(p.id)
+      )
+      const allowedEmails = await getAllowedEmailRecipients({
+        projects: workflowProjects,
+        includeEmployees: true,
+      })
+      const { allowed, disallowed } = isEmailAllowed(
+        workflowRecipientEmail,
+        allowedEmails
+      )
+      if (!allowed) {
+        return formatWhitelistError(disallowed)
       }
 
       const result = await invoiceWorkflow(workflowProjectIds, workflowRecipientEmail)

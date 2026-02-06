@@ -33,6 +33,7 @@ import {
   calculateItemTotalsFromNet,
   calculateItemTotalsFromGross,
   calculateProjectTotals,
+  roundTo2Decimals,
 } from '@/lib/utils/priceCalculations'
 import { createFirstPayment } from '@/lib/utils/paymentSchedule'
 import { audit } from '@/lib/utils/auditLogger'
@@ -158,10 +159,10 @@ export async function createProject(
         invoice_number: project.invoiceNumber || null,
         contract_number: project.contractNumber || null,
         status: project.status || 'Planung',
-        total_amount: project.totalAmount || 0,
-        net_amount: project.netAmount || 0,
-        tax_amount: project.taxAmount || 0,
-        deposit_amount: project.depositAmount || 0,
+        total_amount: roundTo2Decimals(project.totalAmount || 0),
+        net_amount: roundTo2Decimals(project.netAmount || 0),
+        tax_amount: roundTo2Decimals(project.taxAmount || 0),
+        deposit_amount: roundTo2Decimals(project.depositAmount || 0),
         is_deposit_paid: project.isDepositPaid || false,
         is_final_paid: project.isFinalPaid || false,
         offer_date: project.offerDate || null,
@@ -290,18 +291,19 @@ export async function createProject(
             }
             return unitMap[item.unit] || 'Stk'
           })(),
-          price_per_unit: pricePerUnit,
-          gross_price_per_unit: grossPricePerUnit > 0 ? grossPricePerUnit : null,
+          price_per_unit: roundTo2Decimals(pricePerUnit),
+          gross_price_per_unit:
+            grossPricePerUnit > 0 ? roundTo2Decimals(grossPricePerUnit) : null,
           purchase_price_per_unit:
             item.purchasePricePerUnit !== undefined &&
             item.purchasePricePerUnit !== null &&
             item.purchasePricePerUnit > 0
-              ? item.purchasePricePerUnit
+              ? roundTo2Decimals(item.purchasePricePerUnit)
               : null,
           tax_rate: String(taxRate),
-          net_total: netTotal,
-          tax_amount: taxAmount,
-          gross_total: grossTotal,
+          net_total: roundTo2Decimals(netTotal),
+          tax_amount: roundTo2Decimals(taxAmount),
+          gross_total: roundTo2Decimals(grossTotal),
           // Warranty / Appliance fields
           show_in_portal: item.showInPortal || false,
           serial_number: item.serialNumber || null,
@@ -390,10 +392,14 @@ export async function updateProject(
     if (project.invoiceNumber !== undefined) updateData.invoice_number = project.invoiceNumber
     if (project.contractNumber !== undefined) updateData.contract_number = project.contractNumber
     if (project.status !== undefined) updateData.status = project.status
-    if (project.totalAmount !== undefined) updateData.total_amount = project.totalAmount
-    if (project.netAmount !== undefined) updateData.net_amount = project.netAmount
-    if (project.taxAmount !== undefined) updateData.tax_amount = project.taxAmount
-    if (project.depositAmount !== undefined) updateData.deposit_amount = project.depositAmount
+    if (project.totalAmount !== undefined)
+      updateData.total_amount = roundTo2Decimals(project.totalAmount)
+    if (project.netAmount !== undefined)
+      updateData.net_amount = roundTo2Decimals(project.netAmount)
+    if (project.taxAmount !== undefined)
+      updateData.tax_amount = roundTo2Decimals(project.taxAmount)
+    if (project.depositAmount !== undefined)
+      updateData.deposit_amount = roundTo2Decimals(project.depositAmount)
     if (project.isDepositPaid !== undefined) updateData.is_deposit_paid = project.isDepositPaid
     if (project.isFinalPaid !== undefined) updateData.is_final_paid = project.isFinalPaid
     if (project.offerDate !== undefined) updateData.offer_date = project.offerDate
@@ -588,18 +594,19 @@ export async function updateProject(
           specifications: item.specifications || {},
           quantity: quantity,
           unit: unit,
-          price_per_unit: pricePerUnit,
-          gross_price_per_unit: grossPricePerUnit > 0 ? grossPricePerUnit : null,
+          price_per_unit: roundTo2Decimals(pricePerUnit),
+          gross_price_per_unit:
+            grossPricePerUnit > 0 ? roundTo2Decimals(grossPricePerUnit) : null,
           purchase_price_per_unit:
             item.purchasePricePerUnit !== undefined &&
             item.purchasePricePerUnit !== null &&
             item.purchasePricePerUnit > 0
-              ? item.purchasePricePerUnit
+              ? roundTo2Decimals(item.purchasePricePerUnit)
               : null,
           tax_rate: String(taxRate),
-          net_total: netTotal,
-          tax_amount: taxAmount,
-          gross_total: grossTotal,
+          net_total: roundTo2Decimals(netTotal),
+          tax_amount: roundTo2Decimals(taxAmount),
+          gross_total: roundTo2Decimals(grossTotal),
           // Warranty / Appliance fields
           show_in_portal: item.showInPortal || false,
           serial_number: item.serialNumber || null,
@@ -842,7 +849,7 @@ function mapInvoiceItemFromDB(dbItem: InvoiceItemRow): InvoiceItem {
     dbItem.gross_price_per_unit !== null && dbItem.gross_price_per_unit !== undefined
       ? parseFloat(dbItem.gross_price_per_unit)
       : quantity > 0 && Number.isFinite(grossTotal) && grossTotal > 0
-        ? Math.round((grossTotal / quantity) * 100) / 100
+        ? roundTo2Decimals(grossTotal / quantity)
         : undefined
 
   return {

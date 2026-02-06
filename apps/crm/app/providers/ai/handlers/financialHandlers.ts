@@ -6,7 +6,13 @@ import {
   markInvoicePaid,
   markInvoiceUnpaid,
 } from '@/lib/supabase/services'
+import {
+  getAllowedEmailRecipients,
+  isEmailAllowed,
+  formatWhitelistError,
+} from '@/lib/ai/emailWhitelist'
 import type { HandlerContext } from '../utils/handlerTypes'
+import type { PendingEmailAction } from '../types/pendingEmail'
 
 export async function handleCreatePartialPayment(ctx: HandlerContext): Promise<string> {
   const { args, findProject } = ctx
@@ -134,13 +140,14 @@ export async function handleCreateFinalInvoice(ctx: HandlerContext): Promise<str
   }
 }
 
-export async function handleSendReminder(ctx: HandlerContext): Promise<string> {
-  const { args, findProject, setProjects } = ctx
+export async function handleSendReminder(
+  ctx: HandlerContext
+): Promise<string | PendingEmailAction> {
+  const { args, projects, findProject } = ctx
 
   const project = findProject(args.projectId as string)
   if (!project) return '❌ Projekt nicht gefunden.'
 
-  // Finde die Rechnung in der neuen invoices-Tabelle (invoiceId "final" = Schlussrechnung)
   const invoiceIdArg = args.invoiceId as string
   const invoices = await getInvoices(project.id)
   const invoice =
@@ -154,9 +161,6 @@ export async function handleSendReminder(ctx: HandlerContext): Promise<string> {
       : `❌ Rechnung ${invoiceIdArg} nicht gefunden.`
   }
 
-  const invoiceId = invoice.id
-
-  // Bestimme reminderType automatisch, falls nicht angegeben
   let reminderType = args.reminderType as string | undefined
   if (!reminderType) {
     const { getNextReminderType } = await import('@/hooks/useInvoiceCalculations')
@@ -167,54 +171,48 @@ export async function handleSendReminder(ctx: HandlerContext): Promise<string> {
     return `❌ Ungültiger reminderType: ${reminderType}. Muss "first", "second" oder "final" sein.`
   }
 
-  // E-Mail-Whitelist (Best Practice): Nur an im Projekt hinterlegte Kunden-E-Mail
   const recipientEmail = args.recipientEmail as string | undefined
-  const projectEmail = project.email?.trim().toLowerCase()
-  if (recipientEmail) {
-    const allowed = projectEmail ? [projectEmail] : []
-    if (allowed.length > 0 && !allowed.includes(recipientEmail.trim().toLowerCase())) {
-      return `❌ E-Mail-Adresse "${recipientEmail}" ist nicht als Empfänger freigegeben. Bitte nur an im Projekt hinterlegte Kunden-E-Mail versenden.`
-    }
-  }
   const effectiveEmail = recipientEmail || project.email
 
-  try {
-    const response = await fetch('/api/reminders/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        projectId: project.id,
-        invoiceId,
-        reminderType,
-        recipientEmail: effectiveEmail || undefined,
-      }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Fehler beim Senden der Mahnung')
+  // E-Mail-Whitelist: Projekt + Mitarbeiter
+  const allowedEmails = await getAllowedEmailRecipients({
+    projects,
+    projectId: project.id,
+    includeEmployees: true,
+  })
+  if (effectiveEmail) {
+    const { allowed, disallowed } = isEmailAllowed(effectiveEmail, allowedEmails)
+    if (!allowed) {
+      return formatWhitelistError(disallowed)
     }
+  } else if (allowedEmails.length === 0) {
+    return '❌ Keine E-Mail-Adresse im Projekt hinterlegt. Bitte zuerst Kunden-E-Mail eintragen.'
+  }
 
-    const reminderTypeText =
-      reminderType === 'first'
-        ? '1. Mahnung'
-        : reminderType === 'second'
-          ? '2. Mahnung'
-          : 'Letzte Mahnung'
+  const reminderTypeText =
+    reminderType === 'first'
+      ? '1. Mahnung'
+      : reminderType === 'second'
+        ? '2. Mahnung'
+        : 'Letzte Mahnung'
 
-    // Lade Projekt neu, um Reminder zu aktualisieren
-    const { getProject } = await import('@/lib/supabase/services/projects')
-    const updatedProject = await getProject(project.id)
-    if (updatedProject) {
-      setProjects(prev => prev.map(p => (p.id === project.id ? updatedProject : p)))
-    }
-
-    return `✅ ${reminderTypeText} für Rechnung ${invoice.invoiceNumber} erfolgreich gesendet an ${effectiveEmail || project.email || 'Kunde'}.`
-  } catch (error: unknown) {
-    console.error('Error sending reminder:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler'
-    return `❌ Fehler beim Senden der Mahnung: ${errorMessage}`
+  // Human-in-the-loop: Pending zurückgeben statt sofort senden
+  return {
+    type: 'pendingEmail',
+    functionName: 'sendReminder',
+    to: effectiveEmail || '',
+    subject: `${reminderTypeText} – Rechnung ${invoice.invoiceNumber}`,
+    bodyPreview: `${reminderTypeText} für Rechnung ${invoice.invoiceNumber} an ${effectiveEmail || project.email || 'Kunde'}`,
+    api: '/api/reminders/send',
+    payload: {
+      projectId: project.id,
+      invoiceId: invoice.id,
+      reminderType,
+      recipientEmail: effectiveEmail || undefined,
+    },
+    functionCallId: '',
+    projectId: project.id,
+    reminderType,
   }
 }
 
