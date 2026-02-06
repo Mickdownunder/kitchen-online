@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI } from '@google/genai'
-// CustomerProject type is available via projects parameter
+import { GoogleGenAI, createPartFromFunctionResponse } from '@google/genai'
 import { agentTools } from '@/lib/ai/agentTools'
 import { buildProjectSummary } from '@/lib/ai/projectSummary'
 import { buildSystemInstruction } from '@/lib/ai/systemInstruction'
 import { logger } from '@/lib/utils/logger'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 import { createClient } from '@/lib/supabase/server'
+import { executeServerFunctionCall } from '../serverHandlers'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
 // Next.js 15: Erhöhe Body-Size-Limit für große Requests
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+// Max iterations for the function call loop (safety)
+const MAX_FUNCTION_CALL_ROUNDS = 10
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -48,15 +51,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Rate limiting - use authenticated user ID
+    // Rate limiting
     const userId = user.id
 
     const limitCheck = await rateLimit(request, userId)
     if (!limitCheck || !limitCheck.allowed) {
-      logger.warn('Rate limit exceeded', {
-        component: 'api/chat/stream',
-        userId,
-      })
+      logger.warn('Rate limit exceeded', { component: 'api/chat/stream', userId })
       const resetTime = limitCheck?.resetTime || Date.now() + 60000
       return new Response(
         JSON.stringify({
@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // GEMINI_API_KEY vor Body prüfen (fail fast)
     if (!process.env.GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: 'GEMINI_API_KEY is not configured' }), {
         status: 500,
@@ -84,10 +83,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Prüfe Request-Body-Größe und reduziere Projektdaten falls nötig
+    // Parse request body
     let requestBody
     try {
-      // Versuche Body als Text zu lesen für Größenprüfung
       const bodyText = await request.text()
       const bodySizeMB = bodyText.length / (1024 * 1024)
       logger.info('Chat Stream API request body size', {
@@ -102,24 +100,16 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Parse JSON
       requestBody = JSON.parse(bodyText)
     } catch (parseError: unknown) {
       const errMessage = parseError instanceof Error ? parseError.message : 'Unknown parse error'
-      const errName = parseError instanceof Error ? parseError.name : 'Error'
-      logger.error(
-        'Chat Stream API JSON parse error',
-        {
-          component: 'api/chat/stream',
-          message: errMessage,
-          name: errName,
-        },
-        parseError as Error
-      )
+      logger.error('Chat Stream API JSON parse error', {
+        component: 'api/chat/stream',
+        message: errMessage,
+      }, parseError as Error)
       return new Response(
         JSON.stringify({
-          error:
-            'Request body zu groß oder ungültig. Bitte reduzieren Sie die Anzahl der Projekte oder versuchen Sie es erneut.',
+          error: 'Request body zu groß oder ungültig.',
           details: errMessage,
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -128,38 +118,31 @@ export async function POST(request: NextRequest) {
 
     const { message, projects, chatHistory } = requestBody
 
-    // Best practice: Obergrenzen für Nachrichtenlänge und Projektanzahl
+    // Validation
     const MAX_MESSAGE_LENGTH = 10_000
     const MAX_PROJECTS = 500
     const msg = typeof message === 'string' ? message : ''
     if (msg.length > MAX_MESSAGE_LENGTH) {
       return new Response(
-        JSON.stringify({
-          error: `Nachricht zu lang (max. ${MAX_MESSAGE_LENGTH} Zeichen). Bitte kürzen.`,
-        }),
+        JSON.stringify({ error: `Nachricht zu lang (max. ${MAX_MESSAGE_LENGTH} Zeichen).` }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
     const projectList = Array.isArray(projects) ? projects : []
     if (projectList.length > MAX_PROJECTS) {
       return new Response(
-        JSON.stringify({
-          error: `Zu viele Projekte (max. ${MAX_PROJECTS}). Bitte weniger auswählen.`,
-        }),
+        JSON.stringify({ error: `Zu viele Projekte (max. ${MAX_PROJECTS}).` }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // Projekte sind bereits im Frontend optimiert, verwende sie direkt
-    const optimizedProjects = projectList
-
     logger.info('Chat Stream API request received', {
       component: 'api/chat/stream',
-      projectsCount: optimizedProjects.length,
+      projectsCount: projectList.length,
     })
 
-    // Rechnungsdaten server-seitig laden für Projekt-Kontext (Best Practice)
-    const projectIds = optimizedProjects.map((p: { id?: string }) => p.id).filter(Boolean) as string[]
+    // Load invoice data server-side for project context
+    const projectIds = projectList.map((p: { id?: string }) => p.id).filter(Boolean) as string[]
     let invoicesForSummary: import('@/types').Invoice[] = []
     if (projectIds.length > 0) {
       const { data: invoicesRows } = await supabase
@@ -191,119 +174,164 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const projectSummary = buildProjectSummary(optimizedProjects, invoicesForSummary)
+    const projectSummary = buildProjectSummary(projectList, invoicesForSummary)
 
-    // Use flash model for faster responses
-    const useFlashModel =
-      !msg.toLowerCase().includes('komplex') &&
-      !msg.toLowerCase().includes('detailliert') &&
-      msg.length < 1000
-    const model = useFlashModel ? 'gemini-3-flash-preview' : 'gemini-3-pro-preview'
-    logger.debug('Using AI model', {
-      component: 'api/chat/stream',
-      model,
-      useFlashModel,
-    })
+    // Model selection - use Flash by default
+    const model = 'gemini-2.5-flash-preview-05-20'
 
-    // Create a ReadableStream for Server-Sent Events
+    logger.debug('Using AI model', { component: 'api/chat/stream', model })
+
+    // ========================================
+    // Create SSE stream with server-side function execution loop
+    // ========================================
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
+        const allUpdatedProjectIds = new Set<string>()
+
+        const send = (data: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+        }
 
         try {
-          // Build context from chat history
-          let historyContext = ''
+          // Build chat history as native Gemini contents
+          const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
           if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
-            historyContext =
-              '\n\n## VORHERIGE UNTERHALTUNG:\n' +
-              chatHistory
-                .map(
-                  (m: { role: string; content: string }) =>
-                    `${m.role === 'user' ? 'Nutzer' : 'Ki'}: ${m.content}`
-                )
-                .join('\n') +
-              '\n'
+            for (const m of chatHistory as Array<{ role: string; content: string }>) {
+              const role = m.role === 'user' ? 'user' as const : 'model' as const
+              contents.push({ role, parts: [{ text: m.content }] })
+            }
           }
 
           const chat = ai.chats.create({
-            model: model,
+            model,
             config: {
               systemInstruction: buildSystemInstruction({
                 projectSummary,
-                historyContext,
                 variant: 'stream',
               }),
               tools: [{ functionDeclarations: agentTools }],
             },
+            history: contents,
           })
 
-          // Send initial message
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start' })}\n\n`))
+          send({ type: 'start' })
 
-          // Stream the response
-          const response = await chat.sendMessage({ message: msg })
+          // ========================================
+          // Helper: Stream a response and collect function calls
+          // ========================================
+          type FcInfo = { id: string; name: string; args: Record<string, unknown> }
 
-          // Gemini API doesn't support true streaming yet, so we simulate it
-          // by sending the response in chunks for better UX
-          if (response.text) {
-            const text = response.text
-            const words = text.split(' ')
-            let currentChunk = ''
-
-            for (let i = 0; i < words.length; i++) {
-              currentChunk += (i > 0 ? ' ' : '') + words[i]
-
-              // Send every 3 words or at end
-              if ((i + 1) % 3 === 0 || i === words.length - 1) {
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({ type: 'token', text: currentChunk })}\n\n`
-                  )
-                )
-                currentChunk = ''
-                // Small delay for smooth streaming effect
-                await new Promise(resolve => setTimeout(resolve, 30))
+          async function streamAndCollect(
+            asyncGen: AsyncGenerator<import('@google/genai').GenerateContentResponse>
+          ): Promise<FcInfo[]> {
+            const collectedFunctionCalls: FcInfo[] = []
+            for await (const chunk of asyncGen) {
+              // Stream text tokens in real-time
+              if (chunk.text) {
+                send({ type: 'token', text: chunk.text })
+              }
+              // Collect function calls (typically arrive in last chunk)
+              if (chunk.functionCalls?.length) {
+                for (const fc of chunk.functionCalls) {
+                  collectedFunctionCalls.push({
+                    id: fc.id || `fc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    name: fc.name || 'unknown',
+                    args: (fc.args || {}) as Record<string, unknown>,
+                  })
+                }
               }
             }
+            return collectedFunctionCalls
           }
 
-          // Extract function calls
-          const functionCalls =
-            response.functionCalls?.map(fc => ({
-              id: fc.id || Date.now().toString(),
-              name: fc.name || 'unknown',
-              args: fc.args || {},
-            })) || []
+          // ========================================
+          // Execute function calls on server
+          // ========================================
+          async function executeFunctionCalls(functionCalls: FcInfo[]) {
+            const functionResponseParts = []
+            for (const fc of functionCalls) {
+              logger.info('Executing server function call', {
+                component: 'api/chat/stream',
+                functionName: fc.name,
+              })
 
-          // Send function calls
-          if (functionCalls.length > 0) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ type: 'functionCalls', functionCalls })}\n\n`
+              const handlerResult = await executeServerFunctionCall(
+                fc.name,
+                fc.args,
+                supabase,
+                userId
               )
-            )
+
+              // Track updated project IDs
+              if (handlerResult.updatedProjectIds) {
+                handlerResult.updatedProjectIds.forEach(id => allUpdatedProjectIds.add(id))
+              }
+
+              // Send function result to client for display
+              send({
+                type: 'functionResult',
+                functionName: fc.name,
+                result: handlerResult.result,
+              })
+
+              // Handle pending email (human-in-the-loop)
+              if (handlerResult.pendingEmail) {
+                send({
+                  type: 'pendingEmail',
+                  email: handlerResult.pendingEmail,
+                })
+              }
+
+              // Build function response for Gemini
+              functionResponseParts.push(
+                createPartFromFunctionResponse(
+                  fc.id,
+                  fc.name,
+                  { result: handlerResult.result }
+                )
+              )
+            }
+            return functionResponseParts
           }
 
-          // Send completion
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: 'done', duration: Date.now() - startTime })}\n\n`
-            )
-          )
+          // ========================================
+          // Main loop: True streaming with native function call loop
+          // ========================================
+
+          // First message: stream response in real-time
+          const initialStream = await chat.sendMessageStream({ message: msg })
+          let pendingFunctionCalls = await streamAndCollect(initialStream)
+
+          let round = 0
+          while (pendingFunctionCalls.length > 0 && round < MAX_FUNCTION_CALL_ROUNDS) {
+            round++
+
+            // Notify client about function calls
+            send({ type: 'functionCalls', functionCalls: pendingFunctionCalls, executing: true })
+
+            // Execute function calls on the server
+            const functionResponseParts = await executeFunctionCalls(pendingFunctionCalls)
+
+            // Send function responses back to Gemini and stream the next response
+            const nextStream = await chat.sendMessageStream({ message: functionResponseParts })
+            pendingFunctionCalls = await streamAndCollect(nextStream)
+          }
+
+          // Send completion with list of updated projects
+          send({
+            type: 'done',
+            duration: Date.now() - startTime,
+            updatedProjectIds: Array.from(allUpdatedProjectIds),
+          })
           controller.close()
         } catch (error: unknown) {
           const errMsg = error instanceof Error ? error.message : 'Unbekannter Fehler'
-          logger.error(
-            'Chat Stream API stream error',
-            {
-              component: 'api/chat/stream',
-              action: 'streaming',
-            },
-            error as Error
-          )
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'error', error: errMsg })}\n\n`)
-          )
+          logger.error('Chat Stream API stream error', {
+            component: 'api/chat/stream',
+            action: 'streaming',
+          }, error as Error)
+          send({ type: 'error', error: errMsg })
           controller.close()
         }
       },
@@ -317,13 +345,9 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: unknown) {
-    logger.error(
-      'Chat Stream API error',
-      {
-        component: 'api/chat/stream',
-      },
-      error as Error
-    )
+    logger.error('Chat Stream API error', {
+      component: 'api/chat/stream',
+    }, error as Error)
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Failed to process chat message',

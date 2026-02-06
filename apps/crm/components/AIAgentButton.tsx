@@ -7,7 +7,7 @@ import { useApp } from '@/app/providers'
 
 const AIAgentButton: React.FC = () => {
   const [isAgentOpen, setIsAgentOpen] = useState(false)
-  const { projects, handleFunctionCall, addDocumentToProject } = useApp()
+  const { projects, addDocumentToProject } = useApp()
 
   return (
     <>
@@ -22,7 +22,6 @@ const AIAgentButton: React.FC = () => {
         projects={projects}
         isOpen={isAgentOpen}
         onClose={() => setIsAgentOpen(false)}
-        onFunctionCall={handleFunctionCall}
         onAddDocument={addDocumentToProject}
       />
     </>

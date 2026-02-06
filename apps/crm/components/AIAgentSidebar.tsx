@@ -12,17 +12,10 @@ import { ChatInput } from './ai/ChatInput'
 import { ChatHistory } from './ai/ChatHistory'
 import { ProactiveSuggestions } from './ai/ProactiveSuggestions'
 import { EmailConfirmationCard } from './ai/EmailConfirmationCard'
-import {
-  isPendingEmailAction,
-  type PendingEmailAction,
-} from '@/app/providers/ai/types/pendingEmail'
+import type { PendingEmailAction } from '@/app/providers/ai/types/pendingEmail'
 
 interface AIAgentSidebarProps {
   projects: CustomerProject[]
-  onFunctionCall: (
-    name: string,
-    args: Record<string, unknown>
-  ) => Promise<string | void | PendingEmailAction> | string | void | PendingEmailAction
   onAddDocument: (projectId: string, doc: ProjectDocument) => void
   isOpen: boolean
   onClose: () => void
@@ -30,15 +23,10 @@ interface AIAgentSidebarProps {
 
 interface PendingEmailState {
   pending: PendingEmailAction
-  functionCallId: string
-  functionResponses: Array<{ id: string; name: string; response: { result: string } }>
-  sessionId: string | null
-  file: { base64: string; name: string; type: string } | null
 }
 
 const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
   projects,
-  onFunctionCall,
   onAddDocument,
   isOpen,
   onClose,
@@ -55,7 +43,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
   const [pendingEmail, setPendingEmail] = useState<PendingEmailState | null>(null)
 
   const abortControllerRef = useRef<AbortController | null>(null)
-  const { setProjects, refreshProjects } = useApp()
+  const { refreshProjects } = useApp()
 
   // Use extracted hooks
   const {
@@ -97,11 +85,24 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
     }
   }, [isOpen, loadChatSessions])
 
-  // Optimize project data for API calls
-  // NOTE: Invoice data is now loaded separately from the invoices table
-  // Legacy fields (partialPayments, finalInvoice) are no longer included
+  // Optimize project data for API calls - minimize token usage
   const optimizeProjectsForAPI = useCallback((projectList: CustomerProject[]) => {
-    return projectList.map(p => ({
+    // Only send active projects (not archived/cancelled) to save tokens
+    // Include recently completed projects (last 30 days) for reference
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const activeProjects = projectList.filter(p => {
+      if (p.status === 'Abgeschlossen') {
+        // Include completed projects from last 30 days
+        const updatedAt = p.updatedAt ? new Date(p.updatedAt) : null
+        return updatedAt && updatedAt >= thirtyDaysAgo
+      }
+      // Always include non-completed projects
+      return true
+    })
+
+    return activeProjects.map(p => ({
       id: p.id,
       customerName: p.customerName,
       status: p.status,
@@ -112,8 +113,9 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
       isDepositPaid: p.isDepositPaid,
       isFinalPaid: p.isFinalPaid,
       salespersonName: p.salespersonName,
+      // Limit items to max 20 per project (enough for context)
       items:
-        p.items?.map(item => ({
+        p.items?.slice(0, 20).map(item => ({
           description: item.description,
           quantity: item.quantity,
           unit: item.unit,
@@ -122,15 +124,15 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
           modelNumber: item.modelNumber || undefined,
           position: item.position,
         })) || [],
-      notes: p.notes?.slice(-300) || '',
+      notes: p.notes?.slice(-200) || '',
       complaints:
-        p.complaints?.map(c => ({ description: c.description?.slice(0, 200) || '' })) || [],
-      documentsCount: p.documents?.length || 0,
+        p.complaints?.map(c => ({ description: c.description?.slice(0, 100) || '' })) || [],
       isMeasured: p.isMeasured,
       isOrdered: p.isOrdered,
       isInstallationAssigned: p.isInstallationAssigned,
       orderDate: p.orderDate,
       measurementDate: p.measurementDate,
+      deliveryDate: p.deliveryDate,
       installationDate: p.installationDate,
     }))
   }, [])
@@ -187,7 +189,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
         optimizedCount: optimizedProjects.length,
       })
 
-      // Stream response
+      // Stream response with server-side function execution
       abortControllerRef.current = new AbortController()
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
@@ -206,62 +208,110 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let fullText = ''
-      let functionCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> = []
+      let hadFunctionCalls = false
+      let updatedProjectIds: string[] = []
 
       if (reader) {
+        let buffer = ''
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
 
-          const chunk = decoder.decode(value)
-          const lines = chunk.split('\n')
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          // Keep incomplete line in buffer
+          buffer = lines.pop() || ''
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6))
-                if (data.type === 'token' && data.text) {
-                  fullText += data.text
-                  setStreamingText(fullText)
-                } else if (data.type === 'functionCalls') {
-                  functionCalls = data.functionCalls || []
-                  if (functionCalls.length > 0 && !fullText) {
-                    const functionNames = functionCalls.map(fc => fc.name).join(', ')
-                    setStreamingText(`Ich erledige das für dich... (${functionNames})`)
+            if (!line.startsWith('data: ')) continue
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              switch (data.type) {
+                case 'token':
+                  if (data.text) {
+                    fullText += data.text
+                    setStreamingText(fullText)
                   }
-                } else if (data.type === 'error') {
+                  break
+
+                case 'functionCalls':
+                  // Server is executing these - show progress to user
+                  hadFunctionCalls = true
+                  if (data.functionCalls?.length > 0) {
+                    const names = data.functionCalls.map((fc: { name: string }) => fc.name).join(', ')
+                    setStreamingText(prev => prev || `Führe Aktionen aus: ${names}...`)
+                  }
+                  break
+
+                case 'functionResult':
+                  // Show individual function results as they complete
+                  if (data.result) {
+                    setStreamingText(prev => {
+                      const resultLine = `${data.functionName}: ${data.result}`
+                      if (prev.includes('Führe Aktionen aus:') || prev.includes('...')) {
+                        return resultLine
+                      }
+                      return prev + '\n' + resultLine
+                    })
+                  }
+                  break
+
+                case 'pendingEmail':
+                  // Human-in-the-loop: Show email confirmation
+                  if (data.email) {
+                    setPendingEmail({
+                      pending: {
+                        type: 'pendingEmail',
+                        functionName: data.email.functionName,
+                        to: data.email.to,
+                        subject: data.email.subject,
+                        bodyPreview: data.email.bodyPreview,
+                        api: data.email.api,
+                        payload: data.email.payload,
+                        functionCallId: '',
+                        projectId: data.email.projectId,
+                        reminderType: data.email.reminderType,
+                      },
+                    })
+                  }
+                  break
+
+                case 'done':
+                  updatedProjectIds = data.updatedProjectIds || []
+                  break
+
+                case 'error':
                   throw new Error(data.error)
-                }
-              } catch {
-                // Ignore JSON parse errors
               }
+            } catch (e) {
+              // Only throw if it was an explicit error event
+              if (e instanceof Error && !e.message.includes('JSON')) throw e
             }
           }
         }
       }
 
-      // Save and display response
+      // If projects were modified, refresh them
+      if (updatedProjectIds.length > 0) {
+        refreshProjects(true, true)
+      }
+
+      // Save and display final response
+      const functionCallsForSave = hadFunctionCalls ? [{ id: 'server', name: 'server-executed', args: {} }] : undefined
       if (sessionId && fullText) {
-        await saveModelMessage(fullText, functionCalls.length > 0 ? functionCalls : undefined)
+        await saveModelMessage(fullText, functionCallsForSave)
       }
 
       let finalText = fullText.trim()
       if (!finalText) {
-        finalText =
-          functionCalls.length > 0
-            ? `Ich erledige das für dich... (${functionCalls.map(fc => fc.name).join(', ')})`
-            : 'Ich bearbeite deine Anfrage...'
+        finalText = hadFunctionCalls ? 'Aktionen erfolgreich ausgeführt.' : 'Ich bearbeite deine Anfrage...'
       }
 
       addMessage({ role: 'model', text: finalText })
       setStreamingText('')
 
       if (isTTSEnabled && finalText) speakText(finalText)
-
-      // Handle function calls
-      if (functionCalls.length > 0) {
-        await handleFunctionCalls(functionCalls, sessionId, file)
-      }
     } catch (error: unknown) {
       console.error('Agent Error:', error)
       const err = error as { name?: string; message?: string }
@@ -270,7 +320,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
           ? 'Die Anfrage wurde abgebrochen.'
           : err.message
             ? `Fehler: ${err.message}`
-            : 'Sorry Chef, da gab es einen Fehler in der Leitung.'
+            : 'Es ist ein Fehler aufgetreten.'
 
       addMessage({ role: 'model', text: errorMessage })
       setStreamingText('')
@@ -280,166 +330,10 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
     }
   }
 
-  const doFollowUp = useCallback(
-    async (
-      functionResponses: Array<{ id: string; name: string; response: { result: string } }>,
-      sessionId: string | null
-    ) => {
-      const chatHistoryForFollowUp = await getChatHistoryForContext(10)
-      const followUpRes = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `INFO: Aktionen ausgeführt. Rückmeldung: ${JSON.stringify(functionResponses)}. Bitte antworte dem Nutzer.`,
-          projects: optimizeProjectsForAPI(projects),
-          sessionId,
-          chatHistory: chatHistoryForFollowUp.map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
-      })
-
-      if (followUpRes.ok) {
-        const followUpReader = followUpRes.body?.getReader()
-        const decoder = new TextDecoder()
-        let followUpText = ''
-
-        if (followUpReader) {
-          while (true) {
-            const { done, value } = await followUpReader.read()
-            if (done) break
-
-            const chunk = decoder.decode(value)
-            for (const line of chunk.split('\n')) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6))
-                  if (data.type === 'token' && data.text) {
-                    followUpText += data.text
-                    setStreamingText(followUpText)
-                  }
-                } catch {
-                  // Ignore
-                }
-              }
-            }
-          }
-        }
-
-        if (sessionId && followUpText) await saveModelMessage(followUpText)
-
-        const finalFollowUp = followUpText || 'Aktionen erfolgreich ausgeführt.'
-        addMessage({ role: 'model', text: finalFollowUp })
-        setStreamingText('')
-
-        if (isTTSEnabled && finalFollowUp) speakText(finalFollowUp)
-      }
-    },
-    [
-      projects,
-      optimizeProjectsForAPI,
-      getChatHistoryForContext,
-      saveModelMessage,
-      addMessage,
-      isTTSEnabled,
-      speakText,
-    ]
-  )
-
-  const handleFunctionCalls = async (
-    functionCalls: Array<{ id: string; name: string; args: Record<string, unknown> }>,
-    sessionId: string | null,
-    file: { base64: string; name: string; type: string } | null
-  ) => {
-    const functionResponses: Array<{
-      id: string
-      name: string
-      response: { result: string }
-    }> = []
-    const MAX_RETRIES = 3
-
-    for (const fc of functionCalls) {
-      let result: string | void | PendingEmailAction = undefined
-      let retryCount = 0
-      let success = false
-
-      while (retryCount < MAX_RETRIES && !success) {
-        try {
-          result = await onFunctionCall(fc.name, fc.args)
-
-          if (isPendingEmailAction(result)) {
-            setPendingEmail({
-              pending: { ...result, functionCallId: fc.id },
-              functionCallId: fc.id,
-              functionResponses: [...functionResponses],
-              sessionId,
-              file,
-            })
-            return
-          }
-
-          if (result && typeof result === 'string') {
-            if (result.startsWith('✅')) {
-              success = true
-            } else if (result.startsWith('❌') && retryCount < MAX_RETRIES - 1) {
-              retryCount++
-              await new Promise(resolve => setTimeout(resolve, 1000))
-              continue
-            } else {
-              success = !result.startsWith('❌')
-            }
-          } else {
-            success = true
-          }
-        } catch (error: unknown) {
-          if (retryCount < MAX_RETRIES - 1) {
-            retryCount++
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            continue
-          } else {
-            result = `❌ Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
-          }
-        }
-      }
-
-      if (
-        fc.name === 'archiveDocument' &&
-        typeof result === 'string' &&
-        result.startsWith('✅') &&
-        file
-      ) {
-        const newDoc: ProjectDocument = {
-          id: 'ai-' + Date.now(),
-          name: ((fc.args.documentType as string) || 'Dokument') + '_' + file.name,
-          mimeType: file.type,
-          data: `data:${file.type};base64,${file.base64}`,
-          uploadedAt: new Date().toLocaleDateString('de-DE'),
-        }
-        onAddDocument(fc.args.projectId as string, newDoc)
-      }
-
-      const resultStr =
-        typeof result === 'string'
-          ? result
-          : success
-            ? 'Erfolgreich ausgeführt.'
-            : 'Fehlgeschlagen.'
-      functionResponses.push({
-        id: fc.id,
-        name: fc.name,
-        response: { result: resultStr },
-      })
-    }
-
-    await doFollowUp(functionResponses, sessionId)
-  }
-
   const handleEmailConfirm = useCallback(async () => {
     if (!pendingEmail) return
 
-    const { pending, functionCallId, functionResponses, sessionId } = pendingEmail
-    const responses = [...functionResponses]
+    const { pending } = pendingEmail
 
     try {
       const res = await fetch(pending.api, {
@@ -451,65 +345,27 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
       const data = await res.json().catch(() => ({}))
       const success = res.ok
       const resultMsg = success
-        ? data.message ||
-          `✅ E-Mail erfolgreich an ${pending.to} versendet: "${pending.subject}"`
+        ? data.message || `✅ E-Mail erfolgreich an ${pending.to} versendet: "${pending.subject}"`
         : `❌ ${data.error || 'Fehler beim Versenden'}`
 
+      setPendingEmail(null)
+      addMessage({ role: 'model', text: resultMsg })
+
       if (success && pending.projectId) {
-        const noteDate = new Date().toLocaleDateString('de-DE')
-        const noteText =
-          pending.functionName === 'sendReminder'
-            ? `Mahnung per E-Mail an ${pending.to} gesendet`
-            : `E-Mail an ${pending.to} versendet: ${pending.subject}`
-        setProjects(prev =>
-          prev.map(p =>
-            p.id === pending.projectId
-              ? {
-                  ...p,
-                  notes: `${p.notes || ''}\n${noteDate}: ${noteText}`,
-                }
-              : p
-          )
-        )
         refreshProjects(true, true)
       }
-
-      setPendingEmail(null)
-      responses.push({
-        id: functionCallId,
-        name: pending.functionName,
-        response: { result: resultMsg },
-      })
-      addMessage({ role: 'model', text: resultMsg })
-      await doFollowUp(responses, sessionId)
     } catch (err) {
       setPendingEmail(null)
-      const errMsg =
-        err instanceof Error ? err.message : 'Unbekannter Fehler beim Versenden'
-      responses.push({
-        id: functionCallId,
-        name: pending.functionName,
-        response: { result: `❌ ${errMsg}` },
-      })
+      const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler beim Versenden'
       addMessage({ role: 'model', text: `❌ ${errMsg}` })
-      await doFollowUp(responses, sessionId)
     }
-  }, [pendingEmail, setProjects, refreshProjects, addMessage, doFollowUp])
+  }, [pendingEmail, refreshProjects, addMessage])
 
-  const handleEmailCancel = useCallback(async () => {
+  const handleEmailCancel = useCallback(() => {
     if (!pendingEmail) return
-
-    const { functionResponses, sessionId } = pendingEmail
-    const cancelMsg = 'E-Mail-Versand abgebrochen.'
     setPendingEmail(null)
-    functionResponses.push({
-      id: pendingEmail.functionCallId,
-      name: pendingEmail.pending.functionName,
-      response: { result: cancelMsg },
-    })
-    addMessage({ role: 'model', text: cancelMsg })
-    await doFollowUp(functionResponses, sessionId)
-  }, [pendingEmail, addMessage, doFollowUp])
+    addMessage({ role: 'model', text: 'E-Mail-Versand abgebrochen.' })
+  }, [pendingEmail, addMessage])
 
   if (!isOpen) return null
 
@@ -607,7 +463,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
             <div className="space-y-4 px-8 pb-4">
               <EmailConfirmationCard
                 pending={pendingEmail.pending}
-                functionCallId={pendingEmail.functionCallId}
+                functionCallId={pendingEmail.pending.functionCallId}
                 onConfirm={handleEmailConfirm}
                 onCancel={handleEmailCancel}
               />

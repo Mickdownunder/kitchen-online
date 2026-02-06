@@ -22,7 +22,6 @@ import { refreshDeliveryNotesWithCache } from './providers/deliveryNotesCache'
 import { refreshAppointmentsWithCache } from './providers/appointmentsCache'
 import { scheduleDeliveryDateBackgroundCheck } from './providers/deliveryDateBackground'
 import { schedulePaymentScheduleCheck } from './providers/paymentScheduleBackground'
-import { handleFunctionCallImpl } from './providers/ai/handleFunctionCall'
 import { useAuth } from '@/hooks/useAuth'
 
 interface AppContextType {
@@ -43,11 +42,7 @@ interface AppContextType {
   setAppointments: React.Dispatch<React.SetStateAction<PlanningAppointment[]>>
   refreshAppointments: () => Promise<void>
 
-  // AI Functions
-  handleFunctionCall: (
-    name: string,
-    args: Record<string, unknown>
-  ) => Promise<string | void | import('./providers/ai/types/pendingEmail').PendingEmailAction>
+  // AI Functions (function calls are now executed server-side)
   addDocumentToProject: (projectId: string, doc: ProjectDocument) => void
 
   // Data freshness
@@ -175,23 +170,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [projects, isLoading, setProjects])
 
-  const handleFunctionCall = async (
-    name: string,
-    args: Record<string, unknown>
-  ): Promise<
-    | string
-    | void
-    | import('./providers/ai/types/pendingEmail').PendingEmailAction
-  > => {
-    return await handleFunctionCallImpl({
-      name,
-      args,
-      projects,
-      setProjects,
-      setAppointments,
-    })
-  }
-
   const addDocumentToProject = async (projectId: string, doc: ProjectDocument) => {
     const project = projects.find(
       p =>
@@ -220,7 +198,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         appointments,
         setAppointments,
         refreshAppointments: () => refreshAppointments(true),
-        handleFunctionCall,
         addDocumentToProject,
         refreshProjects: (force = true, silent = false) => refreshProjects(force, silent),
         isLoading,
