@@ -160,7 +160,6 @@ export async function middleware(request: NextRequest) {
     '/statistics',
     '/accounting',
     '/settings',
-    '/clear-data',
   ]
   // Root route on CRM domain should redirect to CRM login, but NOT on portal subdomain
   const isRootRoute = pathname === '/' && !isPortalSubdomain
