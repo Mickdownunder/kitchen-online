@@ -8,7 +8,6 @@ import {
   AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
-  Link2 as LinkIcon,
 } from 'lucide-react'
 import { CustomerProject, Invoice } from '@/types'
 import {
@@ -33,8 +32,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import Link from 'next/link'
-
 interface OverviewTabProps {
   projects: CustomerProject[]
   invoices: Invoice[]
@@ -173,12 +170,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 Vorperiode: {formatCurrency(previousMetrics.soldRevenue)} €
               </p>
             )}
-            <Link
-              href="/statistics?tab=projects"
-              className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700"
-            >
-              <LinkIcon className="h-3 w-3" /> Details
-            </Link>
           </div>
         </div>
 
@@ -215,12 +206,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 Vorperiode: {formatCurrency(previousMetrics.invoicedRevenue)} €
               </p>
             )}
-            <Link
-              href="/statistics?tab=invoices"
-              className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-purple-600 hover:text-purple-700"
-            >
-              <LinkIcon className="h-3 w-3" /> Details
-            </Link>
           </div>
         </div>
 
@@ -257,12 +242,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 Vorperiode: {formatCurrency(previousMetrics.receivedMoney)} €
               </p>
             )}
-            <Link
-              href="/statistics?tab=invoices"
-              className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700"
-            >
-              <LinkIcon className="h-3 w-3" /> Details
-            </Link>
           </div>
         </div>
 
@@ -299,12 +278,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 Vorperiode: {formatCurrency(previousMetrics.outstanding)} €
               </p>
             )}
-            <Link
-              href="/statistics?tab=invoices"
-              className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700"
-            >
-              <LinkIcon className="h-3 w-3" /> Details
-            </Link>
           </div>
         </div>
       </div>

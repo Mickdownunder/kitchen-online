@@ -69,6 +69,15 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
   // Get initial tab from URL or default to 'overview'
   const initialTab = (searchParams.get('tab') as StatisticsTab) || 'overview'
   const [activeTab, setActiveTab] = useState<StatisticsTab>(initialTab)
+
+  // Sync activeTab when URL changes (e.g. when clicking Details links from Overview cards)
+  const validTabs: StatisticsTab[] = ['overview', 'projects', 'invoices', 'deliveries', 'customers']
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as StatisticsTab
+    if (tabFromUrl && validTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [searchParams, activeTab])
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
   const [timeRange, setTimeRange] = useState<TimeRange>('year')
   const [compareWithPrevious, setCompareWithPrevious] = useState(true)
