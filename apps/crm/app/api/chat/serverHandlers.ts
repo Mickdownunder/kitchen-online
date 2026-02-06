@@ -106,6 +106,109 @@ async function appendProjectNote(
     .eq('id', projectId)
 }
 
+// ============================================
+// Email Whitelist (server-side)
+// ============================================
+
+/**
+ * Collects allowed email addresses from projects and employees.
+ * This is the server-side equivalent of lib/ai/emailWhitelist.ts
+ * but uses the server Supabase client instead of browser services.
+ */
+async function getAllowedEmails(
+  supabase: SupabaseClient,
+  userId: string,
+  projectId?: string
+): Promise<Set<string>> {
+  const allowed = new Set<string>()
+
+  // Collect project emails
+  if (projectId) {
+    const { data: project } = await supabase
+      .from('projects')
+      .select('email')
+      .eq('id', projectId)
+      .maybeSingle()
+    if (project?.email) allowed.add((project.email as string).trim().toLowerCase())
+  } else {
+    // Get all project emails for the user
+    const { data: projects } = await supabase
+      .from('projects')
+      .select('email')
+      .not('email', 'is', null)
+    if (projects) {
+      for (const p of projects) {
+        if (p.email) allowed.add((p.email as string).trim().toLowerCase())
+      }
+    }
+  }
+
+  // Collect employee emails
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (settings?.id) {
+    const { data: employees } = await supabase
+      .from('employees')
+      .select('email')
+      .eq('company_id', settings.id)
+      .eq('is_active', true)
+      .not('email', 'is', null)
+    if (employees) {
+      for (const e of employees) {
+        if (e.email) allowed.add((e.email as string).trim().toLowerCase())
+      }
+    }
+  }
+
+  return allowed
+}
+
+function checkEmailWhitelist(
+  to: string,
+  allowed: Set<string>
+): { ok: boolean; blocked: string[] } {
+  const addresses = to.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+  const blocked = addresses.filter(addr => !allowed.has(addr))
+  return { ok: blocked.length === 0, blocked }
+}
+
+function formatWhitelistError(blocked: string[]): string {
+  return `❌ E-Mail-Adresse(n) "${blocked.join(', ')}" nicht freigegeben. Nur an im Projekt hinterlegte Kunden-E-Mails oder Mitarbeiter-E-Mails erlaubt.`
+}
+
+// ============================================
+// Audit Logging (server-side, direct to DB)
+// ============================================
+
+async function logAuditToDB(
+  supabase: SupabaseClient,
+  userId: string,
+  action: string,
+  entityType: string,
+  entityId: string | undefined,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  try {
+    await supabase.from('audit_logs').insert({
+      user_id: userId,
+      action,
+      entity_type: entityType,
+      entity_id: entityId || null,
+      metadata,
+    })
+  } catch (err) {
+    // Audit logging should never break the main operation
+    logger.error('Failed to write audit log', {
+      component: 'serverHandlers',
+      error: err instanceof Error ? err.message : 'unknown',
+    })
+  }
+}
+
 async function getNextInvoiceNumber(
   supabase: SupabaseClient,
   userId: string
@@ -921,6 +1024,11 @@ const handleSendEmail: ServerHandler = async (args, supabase, userId) => {
     return { result: '❌ E-Mail-Parameter unvollständig. Benötigt: to, subject, body' }
   }
 
+  // SECURITY: Email whitelist check
+  const allowed = await getAllowedEmails(supabase, userId, args.projectId as string | undefined)
+  const { ok, blocked } = checkEmailWhitelist(emailTo, allowed)
+  if (!ok) return { result: formatWhitelistError(blocked) }
+
   // E-Mail requires human confirmation - return as pending
   const pdfType = args.pdfType as string | undefined
   const bodyPreview = emailBody.length > 150 ? `${emailBody.slice(0, 150)}...` : emailBody
@@ -969,7 +1077,7 @@ const handleSendEmail: ServerHandler = async (args, supabase, userId) => {
   }
 }
 
-const handleSendReminder: ServerHandler = async (args, supabase) => {
+const handleSendReminder: ServerHandler = async (args, supabase, userId) => {
   const project = await findProject(supabase, args.projectId as string)
   if (!project) return { result: '❌ Projekt nicht gefunden.' }
 
@@ -1000,6 +1108,11 @@ const handleSendReminder: ServerHandler = async (args, supabase) => {
   if (!effectiveEmail) {
     return { result: '❌ Keine E-Mail-Adresse hinterlegt.' }
   }
+
+  // SECURITY: Email whitelist check
+  const allowed = await getAllowedEmails(supabase, userId, project.id)
+  const { ok, blocked } = checkEmailWhitelist(effectiveEmail, allowed)
+  if (!ok) return { result: formatWhitelistError(blocked) }
 
   const reminderTypeText = reminderType === 'first' ? '1. Mahnung' : reminderType === 'second' ? '2. Mahnung' : 'Letzte Mahnung'
 
@@ -1099,6 +1212,10 @@ export async function executeServerFunctionCall(
 ): Promise<ServerHandlerResult> {
   // Block dangerous functions
   if (blockedFunctions.has(name)) {
+    await logAuditToDB(supabase, userId, 'ai.function_blocked', 'ai_action', undefined, {
+      functionName: name,
+      reason: 'delete_blocked',
+    })
     return { result: '⛔ Löschen ist aus Sicherheitsgründen nur manuell möglich.' }
   }
 
@@ -1111,12 +1228,26 @@ export async function executeServerFunctionCall(
   try {
     const result = await handler(args, supabase, userId)
     const duration = Date.now() - start
+    const success = result.result.startsWith('✅')
+
     logger.info('Server function call executed', {
       component: 'serverHandlers',
       functionName: name,
-      success: result.result.startsWith('✅'),
+      success,
       duration,
     })
+
+    // Audit log: Write to DB for traceability
+    const entityId = (args.projectId as string) || (args.customerId as string) || (args.articleId as string) || undefined
+    await logAuditToDB(supabase, userId, 'ai.function_called', 'ai_action', entityId, {
+      functionName: name,
+      success,
+      durationMs: duration,
+      result: result.result.slice(0, 200),
+      hasPendingEmail: !!result.pendingEmail,
+      updatedProjectIds: result.updatedProjectIds,
+    })
+
     return result
   } catch (error) {
     const duration = Date.now() - start
@@ -1127,6 +1258,14 @@ export async function executeServerFunctionCall(
       error: errMsg,
       duration,
     })
+
+    // Audit log: Write error to DB
+    await logAuditToDB(supabase, userId, 'ai.function_failed', 'ai_action', undefined, {
+      functionName: name,
+      error: errMsg,
+      durationMs: duration,
+    })
+
     return { result: `❌ Fehler bei ${name}: ${errMsg}` }
   }
 }
