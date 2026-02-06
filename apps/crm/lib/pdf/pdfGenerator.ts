@@ -288,7 +288,8 @@ async function generateOrderPDF(
       showUnitPrices: false,
       appendAgb,
     })
-    const pdfBuffer = await renderToBuffer(pdfElement as React.ReactElement)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- renderToBuffer expects DocumentProps, createElement returns generic ReactElement
+    const pdfBuffer = await renderToBuffer(pdfElement as any)
     const pdfBase64 = pdfBuffer.toString('base64')
     const safeOrder = (project.orderNumber || project.id?.slice(0, 8) || 'Auftrag').replace(/\//g, '-')
     const safeName = (project.customerName || 'Kunde').replace(/\s/g, '_')

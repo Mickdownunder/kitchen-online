@@ -434,9 +434,9 @@ export async function getNextDeliveryNoteNumber(): Promise<string> {
   const prefix = settings.delivery_note_prefix || 'LS-'
   const year = new Date().getFullYear()
 
-  // Alle existierenden Lieferscheinnummern abfragen
+  // Alle existierenden Kunden-Lieferscheinnummern abfragen (customer_delivery_notes, nicht delivery_notes)
   const { data: existing } = await supabase
-    .from('delivery_notes')
+    .from('customer_delivery_notes')
     .select('delivery_note_number')
     .eq('user_id', user.id)
 
@@ -472,7 +472,7 @@ export async function peekNextDeliveryNoteNumber(): Promise<string> {
   const year = new Date().getFullYear()
 
   const { data: existing } = await supabase
-    .from('delivery_notes')
+    .from('customer_delivery_notes')
     .select('delivery_note_number')
     .eq('user_id', user.id)
 

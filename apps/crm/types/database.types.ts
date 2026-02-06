@@ -227,6 +227,80 @@ export type Database = {
           },
         ]
       }
+      bank_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          bank_account_id: string | null
+          transaction_date: string
+          amount: number
+          reference: string | null
+          counterparty_name: string | null
+          counterparty_iban: string | null
+          supplier_invoice_id: string | null
+          invoice_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          bank_account_id?: string | null
+          transaction_date: string
+          amount: number
+          reference?: string | null
+          counterparty_name?: string | null
+          counterparty_iban?: string | null
+          supplier_invoice_id?: string | null
+          invoice_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          bank_account_id?: string | null
+          transaction_date?: string
+          amount?: number
+          reference?: string | null
+          counterparty_name?: string | null
+          counterparty_iban?: string | null
+          supplier_invoice_id?: string | null
+          invoice_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_supplier_invoice_id_fkey"
+            columns: ["supplier_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
@@ -349,7 +423,11 @@ export type Database = {
           logo_base64: string | null
           logo_url: string | null
           next_invoice_number: number | null
+          next_order_number: number | null
+          next_delivery_note_number: number | null
           offer_prefix: string | null
+          order_prefix: string | null
+          delivery_note_prefix: string | null
           order_footer_templates: Json | null
           payment_terms_options: Json | null
           phone: string | null
@@ -382,7 +460,11 @@ export type Database = {
           logo_base64?: string | null
           logo_url?: string | null
           next_invoice_number?: number | null
+          next_order_number?: number | null
+          next_delivery_note_number?: number | null
           offer_prefix?: string | null
+          order_prefix?: string | null
+          delivery_note_prefix?: string | null
           order_footer_templates?: Json | null
           payment_terms_options?: Json | null
           phone?: string | null
@@ -415,7 +497,11 @@ export type Database = {
           logo_base64?: string | null
           logo_url?: string | null
           next_invoice_number?: number | null
+          next_order_number?: number | null
+          next_delivery_note_number?: number | null
           offer_prefix?: string | null
+          order_prefix?: string | null
+          delivery_note_prefix?: string | null
           order_footer_templates?: Json | null
           payment_terms_options?: Json | null
           phone?: string | null
@@ -1258,6 +1344,38 @@ export type Database = {
           },
         ]
       }
+      order_sign_tokens: {
+        Row: {
+          id: string
+          project_id: string
+          token: string
+          expires_at: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          token: string
+          expires_at: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          token?: string
+          expires_at?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_sign_tokens_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           agb_snapshot: string | null
@@ -1637,6 +1755,8 @@ export type Database = {
           order_date: string | null
           order_footer_text: string | null
           order_number: string
+          order_contract_signed_at: string | null
+          order_contract_signed_by: string | null
           partial_payments: Json | null
           payment_schedule: Json | null
           ready_for_assembly_date: string | null
@@ -1693,6 +1813,8 @@ export type Database = {
           order_date?: string | null
           order_footer_text?: string | null
           order_number: string
+          order_contract_signed_at?: string | null
+          order_contract_signed_by?: string | null
           partial_payments?: Json | null
           payment_schedule?: Json | null
           ready_for_assembly_date?: string | null
@@ -1749,6 +1871,8 @@ export type Database = {
           order_date?: string | null
           order_footer_text?: string | null
           order_number?: string
+          order_contract_signed_at?: string | null
+          order_contract_signed_by?: string | null
           partial_payments?: Json | null
           payment_schedule?: Json | null
           ready_for_assembly_date?: string | null
@@ -1820,6 +1944,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "permissions"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      supplier_invoice_custom_categories: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_invoice_custom_categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
         ]
       }

@@ -71,7 +71,7 @@ export function useProjectSubmit({
           (formData.address ?? currentAddress ?? '').trim(),
         phone: formData.phone || '',
         email: formData.email || '',
-        orderNumber: formData.id ? formData.orderNumber : undefined, // Bei neuem Projekt: createProject nutzt getNextOrderNumber()
+        orderNumber: (formData.id ? formData.orderNumber : undefined) ?? '', // Bei neuem Projekt: createProject nutzt getNextOrderNumber()
         status: formData.status || ProjectStatus.PLANNING,
         items: validItems,
         totalAmount: roundTo2Decimals(calculations.grossTotal || 0),

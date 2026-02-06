@@ -443,7 +443,7 @@ export const InvoicePDFDocumentServer: React.FC<{ invoice: InvoiceData }> = ({ i
         <View style={styles.titleSection}>
           <View style={styles.titleRow}>
             <View>
-              <View style={[styles.titleBadge, isCredit && { backgroundColor: '#dc2626' }]}>
+              <View style={[styles.titleBadge, ...(isCredit ? [{ backgroundColor: '#dc2626' }] : [])]}>
                 <Text style={styles.titleBadgeText}>
                   {isCredit ? 'STORNORECHNUNG' : isDeposit ? 'ANZAHLUNGSRECHNUNG' : 'SCHLUSSRECHNUNG'}
                 </Text>

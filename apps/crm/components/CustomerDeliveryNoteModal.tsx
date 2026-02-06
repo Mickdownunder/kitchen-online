@@ -83,7 +83,7 @@ export default function CustomerDeliveryNoteModal({
       } else {
         await createCustomerDeliveryNote({
           projectId: project.id,
-          deliveryNoteNumber: undefined, // Wird fortlaufend generiert (getNextDeliveryNoteNumber)
+          deliveryNoteNumber: '', // Leer = wird fortlaufend generiert (getNextDeliveryNoteNumber)
           deliveryDate,
           deliveryAddress: deliveryAddress || undefined,
           items,

@@ -54,13 +54,8 @@ if (process.env.NODE_ENV === 'production') {
 
 const nextConfig = {
   reactStrictMode: true,
-  // TypeScript-Fehler beim Build ignorieren (Typ-Definitionen, Code läuft korrekt)
   typescript: {
-    ignoreBuildErrors: true,
-  },
-  // ESLint-Fehler beim Build ignorieren
-  eslint: {
-    ignoreDuringBuilds: true,
+    ignoreBuildErrors: false,
   },
   experimental: {
     serverActions: {

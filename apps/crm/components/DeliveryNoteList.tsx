@@ -16,6 +16,13 @@ export default function DeliveryNoteList() {
   const [showUpload, setShowUpload] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortField, setSortField] = useState<'date' | 'supplierName' | 'number' | 'status'>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  const handleSort = (field: 'date' | 'supplierName' | 'number' | 'status') => {
+    setSortField(field)
+    setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+  }
 
   useEffect(() => {
     loadData()

@@ -42,26 +42,29 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
   onSave,
   onCancel,
 }) => {
-  const [formData, setFormData] = useState<Partial<Article>>({
-    sku: '',
-    manufacturer: '',
-    modelNumber: '',
-    category: 'Kitchen',
-    name: '',
-    description: '',
-    specifications: {},
-    defaultPurchasePrice: 0,
-    defaultSalePrice: 0,
-    taxRate: 20,
-    unit: 'Stk',
-    inStock: true,
-    stockQuantity: 0,
-    isActive: true,
-    ..._article,
-    // Beim Bearbeiten: Beschreibung aus name füllen wenn description leer
-    description: _article
-      ? (_article.description ?? _article.name ?? '')
-      : '',
+  const [formData, setFormData] = useState<Partial<Article>>(() => {
+    const base: Partial<Article> = {
+      sku: '',
+      manufacturer: '',
+      modelNumber: '',
+      category: 'Kitchen',
+      name: '',
+      description: '',
+      specifications: {},
+      defaultPurchasePrice: 0,
+      defaultSalePrice: 0,
+      taxRate: 20,
+      unit: 'Stk',
+      inStock: true,
+      stockQuantity: 0,
+      isActive: true,
+    }
+    if (!_article) return base
+    return {
+      ...base,
+      ..._article,
+      description: _article.description ?? _article.name ?? '',
+    }
   })
 
   const [specKey, setSpecKey] = useState('')

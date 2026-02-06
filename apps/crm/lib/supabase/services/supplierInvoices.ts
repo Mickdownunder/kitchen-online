@@ -361,7 +361,7 @@ export async function getSupplierInvoiceCustomCategories(): Promise<SupplierInvo
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    createdAt: row.created_at,
+    createdAt: row.created_at ?? '',
   }))
 }
 
@@ -385,7 +385,7 @@ export async function addSupplierInvoiceCustomCategory(name: string): Promise<Su
     id: data.id,
     userId: data.user_id,
     name: data.name,
-    createdAt: data.created_at,
+    createdAt: data.created_at ?? '',
   }
 }
 
@@ -443,8 +443,9 @@ export async function getSupplierInvoiceStats(
     { count: number; netAmount: number; taxAmount: number }
   >()
   invoices.forEach(inv => {
-    const existing = categoryMap.get(inv.category) || { count: 0, netAmount: 0, taxAmount: 0 }
-    categoryMap.set(inv.category, {
+    const cat = inv.category as SupplierInvoiceCategory
+    const existing = categoryMap.get(cat) || { count: 0, netAmount: 0, taxAmount: 0 }
+    categoryMap.set(cat, {
       count: existing.count + 1,
       netAmount: existing.netAmount + inv.netAmount,
       taxAmount: existing.taxAmount + inv.taxAmount,
