@@ -1,14 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import {
-  DollarSign,
-  ReceiptText,
-  CreditCard,
-  AlertCircle,
-  ArrowUpRight,
-  ArrowDownRight,
-} from 'lucide-react'
+import { DollarSign, ReceiptText, CreditCard, AlertCircle } from 'lucide-react'
 import { CustomerProject, Invoice } from '@/types'
 import {
   calculateSoldRevenue,
@@ -32,6 +25,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
+import { StatCard, ChartContainer } from '@/components/ui'
 interface OverviewTabProps {
   projects: CustomerProject[]
   invoices: Invoice[]
@@ -137,161 +131,86 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     <div className="space-y-8">
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Verkaufter Umsatz */}
-        <div className="glass group relative cursor-pointer overflow-hidden rounded-2xl border border-white/50 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
-          <div className="absolute right-0 top-0 -mr-16 -mt-16 h-32 w-32 rounded-full bg-blue-100 opacity-20 transition-opacity duration-300 group-hover:opacity-30"></div>
-          <div className="relative">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="rounded-xl bg-blue-100 p-3">
-                <DollarSign className="h-6 w-6 text-blue-600" />
-              </div>
-              {compareWithPrevious && (
-                <div
-                  className={`flex items-center gap-1 text-xs font-black ${changes.soldRevenue >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                >
-                  {changes.soldRevenue >= 0 ? (
-                    <ArrowUpRight className="h-4 w-4" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4" />
-                  )}
-                  {formatPercent(changes.soldRevenue)}
-                </div>
-              )}
-            </div>
-            <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-              Verkaufter Umsatz
-            </p>
-            <p className="mb-1 text-3xl font-black text-slate-900">
-              {formatCurrency(currentMetrics.soldRevenue)} €
-            </p>
-            <p className="text-xs text-slate-500">Auftragsvolumen</p>
-            {compareWithPrevious && previousMetrics.soldRevenue > 0 && (
-              <p className="mt-1 text-xs text-slate-400">
-                Vorperiode: {formatCurrency(previousMetrics.soldRevenue)} €
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Buchhalterischer Umsatz */}
-        <div className="glass group relative cursor-pointer overflow-hidden rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
-          <div className="absolute right-0 top-0 -mr-16 -mt-16 h-32 w-32 rounded-full bg-purple-100 opacity-20 transition-opacity duration-300 group-hover:opacity-30"></div>
-          <div className="relative">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="rounded-xl bg-purple-100 p-3">
-                <ReceiptText className="h-6 w-6 text-purple-600" />
-              </div>
-              {compareWithPrevious && (
-                <div
-                  className={`flex items-center gap-1 text-xs font-black ${changes.invoicedRevenue >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                >
-                  {changes.invoicedRevenue >= 0 ? (
-                    <ArrowUpRight className="h-4 w-4" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4" />
-                  )}
-                  {formatPercent(changes.invoicedRevenue)}
-                </div>
-              )}
-            </div>
-            <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-              Buchhalterischer Umsatz
-            </p>
-            <p className="mb-1 text-3xl font-black text-slate-900">
-              {formatCurrency(currentMetrics.invoicedRevenue)} €
-            </p>
-            <p className="text-xs text-slate-500">Nur Schlussrechnungen</p>
-            {compareWithPrevious && previousMetrics.invoicedRevenue > 0 && (
-              <p className="mt-1 text-xs text-slate-400">
-                Vorperiode: {formatCurrency(previousMetrics.invoicedRevenue)} €
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Eingegangenes Geld */}
-        <div className="glass group relative cursor-pointer overflow-hidden rounded-2xl border border-white/50 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
-          <div className="absolute right-0 top-0 -mr-16 -mt-16 h-32 w-32 rounded-full bg-emerald-100 opacity-20 transition-opacity duration-300 group-hover:opacity-30"></div>
-          <div className="relative">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="rounded-xl bg-emerald-100 p-3">
-                <CreditCard className="h-6 w-6 text-emerald-600" />
-              </div>
-              {compareWithPrevious && (
-                <div
-                  className={`flex items-center gap-1 text-xs font-black ${changes.receivedMoney >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                >
-                  {changes.receivedMoney >= 0 ? (
-                    <ArrowUpRight className="h-4 w-4" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4" />
-                  )}
-                  {formatPercent(changes.receivedMoney)}
-                </div>
-              )}
-            </div>
-            <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-              Eingegangen
-            </p>
-            <p className="mb-1 text-3xl font-black text-slate-900">
-              {formatCurrency(currentMetrics.receivedMoney)} €
-            </p>
-            <p className="text-xs text-slate-500">Cash Flow</p>
-            {compareWithPrevious && previousMetrics.receivedMoney > 0 && (
-              <p className="mt-1 text-xs text-slate-400">
-                Vorperiode: {formatCurrency(previousMetrics.receivedMoney)} €
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Offene Forderungen */}
-        <div className="glass group relative cursor-pointer overflow-hidden rounded-2xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
-          <div className="absolute right-0 top-0 -mr-16 -mt-16 h-32 w-32 rounded-full bg-amber-100 opacity-20 transition-opacity duration-300 group-hover:opacity-30"></div>
-          <div className="relative">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="rounded-xl bg-amber-100 p-3">
-                <AlertCircle className="h-6 w-6 text-amber-600" />
-              </div>
-              {compareWithPrevious && (
-                <div
-                  className={`flex items-center gap-1 text-xs font-black ${changes.outstanding >= 0 ? 'text-red-600' : 'text-green-600'}`}
-                >
-                  {changes.outstanding >= 0 ? (
-                    <ArrowUpRight className="h-4 w-4" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4" />
-                  )}
-                  {formatPercent(Math.abs(changes.outstanding))}
-                </div>
-              )}
-            </div>
-            <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-              Offen
-            </p>
-            <p className="mb-1 text-3xl font-black text-slate-900">
-              {formatCurrency(currentMetrics.outstanding)} €
-            </p>
-            <p className="text-xs text-slate-500">Forderungen</p>
-            {compareWithPrevious && previousMetrics.outstanding > 0 && (
-              <p className="mt-1 text-xs text-slate-400">
-                Vorperiode: {formatCurrency(previousMetrics.outstanding)} €
-              </p>
-            )}
-          </div>
-        </div>
+        <StatCard
+          icon={DollarSign}
+          iconColor="blue"
+          value={`${formatCurrency(currentMetrics.soldRevenue)} €`}
+          label="Verkaufter Umsatz"
+          subtitle="Auftragsvolumen"
+          subtitleSecondary={
+            compareWithPrevious && previousMetrics.soldRevenue > 0
+              ? `Vorperiode: ${formatCurrency(previousMetrics.soldRevenue)} €`
+              : undefined
+          }
+          trend={
+            compareWithPrevious
+              ? { value: changes.soldRevenue, isPositive: changes.soldRevenue >= 0 }
+              : undefined
+          }
+          tint="blue"
+        />
+        <StatCard
+          icon={ReceiptText}
+          iconColor="purple"
+          value={`${formatCurrency(currentMetrics.invoicedRevenue)} €`}
+          label="Buchhalterischer Umsatz"
+          subtitle="Nur Schlussrechnungen"
+          subtitleSecondary={
+            compareWithPrevious && previousMetrics.invoicedRevenue > 0
+              ? `Vorperiode: ${formatCurrency(previousMetrics.invoicedRevenue)} €`
+              : undefined
+          }
+          trend={
+            compareWithPrevious
+              ? { value: changes.invoicedRevenue, isPositive: changes.invoicedRevenue >= 0 }
+              : undefined
+          }
+          tint="purple"
+        />
+        <StatCard
+          icon={CreditCard}
+          iconColor="emerald"
+          value={`${formatCurrency(currentMetrics.receivedMoney)} €`}
+          label="Eingegangen"
+          subtitle="Cash Flow"
+          subtitleSecondary={
+            compareWithPrevious && previousMetrics.receivedMoney > 0
+              ? `Vorperiode: ${formatCurrency(previousMetrics.receivedMoney)} €`
+              : undefined
+          }
+          trend={
+            compareWithPrevious
+              ? { value: changes.receivedMoney, isPositive: changes.receivedMoney >= 0 }
+              : undefined
+          }
+          tint="emerald"
+        />
+        <StatCard
+          icon={AlertCircle}
+          iconColor="amber"
+          value={`${formatCurrency(currentMetrics.outstanding)} €`}
+          label="Offen"
+          subtitle="Forderungen"
+          subtitleSecondary={
+            compareWithPrevious && previousMetrics.outstanding > 0
+              ? `Vorperiode: ${formatCurrency(previousMetrics.outstanding)} €`
+              : undefined
+          }
+          trend={
+            compareWithPrevious
+              ? { value: Math.abs(changes.outstanding), isPositive: changes.outstanding < 0 }
+              : undefined
+          }
+          tint="amber"
+        />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Umsatz-Vergleich */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6">
-            <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-              Umsatz-Vergleich
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">Verkauft vs. Schlussrechnungen vs. Eingegangen</p>
-          </div>
+        <ChartContainer
+          title="Umsatz-Vergleich"
+          subtitle="Verkauft vs. Schlussrechnungen vs. Eingegangen"
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -334,16 +253,12 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
 
-        {/* Cash Flow Trend */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6">
-            <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-              Cash Flow Trend
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">Eingegangenes Geld pro Monat</p>
-          </div>
+        <ChartContainer
+          title="Cash Flow Trend"
+          subtitle="Eingegangenes Geld pro Monat"
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -386,7 +301,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
       </div>
     </div>
   )

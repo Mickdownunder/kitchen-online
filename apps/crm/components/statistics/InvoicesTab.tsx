@@ -24,7 +24,8 @@ import {
   calculateMonthlyInvoiceDataFromInvoices,
   DateFilter,
 } from './utils/revenueCalculations'
-import { Download } from 'lucide-react'
+import { Download, ReceiptText, Euro, CreditCard, Clock } from 'lucide-react'
+import { StatCard, ChartContainer } from '@/components/ui'
 
 interface InvoicesTabProps {
   invoices: Invoice[]
@@ -126,30 +127,26 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
     <div className="space-y-8">
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-            Schlussrechnungen
-          </p>
-          <p className="text-3xl font-black text-slate-900">
-            {formatCurrency(stats.invoicedRevenue)} €
-          </p>
-          <p className="mt-1 text-xs text-slate-500">{stats.finalInvoiceCount} Rechnungen</p>
-        </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-            Anzahlungen
-          </p>
-          <p className="text-3xl font-black text-slate-900">
-            {formatCurrency(stats.depositRevenue)} €
-          </p>
-          <p className="mt-1 text-xs text-slate-500">{stats.depositInvoiceCount} Anzahlungen</p>
-        </div>
+        <StatCard
+          icon={ReceiptText}
+          iconColor="purple"
+          value={`${formatCurrency(stats.invoicedRevenue)} €`}
+          label="Schlussrechnungen"
+          subtitle={`${stats.finalInvoiceCount} Rechnungen`}
+          tint="purple"
+        />
+        <StatCard
+          icon={Euro}
+          iconColor="blue"
+          value={`${formatCurrency(stats.depositRevenue)} €`}
+          label="Anzahlungen"
+          subtitle={`${stats.depositInvoiceCount} Anzahlungen`}
+          tint="blue"
+        />
         <div className="glass group relative overflow-hidden rounded-2xl border-2 border-slate-900 bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
-          <div className="absolute right-0 top-0 -mr-16 -mt-16 h-32 w-32 rounded-full bg-white/10 transition-opacity group-hover:opacity-50"></div>
+          <div className="absolute right-0 top-0 -mr-16 -mt-16 h-32 w-32 rounded-full bg-white/10 transition-opacity group-hover:opacity-50" />
           <div className="relative z-10">
-            <p className="mb-1 text-xs font-black uppercase tracking-widest text-white/90">
-              Gesamt
-            </p>
+            <p className="mb-1 text-xs font-black uppercase tracking-widest text-white/90">Gesamt</p>
             <p className="mb-1 text-3xl font-black text-white">
               {formatCurrency(stats.invoicedRevenue + stats.depositRevenue)} €
             </p>
@@ -158,37 +155,30 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
             </p>
           </div>
         </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-            Eingegangen
-          </p>
-          <p className="text-3xl font-black text-slate-900">
-            {formatCurrency(stats.receivedMoney)} €
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {stats.paidFinalCount + stats.paidDepositCount} bezahlt
-          </p>
-        </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">Offen</p>
-          <p className="text-3xl font-black text-slate-900">
-            {formatCurrency(stats.outstanding)} €
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Ø {stats.avgPaymentDays} Tage</p>
-        </div>
+        <StatCard
+          icon={CreditCard}
+          iconColor="emerald"
+          value={`${formatCurrency(stats.receivedMoney)} €`}
+          label="Eingegangen"
+          subtitle={`${stats.paidFinalCount + stats.paidDepositCount} bezahlt`}
+          tint="emerald"
+        />
+        <StatCard
+          icon={Clock}
+          iconColor="amber"
+          value={`${formatCurrency(stats.outstanding)} €`}
+          label="Offen"
+          subtitle={`Ø ${stats.avgPaymentDays} Tage`}
+          tint="amber"
+        />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Schlussrechnungen nach Monaten */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-                Schlussrechnungen nach Monaten
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">Final-Rechnungen</p>
-            </div>
+        <ChartContainer
+          title="Schlussrechnungen nach Monaten"
+          subtitle="Final-Rechnungen"
+          action={
             <button
               onClick={() => handleExportCSV(monthlyData, 'schlussrechnungen')}
               className="rounded-lg p-2 transition-all hover:bg-slate-100"
@@ -196,7 +186,8 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
             >
               <Download className="h-4 w-4 text-slate-400" />
             </button>
-          </div>
+          }
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -226,16 +217,12 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
 
-        {/* Anzahlungen nach Monaten */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6">
-            <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-              Anzahlungen nach Monaten
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">Teilzahlungen</p>
-          </div>
+        <ChartContainer
+          title="Anzahlungen nach Monaten"
+          subtitle="Teilzahlungen"
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -265,19 +252,15 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
       </div>
 
       {/* Eingegangen vs. Offen & Rechnungsarten */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Eingegangen vs. Offen */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6">
-            <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-              Eingegangen vs. Offen
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">Zahlungseingang</p>
-          </div>
+        <ChartContainer
+          title="Eingegangen vs. Offen"
+          subtitle="Zahlungseingang"
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -317,13 +300,9 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
 
-        {/* Rechnungsarten-Verteilung */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <h3 className="mb-6 bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-            Rechnungsarten-Verteilung
-          </h3>
+        <ChartContainer title="Rechnungsarten-Verteilung">
           <div className="h-64">
             {invoiceTypeDistribution.some(d => d.value > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -357,7 +336,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, filter }) => {
               </div>
             )}
           </div>
-        </div>
+        </ChartContainer>
       </div>
     </div>
   )

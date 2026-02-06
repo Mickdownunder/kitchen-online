@@ -39,6 +39,7 @@ import {
 import SupplierInvoicesView from './accounting/SupplierInvoicesView'
 import AccountingValidation from './accounting/AccountingValidation'
 import BankReconciliationView from './accounting/BankReconciliationView'
+import { StatCard, ChartContainer } from '@/components/ui'
 
 interface AccountingViewProps {
   projects: CustomerProject[]
@@ -1072,86 +1073,45 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-6 shadow-lg">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <DollarSign className="h-6 w-6 text-slate-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                    Gesamtumsatz
-                  </p>
-                  <p className="text-2xl font-black text-slate-900">
-                    {formatCurrency(totals.totalGross)} €
-                  </p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">Netto: {formatCurrency(totals.totalNet)} €</p>
-            </div>
-
-            <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-6 shadow-lg">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <Percent className="h-6 w-6 text-slate-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                    Umsatzsteuer
-                  </p>
-                  <p className="text-2xl font-black text-slate-900">
-                    {formatCurrency(totals.totalTax)} €
-                  </p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">Aus allen Steuersätzen</p>
-            </div>
-
-            <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-6 shadow-lg">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <Package className="h-6 w-6 text-slate-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                    Rechnungen
-                  </p>
-                  <p className="text-2xl font-black text-slate-900">{totals.invoiceCount}</p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">
-                {totals.paidCount} bezahlt, {totals.invoiceCount - totals.paidCount} offen
-              </p>
-            </div>
-
-            <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-6 shadow-lg">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <Users className="h-6 w-6 text-slate-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                    Eingegangen
-                  </p>
-                  <p className="text-2xl font-black text-slate-900">
-                    {formatCurrency(totals.totalPaid)} €
-                  </p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">
-                Ausstehend: {formatCurrency(totals.totalOutstanding)} €
-              </p>
-            </div>
+            <StatCard
+              icon={DollarSign}
+              iconColor="slate"
+              value={`${formatCurrency(totals.totalGross)} €`}
+              label="Gesamtumsatz"
+              subtitle={`Netto: ${formatCurrency(totals.totalNet)} €`}
+              tint="slate"
+            />
+            <StatCard
+              icon={Percent}
+              iconColor="slate"
+              value={`${formatCurrency(totals.totalTax)} €`}
+              label="Umsatzsteuer"
+              subtitle="Aus allen Steuersätzen"
+              tint="slate"
+            />
+            <StatCard
+              icon={Package}
+              iconColor="slate"
+              value={totals.invoiceCount}
+              label="Rechnungen"
+              subtitle={`${totals.paidCount} bezahlt, ${totals.invoiceCount - totals.paidCount} offen`}
+              tint="slate"
+            />
+            <StatCard
+              icon={Users}
+              iconColor="slate"
+              value={`${formatCurrency(totals.totalPaid)} €`}
+              label="Eingegangen"
+              subtitle={`Ausstehend: ${formatCurrency(totals.totalOutstanding)} €`}
+              tint="slate"
+            />
           </div>
 
           {/* UVA Breakdown */}
-          <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-                  Umsatzsteuervoranmeldung (UVA)
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">Aufgeteilt nach Steuersätzen</p>
-              </div>
+          <ChartContainer
+            title="Umsatzsteuervoranmeldung (UVA)"
+            subtitle="Aufgeteilt nach Steuersätzen"
+            action={
               <button
                 onClick={() => setShowDetails(!showDetails)}
                 className="rounded-lg p-2 transition-all hover:bg-slate-100"
@@ -1162,7 +1122,8 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
                   <Eye className="h-5 w-5 text-slate-400" />
                 )}
               </button>
-            </div>
+            }
+          >
             {showDetails && (
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -1224,21 +1185,13 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
                 </table>
               </div>
             )}
-          </div>
+          </ChartContainer>
 
           {/* Invoice List */}
-          <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-                  Rechnungsübersicht - {periodLabel}
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {filteredInvoices.length} Rechnung{filteredInvoices.length !== 1 ? 'en' : ''} •
-                  Nur Rechnungen aus dem gewählten Zeitraum werden angezeigt
-                </p>
-              </div>
-            </div>
+          <ChartContainer
+            title={`Rechnungsübersicht - ${periodLabel}`}
+            subtitle={`${filteredInvoices.length} Rechnung${filteredInvoices.length !== 1 ? 'en' : ''} • Nur Rechnungen aus dem gewählten Zeitraum werden angezeigt`}
+          >
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -1325,7 +1278,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </ChartContainer>
         </>
       )}
     </div>

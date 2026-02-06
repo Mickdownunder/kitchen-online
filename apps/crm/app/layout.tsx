@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import { headers } from 'next/headers'
 import { AppProvider } from './providers'
 import Layout from '@/components/Layout'
@@ -9,11 +8,8 @@ import { ClientInit } from '@/components/ClientInit'
 import { PerformanceTracker } from '@/components/PerformanceTracker'
 import './globals.css'
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  display: 'swap',
-})
+// System font stack (globals.css) – robust für Offline-Builds, keine Google-Fonts-Abhängigkeit
+const fontClass = 'antialiased'
 
 export const metadata: Metadata = {
   title: 'KüchenOnline',
@@ -46,7 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Portal routes get minimal layout (portal has its own layout)
   if (isPortalRoute) {
     return (
-      <html lang="de" className={inter.className}>
+      <html lang="de" className={fontClass}>
         <body className="bg-slate-50 text-slate-900">
           {children}
         </body>
@@ -56,7 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   // CRM routes get full layout with providers
   return (
-    <html lang="de" className={inter.className}>
+    <html lang="de" className={fontClass}>
       <body className="bg-slate-50 text-slate-900">
         <ErrorBoundary>
           <ToastProvider>

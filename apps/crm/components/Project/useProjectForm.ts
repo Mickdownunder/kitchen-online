@@ -41,7 +41,6 @@ export function useProjectForm(
       complaints: [],
       documents: [],
       notes: '',
-      partialPayments: [],
     }
     const merged = { ...base, ...initialProject }
     if (merged.address && !merged.addressStreet) {
@@ -118,41 +117,6 @@ export function useProjectForm(
       peekNextOrderNumber().then(num => setFormData(prev => ({ ...prev, orderNumber: num })))
     }
   }, [initialProject?.id])
-
-  // Initialize partial payments if not exists (Legacy-Migration)
-  // HINWEIS: Dieser Code existiert nur für die Migration alter Projekte mit depositAmount.
-  // Neue Anzahlungen werden über die Zahlungsseite erstellt, wo fortlaufende Rechnungsnummern
-  // korrekt generiert werden (getNextInvoiceNumber).
-  // Die hier generierte Nummer ist ein Platzhalter für Legacy-Daten.
-  useEffect(() => {
-    if (!formData.partialPayments && formData.depositAmount && formData.depositAmount > 0) {
-      setFormData(prev => ({
-        ...prev,
-        partialPayments: [
-          {
-            id: `partial-${Date.now()}`,
-            // Legacy-Platzhalter - echte fortlaufende Nummern werden über Zahlungsseite generiert
-            invoiceNumber: prev.invoiceNumber
-              ? `${prev.invoiceNumber}-A1`
-              : `R-${new Date().getFullYear()}-${prev.orderNumber}-A1`,
-            amount: prev.depositAmount || 0,
-            date: prev.orderDate || prev.measurementDate || new Date().toISOString().split('T')[0],
-            description: 'Anzahlung',
-            isPaid: prev.isDepositPaid || false,
-            paidDate: prev.isDepositPaid ? new Date().toISOString().split('T')[0] : undefined,
-          },
-        ],
-      }))
-    }
-  }, [
-    formData.partialPayments,
-    formData.depositAmount,
-    formData.invoiceNumber,
-    formData.orderNumber,
-    formData.orderDate,
-    formData.measurementDate,
-    formData.isDepositPaid,
-  ])
 
   // Return unified API (backward compatible)
   return {

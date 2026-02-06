@@ -15,6 +15,7 @@ import {
   Eye,
   RefreshCw,
 } from 'lucide-react'
+import { StatCard } from '@/components/ui'
 import { DeliveryNote, CustomerDeliveryNote, CustomerProject } from '@/types'
 import { useApp } from '../providers'
 import DeliveryNoteUpload from '@/components/DeliveryNoteUpload'
@@ -381,86 +382,54 @@ export default function DeliveriesClient() {
       {/* Stats Cards - Only for filtered delivery notes */}
       {(filteredSupplier.length > 0 || filteredCustomer.length > 0) && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <Package className="h-6 w-6 text-amber-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Lieferanten-Lieferscheine
-              </p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{filteredSupplier.length}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {(() => {
-                const matched = filteredSupplier.filter(n => n.matchedProjectId).length
-                return `${matched} zugeordnet`
-              })()}
-            </p>
-          </div>
-
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <Truck className="h-6 w-6 text-blue-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Kunden-Lieferscheine
-              </p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{filteredCustomer.length}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {(() => {
-                const completed = filteredCustomer.filter(
-                  n => n.status === 'completed' || n.status === 'signed'
-                ).length
-                return `${completed} abgeschlossen`
-              })()}
-            </p>
-          </div>
-
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-slate-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <FolderOpen className="h-6 w-6 text-slate-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">Gesamt</p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">
-              {filteredSupplier.length + filteredCustomer.length}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {activeTab === 'supplier' ? 'Lieferanten' : 'Kunden'} gefiltert
-            </p>
-          </div>
-
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <Eye className="h-6 w-6 text-emerald-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Status-Verteilung
-              </p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">
-              {(() => {
-                const currentList = activeTab === 'supplier' ? filteredSupplier : filteredCustomer
-                const completed = currentList.filter(
-                  n =>
-                    (activeTab === 'supplier' && n.status === 'completed') ||
-                    (activeTab === 'customer' &&
-                      (n.status === 'completed' || n.status === 'signed'))
-                ).length
-                return completed
-              })()}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {(() => {
-                const currentList = activeTab === 'supplier' ? filteredSupplier : filteredCustomer
-                const total = currentList.length
-                const completed = currentList.filter(
-                  n =>
-                    (activeTab === 'supplier' && n.status === 'completed') ||
-                    (activeTab === 'customer' &&
-                      (n.status === 'completed' || n.status === 'signed'))
-                ).length
-                return total > 0 ? `${Math.round((completed / total) * 100)}% abgeschlossen` : '0%'
-              })()}
-            </p>
-          </div>
+          <StatCard
+            icon={Package}
+            iconColor="amber"
+            value={filteredSupplier.length}
+            label="Lieferanten-Lieferscheine"
+            subtitle={`${filteredSupplier.filter(n => n.matchedProjectId).length} zugeordnet`}
+            tint="amber"
+          />
+          <StatCard
+            icon={Truck}
+            iconColor="blue"
+            value={filteredCustomer.length}
+            label="Kunden-Lieferscheine"
+            subtitle={`${filteredCustomer.filter(n => n.status === 'completed' || n.status === 'signed').length} abgeschlossen`}
+            tint="blue"
+          />
+          <StatCard
+            icon={FolderOpen}
+            iconColor="slate"
+            value={filteredSupplier.length + filteredCustomer.length}
+            label="Gesamt"
+            subtitle={`${activeTab === 'supplier' ? 'Lieferanten' : 'Kunden'} gefiltert`}
+            tint="slate"
+          />
+          <StatCard
+            icon={Eye}
+            iconColor="emerald"
+            value={(() => {
+              const currentList = activeTab === 'supplier' ? filteredSupplier : filteredCustomer
+              return currentList.filter(
+                n =>
+                  (activeTab === 'supplier' && n.status === 'completed') ||
+                  (activeTab === 'customer' && (n.status === 'completed' || n.status === 'signed'))
+              ).length
+            })()}
+            label="Status-Verteilung"
+            subtitle={(() => {
+              const currentList = activeTab === 'supplier' ? filteredSupplier : filteredCustomer
+              const total = currentList.length
+              const completed = currentList.filter(
+                n =>
+                  (activeTab === 'supplier' && n.status === 'completed') ||
+                  (activeTab === 'customer' && (n.status === 'completed' || n.status === 'signed'))
+              ).length
+              return total > 0 ? `${Math.round((completed / total) * 100)}% abgeschlossen` : '0%'
+            })()}
+            tint="emerald"
+          />
         </div>
       )}
 

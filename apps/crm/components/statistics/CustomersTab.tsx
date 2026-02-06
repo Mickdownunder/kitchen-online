@@ -4,7 +4,8 @@ import React, { useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { CustomerProject } from '@/types'
 import { DateFilter } from './utils/revenueCalculations'
-import { Download, Users, TrendingUp } from 'lucide-react'
+import { Download, Users, TrendingUp, Award } from 'lucide-react'
+import { StatCard, ChartContainer } from '@/components/ui'
 
 interface CustomersTabProps {
   projects: CustomerProject[]
@@ -165,51 +166,37 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ projects, filter }) => {
     <div className="space-y-8">
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-lg">
-          <div className="mb-2 flex items-center gap-3">
-            <Users className="h-6 w-6 text-blue-600" />
-            <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-              Kunden gesamt
-            </p>
-          </div>
-          <p className="text-3xl font-black text-slate-900">{customerGrowth.total}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            {customerGrowth.new} neu, {customerGrowth.existing} Bestand
-          </p>
-        </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-lg">
-          <div className="mb-2 flex items-center gap-3">
-            <TrendingUp className="h-6 w-6 text-emerald-600" />
-            <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-              Ø Kundenwert
-            </p>
-          </div>
-          <p className="text-3xl font-black text-slate-900">{formatCurrency(avgCustomerValue)} €</p>
-        </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-            Top Kunde LTV
-          </p>
-          <p className="text-3xl font-black text-slate-900">
-            {topCustomers.length > 0 ? formatCurrency(topCustomers[0].ltv) : '0'} €
-          </p>
-          {topCustomers.length > 0 && (
-            <p className="mt-1 text-xs text-slate-500">{topCustomers[0].name}</p>
-          )}
-        </div>
+        <StatCard
+          icon={Users}
+          iconColor="blue"
+          value={customerGrowth.total}
+          label="Kunden gesamt"
+          subtitle={`${customerGrowth.new} neu, ${customerGrowth.existing} Bestand`}
+          tint="blue"
+        />
+        <StatCard
+          icon={TrendingUp}
+          iconColor="emerald"
+          value={`${formatCurrency(avgCustomerValue)} €`}
+          label="Ø Kundenwert"
+          tint="emerald"
+        />
+        <StatCard
+          icon={Award}
+          iconColor="purple"
+          value={topCustomers.length > 0 ? `${formatCurrency(topCustomers[0].ltv)} €` : '0 €'}
+          label="Top Kunde LTV"
+          subtitle={topCustomers.length > 0 ? topCustomers[0].name : undefined}
+          tint="purple"
+        />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Top 10 Kunden nach Umsatz */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-                Top 10 Kunden nach Umsatz
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">Gesamtumsatz pro Kunde</p>
-            </div>
+        <ChartContainer
+          title="Top 10 Kunden nach Umsatz"
+          subtitle="Gesamtumsatz pro Kunde"
+          action={
             <button
               onClick={() => handleExportCSV(customerChartData, 'top_kunden_umsatz')}
               className="rounded-lg p-2 transition-all hover:bg-slate-100"
@@ -217,7 +204,8 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ projects, filter }) => {
             >
               <Download className="h-4 w-4 text-slate-400" />
             </button>
-          </div>
+          }
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -253,16 +241,12 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ projects, filter }) => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
 
-        {/* Kunden-Wachstum */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6">
-            <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-              Kunden-Wachstum
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">Neue vs. Bestandskunden</p>
-          </div>
+        <ChartContainer
+          title="Kunden-Wachstum"
+          subtitle="Neue vs. Bestandskunden"
+        >
           <div className="flex h-80 items-center justify-center">
             <div className="text-center">
               <div className="grid grid-cols-2 gap-8">
@@ -289,18 +273,13 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ projects, filter }) => {
               </div>
             </div>
           </div>
-        </div>
+        </ChartContainer>
       </div>
 
-      {/* Top 15 Kunden Tabelle */}
-      <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-              Top 15 Kunden nach Gesamtumsatz
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">Kunden-Lebenszeitwert (LTV)</p>
-          </div>
+      <ChartContainer
+        title="Top 15 Kunden nach Gesamtumsatz"
+        subtitle="Kunden-Lebenszeitwert (LTV)"
+        action={
           <button
             onClick={() => handleExportCSV(topCustomers, 'top_kunden_ltv')}
             className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-slate-800"
@@ -308,7 +287,8 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ projects, filter }) => {
             <Download className="h-4 w-4" />
             CSV
           </button>
-        </div>
+        }
+      >
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -369,7 +349,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ projects, filter }) => {
             </tbody>
           </table>
         </div>
-      </div>
+      </ChartContainer>
     </div>
   )
 }

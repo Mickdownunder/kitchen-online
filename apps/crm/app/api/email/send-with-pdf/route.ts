@@ -3,6 +3,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { generatePDF, PDFType } from '@/lib/pdf/pdfGenerator'
 import { getProject } from '@/lib/supabase/services/projects'
+import { getInvoices } from '@/lib/supabase/services/invoices'
 import { getCompanySettings, getCompanySettingsById } from '@/lib/supabase/services/company'
 import { deliveryNoteTemplate, invoiceTemplate, orderTemplate } from '@/lib/utils/emailTemplates'
 import { logger } from '@/lib/utils/logger'
@@ -134,27 +135,30 @@ export async function POST(request: NextRequest) {
             )
           }
 
-          // Finde die richtige Rechnung
+          // Lade Rechnungen aus der invoices-Tabelle
+          const invoices = await getInvoices(projectId)
           let invoice = null
+
           if (invoiceId) {
             // Wenn invoiceId ein Index ist (z.B. "0" für erste Anzahlung)
             const index = parseInt(invoiceId)
-            if (!isNaN(index) && project.partialPayments && project.partialPayments[index]) {
-              invoice = project.partialPayments[index]
+            const partials = invoices.filter(inv => inv.type === 'partial')
+            if (!isNaN(index) && partials[index]) {
+              invoice = partials[index]
             } else {
               // Versuche als ID zu finden
-              invoice = project.partialPayments?.find((p: { id?: string }) => p.id === invoiceId)
+              invoice = invoices.find(inv => inv.id === invoiceId)
             }
           }
 
           // Fallback: neueste Anzahlung oder Schlussrechnung
           if (!invoice) {
-            if (project.partialPayments && project.partialPayments.length > 0) {
-              // Neueste Anzahlung
-              invoice = project.partialPayments[project.partialPayments.length - 1]
-            } else if (project.finalInvoice) {
-              // Schlussrechnung
-              invoice = project.finalInvoice
+            const partials = invoices.filter(inv => inv.type === 'partial')
+            const finalInv = invoices.find(inv => inv.type === 'final')
+            if (partials.length > 0) {
+              invoice = partials[partials.length - 1]
+            } else if (finalInv) {
+              invoice = finalInv
             }
           }
 
@@ -165,15 +169,27 @@ export async function POST(request: NextRequest) {
             )
           }
 
+          // Map Invoice zu InvoiceInput-Format für generatePDF
+          const invoiceInput = {
+            invoiceNumber: invoice.invoiceNumber,
+            amount: invoice.amount,
+            date: invoice.invoiceDate,
+            description: invoice.description,
+            type: invoice.type,
+            dueDate: invoice.dueDate,
+            isPaid: invoice.isPaid,
+            paidDate: invoice.paidDate,
+          }
+
           // Generiere PDF
           generatedPDF = await generatePDF({
             type: 'invoice',
             project,
-            invoice,
+            invoice: invoiceInput,
           })
 
-          // Verwende E-Mail-Template
-          const template = invoiceTemplate(project, invoice, companyName)
+          // Verwende E-Mail-Template (erwartet invoiceNumber, amount, date)
+          const template = invoiceTemplate(project, invoiceInput, companyName)
           emailHtml = template.html
           emailText = template.text
           break

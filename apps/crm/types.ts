@@ -591,37 +591,11 @@ export interface CustomerProject {
   totalAmount: number // Gross total
   netAmount: number // Net total
   taxAmount: number // Total tax
-  depositAmount: number // Legacy - sum of all partial payments
-  isDepositPaid: boolean // Legacy - true if all partial payments are paid
+  depositAmount: number // Summe der Anzahlungen (aus payment schedule oder invoices)
+  isDepositPaid: boolean
   isFinalPaid: boolean
 
-  // ============================================
-  // LEGACY: Rechnungsdaten (deprecated - use invoices table)
-  // ============================================
-  /**
-   * @deprecated Use invoices table instead. Will be removed in future version.
-   * Kept for backward compatibility during migration period.
-   */
-  partialPayments?: PartialPayment[]
-  /**
-   * @deprecated Use invoices table instead. Will be removed in future version.
-   * Kept for backward compatibility during migration period.
-   */
-  finalInvoice?: {
-    invoiceNumber: string
-    amount: number
-    date: string
-    isPaid: boolean
-    paidDate?: string
-    dueDate?: string // Fälligkeitsdatum
-    reminders?: Reminder[] // Array von gesendeten Mahnungen
-    overdueDays?: number // Berechnete Anzahl überfälliger Tage
-  }
-
-  // ============================================
-  // NEW: Referenzen zu separaten Tabellen
-  // ============================================
-  /** Rechnungen aus der invoices-Tabelle (ersetzt partialPayments + finalInvoice) */
+  /** Rechnungen aus der invoices-Tabelle */
   invoices?: Invoice[]
   /** Auftrag aus der orders-Tabelle */
   order?: Order

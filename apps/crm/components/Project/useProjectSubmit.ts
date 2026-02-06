@@ -77,15 +77,9 @@ export function useProjectSubmit({
         totalAmount: roundTo2Decimals(calculations.grossTotal || 0),
         netAmount: roundTo2Decimals(calculations.netTotal || 0),
         taxAmount: roundTo2Decimals(calculations.taxTotal || 0),
-        depositAmount: roundTo2Decimals(
-          formData.partialPayments?.reduce((sum, p) => sum + p.amount, 0) ||
-            formData.depositAmount ||
-            0
-        ),
-        isDepositPaid: formData.partialPayments?.every(p => p.isPaid) || !!formData.isDepositPaid,
-        isFinalPaid: formData.finalInvoice?.isPaid || !!formData.isFinalPaid,
-        partialPayments: formData.partialPayments || [],
-        finalInvoice: formData.finalInvoice,
+        depositAmount: roundTo2Decimals(formData.depositAmount || 0),
+        isDepositPaid: !!formData.isDepositPaid,
+        isFinalPaid: !!formData.isFinalPaid,
         isMeasured: !!formData.isMeasured,
         isOrdered: !!formData.isOrdered,
         isInstallationAssigned: !!formData.isInstallationAssigned,

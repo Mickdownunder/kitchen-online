@@ -17,7 +17,8 @@ import {
 import { CustomerProject } from '@/types'
 import { DateFilter } from './utils/revenueCalculations'
 import { calculateMarginOnlyWithPurchase } from '@/lib/utils/priceCalculations'
-import { Download } from 'lucide-react'
+import { Download, DollarSign, FolderOpen, TrendingUp, Percent } from 'lucide-react'
+import { StatCard, ChartContainer } from '@/components/ui'
 
 interface ProjectsTabProps {
   projects: CustomerProject[]
@@ -199,50 +200,45 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
     <div className="space-y-8">
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-            Verkaufter Umsatz
-          </p>
-          <p className="text-3xl font-black text-slate-900">
-            {formatCurrency(stats.totalRevenue)} €
-          </p>
-        </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-            Projekte
-          </p>
-          <p className="text-3xl font-black text-slate-900">{stats.projectCount}</p>
-        </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">
-            Ø Projektwert
-          </p>
-          <p className="text-3xl font-black text-slate-900">
-            {formatCurrency(stats.avgProjectValue)} €
-          </p>
-        </div>
-        <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg">
-          <p className="mb-1 text-xs font-black uppercase tracking-widest text-slate-500">Marge</p>
-          <p className="text-3xl font-black text-slate-900">
-            {stats.marginPercent != null ? `${stats.marginPercent.toFixed(1)}%` : '—'}
-          </p>
-          <p className="text-xs text-slate-500">
-            {stats.marginPercent != null ? formatCurrency(stats.grossMargin) + ' €' : 'EK erfassen'}
-          </p>
-        </div>
+        <StatCard
+          icon={DollarSign}
+          iconColor="blue"
+          value={`${formatCurrency(stats.totalRevenue)} €`}
+          label="Verkaufter Umsatz"
+          tint="blue"
+        />
+        <StatCard
+          icon={FolderOpen}
+          iconColor="amber"
+          value={stats.projectCount}
+          label="Projekte"
+          tint="amber"
+        />
+        <StatCard
+          icon={TrendingUp}
+          iconColor="emerald"
+          value={`${formatCurrency(stats.avgProjectValue)} €`}
+          label="Ø Projektwert"
+          tint="emerald"
+        />
+        <StatCard
+          icon={Percent}
+          iconColor="purple"
+          value={stats.marginPercent != null ? `${stats.marginPercent.toFixed(1)}%` : '—'}
+          label="Marge"
+          subtitle={
+            stats.marginPercent != null ? formatCurrency(stats.grossMargin) + ' €' : 'EK erfassen'
+          }
+          tint="purple"
+        />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Verkaufter Umsatz nach Monaten */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-                Verkaufter Umsatz nach Monaten
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">Auftragsvolumen</p>
-            </div>
+        <ChartContainer
+          title="Verkaufter Umsatz nach Monaten"
+          subtitle="Auftragsvolumen"
+          action={
             <button
               onClick={() => handleExportCSV(monthlyData, 'umsatz_projekte')}
               className="rounded-lg p-2 transition-all hover:bg-slate-100"
@@ -250,7 +246,8 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
             >
               <Download className="h-4 w-4 text-slate-400" />
             </button>
-          </div>
+          }
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -280,16 +277,12 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
 
-        {/* Projektanzahl nach Monaten */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6">
-            <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-              Projektanzahl nach Monaten
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">Anzahl neuer Aufträge</p>
-          </div>
+        <ChartContainer
+          title="Projektanzahl nach Monaten"
+          subtitle="Anzahl neuer Aufträge"
+        >
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -317,16 +310,12 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartContainer>
       </div>
 
       {/* Status Distribution & Top Customers */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Status-Verteilung */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <h3 className="mb-6 bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-            Projekt-Status Verteilung
-          </h3>
+        <ChartContainer title="Projekt-Status Verteilung">
           <div className="h-64">
             {statusDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -360,17 +349,12 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
               </div>
             )}
           </div>
-        </div>
+        </ChartContainer>
 
-        {/* Top 10 Kunden */}
-        <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-slate-50/50 p-8 shadow-xl">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h3 className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black text-transparent">
-                Top 10 Kunden nach Umsatz
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">Auftragsvolumen</p>
-            </div>
+        <ChartContainer
+          title="Top 10 Kunden nach Umsatz"
+          subtitle="Auftragsvolumen"
+          action={
             <button
               onClick={() => handleExportCSV(topCustomers, 'top_kunden')}
               className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-slate-800"
@@ -378,7 +362,8 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
               <Download className="h-4 w-4" />
               CSV
             </button>
-          </div>
+          }
+        >
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -431,7 +416,7 @@ const ProjectsTab: React.FC<ProjectsTabProps> = ({ projects, filter }) => {
               </tbody>
             </table>
           </div>
-        </div>
+        </ChartContainer>
       </div>
     </div>
   )

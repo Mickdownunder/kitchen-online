@@ -46,6 +46,7 @@ import { ProjectRow } from '@/components/projects/ProjectRow'
 import { useToast } from '@/components/providers/ToastProvider'
 import { useApp } from '@/app/providers'
 import { LeadRow, LeadModal } from '@/components/leads'
+import { StatCard } from '@/components/ui'
 
 interface ProjectListProps {
   projects: CustomerProject[]
@@ -693,56 +694,40 @@ const ProjectList: React.FC<ProjectListProps> = ({
       {/* Stats Cards - Only for filtered projects */}
       {filteredProjects.length > 0 && activeTab === 'orders' && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <DollarSign className="h-6 w-6 text-blue-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Verkaufter Umsatz
-              </p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">
-              {formatCurrency(statsData.totalRevenue)} €
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {statsData.projectCount} Projekt{statsData.projectCount !== 1 ? 'e' : ''}
-            </p>
-          </div>
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <Package className="h-6 w-6 text-amber-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Projekte
-              </p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{statsData.projectCount}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Ø {formatCurrency(statsData.averageAmount)} €
-            </p>
-          </div>
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <Percent className="h-6 w-6 text-emerald-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Durchschnittliche Marge
-              </p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">
-              {statsData.marginPercent != null ? `${statsData.marginPercent.toFixed(1)}%` : '—'}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {statsData.marginPercent != null ? formatCurrency(statsData.margin) + ' €' : 'EK erfassen'}
-            </p>
-          </div>
-          <div className="glass rounded-2xl border border-white/50 bg-gradient-to-br from-white to-purple-50/30 p-6 shadow-lg">
-            <div className="mb-2 flex items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-purple-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Abgeschlossen
-              </p>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{statsData.completedCount}</p>
-            <p className="mt-1 text-xs text-slate-500">{statsData.completedPercent}%</p>
-          </div>
+          <StatCard
+            icon={DollarSign}
+            iconColor="blue"
+            value={`${formatCurrency(statsData.totalRevenue)} €`}
+            label="Verkaufter Umsatz"
+            subtitle={`${statsData.projectCount} Projekt${statsData.projectCount !== 1 ? 'e' : ''}`}
+            tint="blue"
+          />
+          <StatCard
+            icon={Package}
+            iconColor="amber"
+            value={statsData.projectCount}
+            label="Projekte"
+            subtitle={`Ø ${formatCurrency(statsData.averageAmount)} €`}
+            tint="amber"
+          />
+          <StatCard
+            icon={Percent}
+            iconColor="emerald"
+            value={statsData.marginPercent != null ? `${statsData.marginPercent.toFixed(1)}%` : '—'}
+            label="Durchschnittliche Marge"
+            subtitle={
+              statsData.marginPercent != null ? formatCurrency(statsData.margin) + ' €' : 'EK erfassen'
+            }
+            tint="emerald"
+          />
+          <StatCard
+            icon={CheckCircle2}
+            iconColor="purple"
+            value={statsData.completedCount}
+            label="Abgeschlossen"
+            subtitle={`${statsData.completedPercent}%`}
+            tint="purple"
+          />
         </div>
       )}
 

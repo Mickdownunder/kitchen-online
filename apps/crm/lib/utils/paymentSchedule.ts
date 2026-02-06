@@ -1,16 +1,9 @@
-import { CustomerProject, PaymentSchedule, PartialPayment } from '@/types'
+import { CustomerProject, PaymentSchedule } from '@/types'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 /**
- * MIGRATION NOTE:
- * Die Funktionen createFirstPayment() und createSecondPayment() erstellen noch
- * PartialPayment-Objekte für das Legacy-System (project.partialPayments).
- *
- * Für neue Implementierungen:
- * - Verwende createInvoice() aus '@/lib/supabase/services/invoices' direkt
- * - Die Beträge können weiterhin mit calculatePaymentAmounts() berechnet werden
- *
- * @see lib/supabase/services/invoices.ts
+ * Zahlungsschema-Utilities.
+ * Rechnungen werden in der invoices-Tabelle verwaltet (createInvoice aus invoices-Service).
  */
 
 /**
@@ -104,91 +97,3 @@ export function getDaysUntilSecondPaymentDue(project: CustomerProject): number |
   return diffDays
 }
 
-/**
- * Prüft ob eine erste Anzahlung bereits erstellt wurde (automatisch oder manuell)
- */
-export function hasFirstPayment(project: CustomerProject): boolean {
-  if (!project.partialPayments || project.partialPayments.length === 0) return false
-
-  // Prüfe ob eine Anzahlung mit scheduleType 'first' existiert
-  return project.partialPayments.some(p => p.scheduleType === 'first')
-}
-
-/**
- * Prüft ob eine zweite Anzahlung bereits erstellt wurde (automatisch oder manuell)
- */
-export function hasSecondPayment(project: CustomerProject): boolean {
-  if (!project.partialPayments || project.partialPayments.length === 0) return false
-
-  // Prüfe ob eine Anzahlung mit scheduleType 'second' existiert
-  return project.partialPayments.some(p => p.scheduleType === 'second')
-}
-
-/**
- * Erstellt eine PartialPayment für die erste Anzahlung basierend auf dem Zahlungsschema
- */
-export function createFirstPayment(
-  project: CustomerProject,
-  invoiceNumber?: string
-): PartialPayment | null {
-  if (!project.paymentSchedule || !project.paymentSchedule.autoCreateFirst) return null
-  if (hasFirstPayment(project)) return null // Bereits erstellt
-
-  const amounts = calculatePaymentAmounts(project)
-  if (!amounts) return null
-
-  const paymentNumber = (project.partialPayments?.length || 0) + 1
-  const defaultInvoiceNumber =
-    invoiceNumber ||
-    (project.invoiceNumber
-      ? `${project.invoiceNumber}-A${paymentNumber}`
-      : `R-${new Date().getFullYear()}-${project.orderNumber}-A${paymentNumber}`)
-
-  return {
-    id: `partial-${Date.now()}`,
-    invoiceNumber: defaultInvoiceNumber,
-    amount: amounts.first,
-    date: project.orderDate || new Date().toISOString().split('T')[0],
-    description: `${project.paymentSchedule.firstPercent}% Anzahlung`,
-    isPaid: false,
-    scheduleType: 'first',
-  }
-}
-
-/**
- * Erstellt eine PartialPayment für die zweite Anzahlung basierend auf dem Zahlungsschema
- */
-export function createSecondPayment(
-  project: CustomerProject,
-  invoiceNumber?: string
-): PartialPayment | null {
-  if (!project.paymentSchedule || !project.paymentSchedule.autoCreateSecond) return null
-  if (!project.deliveryDate) return null // Kein Liefertermin = keine automatische Erstellung
-  if (hasSecondPayment(project) || project.secondPaymentCreated) return null // Bereits erstellt
-
-  const amounts = calculatePaymentAmounts(project)
-  if (!amounts) return null
-
-  const dueDate = getSecondPaymentDueDate(project)
-  if (!dueDate) return null
-
-  const paymentNumber = (project.partialPayments?.length || 0) + 1
-  const defaultInvoiceNumber =
-    invoiceNumber ||
-    (project.invoiceNumber
-      ? `${project.invoiceNumber}-A${paymentNumber}`
-      : `R-${new Date().getFullYear()}-${project.orderNumber}-A${paymentNumber}`)
-
-  const dueDateStr = dueDate.toISOString().split('T')[0]
-
-  return {
-    id: `partial-${Date.now()}`,
-    invoiceNumber: defaultInvoiceNumber,
-    amount: amounts.second,
-    date: new Date().toISOString().split('T')[0], // Heute erstellt
-    dueDate: dueDateStr, // Fälligkeitsdatum
-    description: `${project.paymentSchedule.secondPercent}% Anzahlung (fällig ${dueDateStr})`,
-    isPaid: false,
-    scheduleType: 'second',
-  }
-}

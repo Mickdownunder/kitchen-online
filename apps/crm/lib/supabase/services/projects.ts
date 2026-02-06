@@ -1,20 +1,8 @@
 /**
  * Projects Service
  *
- * MIGRATION NOTE:
- * Die Felder `partial_payments` und `final_invoice` in der projects-Tabelle sind
- * DEPRECATED und werden durch die neue `invoices`-Tabelle ersetzt.
- *
- * Für neue Implementierungen:
- * - Verwende `createInvoice()`, `getInvoices()`, etc. aus '@/lib/supabase/services/invoices'
- * - Die Legacy-Felder werden weiterhin gelesen/geschrieben für Abwärtskompatibilität
- *
- * Die neuen Tabellen sind:
- * - `invoices`: Für alle Rechnungen (Anzahlungen + Schlussrechnungen)
- * - `orders`: Für Auftragsdetails und Status-Tracking
- *
- * @see supabase/migrations/20260127160000_create_invoices_table.sql
- * @see supabase/migrations/20260127160001_create_orders_table.sql
+ * Rechnungen (Anzahlungen, Schlussrechnungen) werden in der `invoices`-Tabelle verwaltet.
+ * Verwende `createInvoice()`, `getInvoices()`, etc. aus '@/lib/supabase/services/invoices'.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -35,7 +23,9 @@ import {
   calculateProjectTotals,
   roundTo2Decimals,
 } from '@/lib/utils/priceCalculations'
-import { createFirstPayment } from '@/lib/utils/paymentSchedule'
+import { calculatePaymentAmounts } from '@/lib/utils/paymentSchedule'
+import { createInvoice } from './invoices'
+import { getInvoices } from './invoices'
 import { audit } from '@/lib/utils/auditLogger'
 
 function generateAccessCode(length = 12): string {
@@ -124,21 +114,6 @@ export async function createProject(
       documentNames: documents.map((d: ProjectDocument) => d.name),
     })
 
-    // Automatische Erstellung der ersten Anzahlung, wenn paymentSchedule konfiguriert ist
-    let partialPayments = project.partialPayments || []
-    if (project.paymentSchedule?.autoCreateFirst) {
-      const firstPayment = createFirstPayment(project as CustomerProject)
-      if (firstPayment) {
-        partialPayments = [firstPayment, ...partialPayments]
-        logger.info('Automatisch erste Anzahlung erstellt', {
-          component: 'projects',
-          invoiceNumber: firstPayment.invoiceNumber,
-          amount: firstPayment.amount,
-          description: firstPayment.description,
-        })
-      }
-    }
-
     const accessCode = project.accessCode || generateAccessCode()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,8 +155,6 @@ export async function createProject(
         delivery_type: project.deliveryType || 'delivery',
         notes: project.notes || '',
         order_footer_text: project.orderFooterText ?? null,
-        partial_payments: partialPayments,
-        final_invoice: project.finalInvoice || null,
         complaints: project.complaints || [],
         documents: documents,
         payment_schedule: project.paymentSchedule || null,
@@ -203,6 +176,44 @@ export async function createProject(
     }
 
     const projectId = data.id
+
+    // Automatische Erstellung der ersten Anzahlung in der invoices-Tabelle, wenn paymentSchedule konfiguriert ist
+    if (project.paymentSchedule?.autoCreateFirst) {
+      const existingInvoices = await getInvoices(projectId)
+      const hasFirstPayment = existingInvoices.some(
+        inv => inv.type === 'partial' && inv.scheduleType === 'first'
+      )
+      if (!hasFirstPayment) {
+        const amounts = calculatePaymentAmounts(project as CustomerProject)
+        if (amounts) {
+          const paymentNumber = 1
+          const orderNum = project.orderNumber || data.order_number
+          const invoiceNumber =
+            project.invoiceNumber
+              ? `${project.invoiceNumber}-A${paymentNumber}`
+              : `R-${new Date().getFullYear()}-${orderNum}-A${paymentNumber}`
+          try {
+            await createInvoice({
+              projectId,
+              type: 'partial',
+              amount: amounts.first,
+              invoiceDate: project.orderDate || new Date().toISOString().split('T')[0],
+              description: `${project.paymentSchedule.firstPercent}% Anzahlung`,
+              scheduleType: 'first',
+              invoiceNumber,
+            })
+            logger.info('Automatisch erste Anzahlung erstellt', {
+              component: 'projects',
+              invoiceNumber,
+              amount: amounts.first,
+            })
+          } catch (invoiceError) {
+            logger.error('Fehler beim Erstellen der ersten Anzahlung', { component: 'projects' }, invoiceError as Error)
+            // Projekt wurde bereits erstellt - nicht rollback, nur loggen
+          }
+        }
+      }
+    }
 
     // Insert invoice items
     if (project.items && project.items.length > 0) {
@@ -423,16 +434,7 @@ export async function updateProject(
       updateData.order_footer_text = project.orderFooterText
     if (project.accessCode !== undefined) updateData.access_code = project.accessCode
 
-    // Add partial_payments, final_invoice, complaints, and documents if provided
-    if (project.partialPayments !== undefined) {
-      updateData.partial_payments = project.partialPayments
-    }
-    if (project.finalInvoice !== undefined) {
-      updateData.final_invoice = project.finalInvoice
-      // WICHTIG: Synchronisiere isFinalPaid automatisch mit finalInvoice.isPaid
-      // Dies stellt sicher, dass das Legacy-Feld immer korrekt ist
-      updateData.is_final_paid = project.finalInvoice.isPaid
-    }
+    // Add complaints and documents if provided (partialPayments/finalInvoice migrated to invoices table)
     if (project.complaints !== undefined) {
       updateData.complaints = project.complaints
     }
@@ -755,27 +757,6 @@ function mapProjectFromDB(dbProject: ProjectRow): CustomerProject {
     calculatedTotalAmount = grossTotal
   }
 
-  // WICHTIG: Synchronisiere isFinalPaid mit finalInvoice.isPaid, falls finalInvoice existiert
-  // Dies stellt sicher, dass das Legacy-Feld immer korrekt ist, auch wenn die DB inkonsistent ist
-  // Parse finalInvoice sicher - könnte als String oder Objekt kommen
-  let finalInvoice = dbProject.final_invoice || undefined
-  if (finalInvoice && typeof finalInvoice === 'string') {
-    try {
-      finalInvoice = JSON.parse(finalInvoice)
-    } catch (e) {
-      logger.warn('Error parsing finalInvoice from string', { component: 'projects' }, e as Error)
-      finalInvoice = undefined
-    }
-  }
-  // Stelle sicher, dass isPaid ein Boolean ist (könnte als String gespeichert sein)
-  if (finalInvoice && typeof finalInvoice.isPaid !== 'boolean') {
-    finalInvoice.isPaid =
-      finalInvoice.isPaid === true || finalInvoice.isPaid === 'true' || finalInvoice.isPaid === 1
-  }
-  const isFinalPaid = finalInvoice
-    ? finalInvoice.isPaid === true || finalInvoice.isPaid === 'true' || finalInvoice.isPaid === 1
-    : dbProject.is_final_paid || false
-
   return {
     id: dbProject.id,
     userId: dbProject.user_id,
@@ -797,9 +778,7 @@ function mapProjectFromDB(dbProject: ProjectRow): CustomerProject {
     taxAmount: parseFloat(dbProject.tax_amount || 0),
     depositAmount: parseFloat(dbProject.deposit_amount || 0),
     isDepositPaid: dbProject.is_deposit_paid,
-    isFinalPaid: isFinalPaid,
-    partialPayments: dbProject.partial_payments || [],
-    finalInvoice: finalInvoice,
+    isFinalPaid: dbProject.is_final_paid || false,
     paymentSchedule: dbProject.payment_schedule || undefined,
     secondPaymentCreated: dbProject.second_payment_created || false,
     offerDate: dbProject.offer_date,

@@ -40,8 +40,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
             </div>
           ) : (
             projects.map(project => {
-              const totalPartial =
-                project.partialPayments?.reduce((sum, p) => sum + p.amount, 0) || 0
+              const totalPartial = project.depositAmount || 0
               const isSelected = selectedProject?.id === project.id
 
               return (
