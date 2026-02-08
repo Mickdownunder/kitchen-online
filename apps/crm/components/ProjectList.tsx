@@ -27,14 +27,11 @@ import {
   CustomerProject,
   ProjectStatus,
   ProjectDocument,
-  Customer,
 } from '@/types'
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
 import { calculateMarginOnlyWithPurchase } from '@/lib/utils/priceCalculations'
 import { logger } from '@/lib/utils/logger'
 import ProjectModal from './ProjectModal'
-import { getCustomers, getComplaints, getInvoices } from '@/lib/supabase/services'
-import { Invoice } from '@/types'
 import CustomerDeliveryNoteModal from './CustomerDeliveryNoteModal'
 import MeasurementDateModal from './MeasurementDateModal'
 import InstallationDateModal from './InstallationDateModal'
@@ -42,6 +39,8 @@ import DeliveryDateModal from './DeliveryDateModal'
 import { useProjectFilters } from '@/hooks/useProjectFilters'
 import { useGroupedProjects } from '@/hooks/useGroupedProjects'
 import { useProjectModals } from '@/hooks/useProjectModals'
+import { useProjectData } from '@/hooks/useProjectData'
+import { useProjectWorkflow } from '@/hooks/useProjectWorkflow'
 import { ProjectRow } from '@/components/projects/ProjectRow'
 import { useToast } from '@/components/providers/ToastProvider'
 import { useApp } from '@/app/providers'
@@ -67,13 +66,10 @@ const ProjectList: React.FC<ProjectListProps> = ({
 }) => {
   const { success, error, warning } = useToast()
   const { refreshDeliveryNotes } = useApp()
-  
-  // Invoice data for AN/SC indicators
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  
-  // ==========================================================================
-  // Modal State (consolidated in hook)
-  // ==========================================================================
+
+  // Extracted hooks
+  const { customers, invoices, complaintsByProject } = useProjectData()
+  const { applyOverrides, scheduleUpdate, toggleStep } = useProjectWorkflow({ onUpdateProject: onUpdateProject })
   const modals = useProjectModals()
 
   // ==========================================================================
@@ -82,7 +78,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const [activeTab, setActiveTab] = useState<'leads' | 'orders'>('orders')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'measurement' | 'order' | 'installation'>(
-    initialFilter
+    initialFilter,
   )
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth() + 1)
@@ -93,69 +89,20 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const [sortField, setSortField] = useState<ProjectSortField>('date')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
-  // ==========================================================================
-  // Data State
-  // ==========================================================================
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [complaintsByProject, setComplaintsByProject] = useState<Map<string, number>>(new Map())
-
-  useEffect(() => {
-    loadCustomers()
-    loadComplaints()
-    loadInvoices()
-  }, [])
-
-  const loadInvoices = async () => {
-    const result = await getInvoices()
-    if (result.ok) {
-      setInvoices(result.data)
-    }
-  }
-
-  const loadComplaints = async () => {
-    try {
-      // Performance: Nur offene Reklamationen laden (excludeResolved = true)
-      // Resolved werden nicht mehr gezählt, da sie nicht mehr im aktiven Workflow sind
-      const allComplaints = await getComplaints(undefined, true)
-      const map = new Map<string, number>()
-      allComplaints.forEach(c => {
-        const count = map.get(c.projectId) || 0
-        map.set(c.projectId, count + 1)
-      })
-      setComplaintsByProject(map)
-    } catch (error: unknown) {
-      // Ignore aborted requests (normal during page navigation)
-      const errMessage = error instanceof Error ? error.message : ''
-      const errName = error instanceof Error ? error.name : ''
-      if (errMessage.includes('aborted') || errName === 'AbortError') {
-        return
-      }
-      logger.error('Error loading complaints', { component: 'ProjectList' }, error as Error)
-    }
-  }
-
   useEffect(() => {
     if (initialFilter) {
       setFilterType(initialFilter)
     }
   }, [initialFilter])
 
-  // Deep-link support: open a specific project when passed via URL (e.g. /projects?projectId=...)
+  // Deep-link support
   useEffect(() => {
     if (!initialOpenProjectId) return
     const p = projects.find(pr => pr.id === initialOpenProjectId)
     if (p) {
       modals.openProjectModal(p)
     }
-    // Only depend on the specific function, not the entire modals object
   }, [initialOpenProjectId, projects, modals.openProjectModal])
-
-  const loadCustomers = async () => {
-    const result = await getCustomers()
-    if (result.ok) {
-      setCustomers(result.data)
-    }
-  }
 
   // ==========================================================================
   // Memoized project counts and filtering (performance optimization)
@@ -332,148 +279,8 @@ const ProjectList: React.FC<ProjectListProps> = ({
     return map
   }, [invoices])
 
-  // Lokaler State für sofortige UI-Updates
-  const [localProjects, setLocalProjects] = useState<Map<string, Partial<CustomerProject>>>(
-    new Map()
-  )
-  const [updateTimeouts, setUpdateTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map())
-
-  const getProjectWithLocalUpdates = (project: CustomerProject): CustomerProject => {
-    const localUpdates = localProjects.get(project.id)
-    return localUpdates ? { ...project, ...localUpdates } : project
-  }
-
-  // Debounced Update - speichert nur nach 500ms Pause
-  const debouncedUpdate = (project: CustomerProject, updates: Partial<CustomerProject>) => {
-    // Sofort lokalen State aktualisieren
-    setLocalProjects(prev => {
-      const newMap = new Map(prev)
-      const existing = prev.get(project.id) || {}
-      newMap.set(project.id, { ...existing, ...updates })
-      return newMap
-    })
-
-    // Alten Timeout löschen falls vorhanden
-    const existingTimeout = updateTimeouts.get(project.id)
-    if (existingTimeout) {
-      clearTimeout(existingTimeout)
-    }
-
-    // Neuen Timeout setzen für DB-Update
-    const timeout = setTimeout(() => {
-      // Nur existierende DB-Felder updaten
-      const dbUpdates: Partial<CustomerProject> = {}
-      if (updates.isMeasured !== undefined) dbUpdates.isMeasured = updates.isMeasured
-      if (updates.isOrdered !== undefined) dbUpdates.isOrdered = updates.isOrdered
-      if (updates.isInstallationAssigned !== undefined)
-        dbUpdates.isInstallationAssigned = updates.isInstallationAssigned
-      if (updates.status !== undefined) dbUpdates.status = updates.status
-      if (updates.measurementDate !== undefined) dbUpdates.measurementDate = updates.measurementDate
-      if (updates.orderDate !== undefined) dbUpdates.orderDate = updates.orderDate
-      if (updates.installationDate !== undefined)
-        dbUpdates.installationDate = updates.installationDate
-
-      if (Object.keys(dbUpdates).length > 0) {
-        onUpdateProject({ ...project, ...dbUpdates })
-      }
-
-      // Timeout aus Map entfernen
-      setUpdateTimeouts(prev => {
-        const newMap = new Map(prev)
-        newMap.delete(project.id)
-        return newMap
-      })
-    }, 500)
-
-    setUpdateTimeouts(prev => {
-      const newMap = new Map(prev)
-      newMap.set(project.id, timeout)
-      return newMap
-    })
-  }
-
   const quickUpdateStatus = (project: CustomerProject, updates: Partial<CustomerProject>) => {
-    debouncedUpdate(project, updates)
-  }
-
-  const toggleStep = (
-    project: CustomerProject,
-    step: 'measured' | 'ordered' | 'delivered' | 'installation' | 'completed',
-    e: React.MouseEvent
-  ) => {
-    e.stopPropagation()
-
-    const currentProject = getProjectWithLocalUpdates(project)
-    const today = new Date().toISOString().split('T')[0]
-    let updates: Partial<CustomerProject> = {}
-
-    if (step === 'measured') {
-      const newState = !currentProject.isMeasured
-      updates = {
-        isMeasured: newState,
-        measurementDate: newState ? currentProject.measurementDate || today : undefined,
-        status: newState ? ProjectStatus.MEASURING : ProjectStatus.PLANNING,
-      }
-    } else if (step === 'ordered') {
-      const newState = !currentProject.isOrdered
-      updates = {
-        isOrdered: newState,
-        orderDate: newState ? currentProject.orderDate || today : undefined,
-        isMeasured: newState ? true : currentProject.isMeasured,
-        status: newState ? ProjectStatus.ORDERED : ProjectStatus.MEASURING,
-      }
-    } else if (step === 'delivered') {
-      const newState = !currentProject.isDelivered
-      updates = {
-        isDelivered: newState,
-        deliveryDate: newState ? currentProject.deliveryDate || today : undefined,
-        isOrdered: newState ? true : currentProject.isOrdered,
-        isMeasured: newState ? true : currentProject.isMeasured,
-        status: newState ? ProjectStatus.DELIVERY : ProjectStatus.ORDERED,
-      }
-    } else if (step === 'installation') {
-      const newState = !currentProject.isInstallationAssigned
-      updates = {
-        isInstallationAssigned: newState,
-        installationDate: newState ? currentProject.installationDate || today : undefined,
-        isDelivered: newState ? true : currentProject.isDelivered,
-        isOrdered: newState ? true : currentProject.isOrdered,
-        isMeasured: newState ? true : currentProject.isMeasured,
-        status: newState ? ProjectStatus.INSTALLATION : ProjectStatus.DELIVERY,
-      }
-    } else if (step === 'completed') {
-      const newState = !currentProject.isCompleted
-      updates = {
-        isCompleted: newState,
-        completionDate: newState ? currentProject.completionDate || today : undefined,
-        isInstallationAssigned: newState ? true : currentProject.isInstallationAssigned,
-        status: newState ? ProjectStatus.COMPLETED : ProjectStatus.INSTALLATION,
-      }
-    }
-
-    // SOFORT lokalen State aktualisieren (instant!)
-    setLocalProjects(prev => {
-      const newMap = new Map(prev)
-      const existing = prev.get(project.id) || {}
-      newMap.set(project.id, { ...existing, ...updates })
-      return newMap
-    })
-
-    // Debounced DB-Update (nur existierende Felder)
-    const dbUpdates: Partial<CustomerProject> = {}
-    if (updates.isMeasured !== undefined) dbUpdates.isMeasured = updates.isMeasured
-    if (updates.isOrdered !== undefined) dbUpdates.isOrdered = updates.isOrdered
-    if (updates.isInstallationAssigned !== undefined)
-      dbUpdates.isInstallationAssigned = updates.isInstallationAssigned
-    if (updates.status !== undefined) dbUpdates.status = updates.status
-    if (updates.measurementDate !== undefined) dbUpdates.measurementDate = updates.measurementDate
-    if (updates.orderDate !== undefined) dbUpdates.orderDate = updates.orderDate
-    if (updates.installationDate !== undefined)
-      dbUpdates.installationDate = updates.installationDate
-
-    if (Object.keys(dbUpdates).length > 0) {
-      debouncedUpdate(project, dbUpdates)
-    }
+    scheduleUpdate(project, updates)
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -978,7 +785,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
                   </thead>
                   <tbody>
                     {paginatedProjects.map((project, idx) => {
-                      const p = getProjectWithLocalUpdates(project)
+                      const p = applyOverrides(project)
                       return (
                         <ProjectRow
                           key={project.id}
@@ -990,7 +797,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
                           onSelectStatus={(e, s) => { e.stopPropagation(); quickUpdateStatus(project, { status: s }); setOpenDropdownId(null) }}
                           onOpenMeasurementModal={e => {
                             e.stopPropagation()
-                            const currentProject = getProjectWithLocalUpdates(project)
+                            const currentProject = applyOverrides(project)
                             if (currentProject.measurementDate) toggleStep(project, 'measured', e)
                             else modals.openMeasurementModal(project)
                           }}
@@ -998,7 +805,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
                           onOpenDeliveryNote={async e => { e.stopPropagation(); await modals.openDeliveryNoteModal(project) }}
                           onOpenInstallationModal={e => {
                             e.stopPropagation()
-                            const currentProject = getProjectWithLocalUpdates(project)
+                            const currentProject = applyOverrides(project)
                             if (currentProject.installationDate) toggleStep(project, 'installation', e)
                             else modals.openInstallationModal(project)
                           }}
@@ -1162,7 +969,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
                           </thead>
                           <tbody>
                             {groupProjectsToRender.map((project, idx) => {
-                              const p = getProjectWithLocalUpdates(project)
+                              const p = applyOverrides(project)
                               return (
                                 <ProjectRow
                                   key={project.id}
@@ -1174,7 +981,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                   onSelectStatus={(e, s) => { e.stopPropagation(); quickUpdateStatus(project, { status: s }); setOpenDropdownId(null) }}
                                   onOpenMeasurementModal={e => {
                                     e.stopPropagation()
-                                    const currentProject = getProjectWithLocalUpdates(project)
+                                    const currentProject = applyOverrides(project)
                                     if (currentProject.measurementDate) toggleStep(project, 'measured', e)
                                     else modals.openMeasurementModal(project)
                                   }}
@@ -1182,7 +989,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
                                   onOpenDeliveryNote={async e => { e.stopPropagation(); await modals.openDeliveryNoteModal(project) }}
                                   onOpenInstallationModal={e => {
                                     e.stopPropagation()
-                                    const currentProject = getProjectWithLocalUpdates(project)
+                                    const currentProject = applyOverrides(project)
                                     if (currentProject.installationDate) toggleStep(project, 'installation', e)
                                     else modals.openInstallationModal(project)
                                   }}
