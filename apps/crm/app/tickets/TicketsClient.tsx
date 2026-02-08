@@ -167,10 +167,10 @@ function TicketsContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        const msg = data.debug?.userId
-          ? `${data.error || 'Fehler'} (userId: ${data.debug.userId})`
-          : (data.error || 'Fehler beim Laden')
-        throw new Error(msg)
+        // #region agent log
+        if (data.debug) console.error('[DEBUG tickets]', JSON.stringify(data.debug, null, 2))
+        // #endregion
+        throw new Error(data.error || 'Fehler beim Laden')
       }
 
       setTickets(data.data.tickets)

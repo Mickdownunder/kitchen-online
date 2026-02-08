@@ -10,12 +10,20 @@ export async function getCompanyIdForUser(
   userId: string,
   client: SupabaseClient
 ): Promise<string | null> {
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/88795722-4a41-4d8b-9b7c-39ae75620258',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'company.ts:entry',message:'getCompanyIdForUser called',data:{userId},timestamp:Date.now(),hypothesisId:'H1-H5'})}).catch(()=>{});
+  // #endregion
+
   const { data: member, error: memberError } = await client
     .from('company_members')
     .select('company_id')
     .eq('user_id', userId)
     .eq('is_active', true)
     .maybeSingle()
+
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/88795722-4a41-4d8b-9b7c-39ae75620258',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'company.ts:members',message:'company_members result',data:{member,memberError:memberError?.message||null,memberCode:memberError?.code||null},timestamp:Date.now(),hypothesisId:'H1-H2'})}).catch(()=>{});
+  // #endregion
 
   if (memberError) {
     logger.warn('getCompanyIdForUser company_members error', { userId, error: memberError.message })
@@ -28,10 +36,18 @@ export async function getCompanyIdForUser(
     .eq('user_id', userId)
     .maybeSingle()
 
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/88795722-4a41-4d8b-9b7c-39ae75620258',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'company.ts:settings',message:'company_settings result',data:{settings,settingsError:settingsError?.message||null,settingsCode:settingsError?.code||null},timestamp:Date.now(),hypothesisId:'H1-H5'})}).catch(()=>{});
+  // #endregion
+
   if (settingsError) {
     logger.warn('getCompanyIdForUser company_settings error', { userId, error: settingsError.message })
   }
   if (settings?.id) return settings.id
+
+  // #region agent log
+  fetch('http://127.0.0.1:7244/ingest/88795722-4a41-4d8b-9b7c-39ae75620258',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'company.ts:null',message:'returning null - no company found',data:{userId},timestamp:Date.now(),hypothesisId:'H1-H5'})}).catch(()=>{});
+  // #endregion
 
   logger.warn('getCompanyIdForUser no company found', { userId })
   return null
