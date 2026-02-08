@@ -2,6 +2,7 @@
 
 import React from 'react'
 import type { CalendarEvent } from '@/hooks/useCalendarEvents'
+import { getHolidayForDate } from '@/lib/utils/austrianHolidays'
 import { TimeSlot } from './TimeSlot'
 
 interface DayViewProps {
@@ -27,15 +28,19 @@ export const DayView: React.FC<DayViewProps> = ({
 }) => {
   const isToday = date.toDateString() === new Date().toDateString()
   const allEvents = getEventsForDate(date)
+  const holiday = getHolidayForDate(date)
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
-      <div className="bg-slate-800 p-6 text-white">
+      <div className={`p-6 text-white ${holiday ? 'bg-red-900/70' : 'bg-slate-800'}`}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
               {dayNames[(date.getDay() + 6) % 7]}
             </p>
+            {holiday && (
+              <p className="mt-0.5 text-sm font-medium text-red-300">{holiday}</p>
+            )}
             <div className="mt-1 flex items-baseline gap-3">
               <span className={`text-4xl font-bold ${isToday ? 'text-amber-400' : ''}`}>
                 {date.getDate()}

@@ -23,6 +23,8 @@ import {
 import { CreditNoteModal } from './invoices/CreditNoteModal'
 import { useToast } from '@/components/providers/ToastProvider'
 import { logger } from '@/lib/utils/logger'
+import { OpenProjectsOverview } from '@/components/OpenProjectsOverview'
+import { ClipboardList } from 'lucide-react'
 
 interface InvoiceListProps {
   projects: CustomerProject[]
@@ -57,6 +59,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   )
   const [activeTab, setActiveTab] = useState<'invoices' | 'reminders' | 'missing'>('invoices')
   const [showDuePayments, setShowDuePayments] = useState(false)
+  const [showOverview, setShowOverview] = useState(false)
   const [dbInvoices, setDbInvoices] = useState<DBInvoice[]>([])
   const [loadingInvoices, setLoadingInvoices] = useState(true)
   // Storno-Dialog State
@@ -485,7 +488,18 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
             Übersicht aller Anzahlungs- und Schlussrechnungen
           </p>
         </div>
+        <button
+          onClick={() => setShowOverview(true)}
+          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 shadow-sm transition-all hover:scale-[1.02] hover:shadow-lg"
+        >
+          <ClipboardList className="h-4 w-4 text-amber-700" />
+          <span className="text-xs font-bold text-amber-800">Bestandsübersicht</span>
+        </button>
       </div>
+
+      {showOverview && (
+        <OpenProjectsOverview projects={projects} onClose={() => setShowOverview(false)} />
+      )}
 
       {/* Tabs: Rechnungen | Nicht erfasst | Mahnungen */}
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-inner">

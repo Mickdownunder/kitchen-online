@@ -3,6 +3,7 @@
 import React from 'react'
 import { Clock } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useCalendarEvents'
+import { getHolidayForDate } from '@/lib/utils/austrianHolidays'
 import { TimeSlot } from './TimeSlot'
 
 interface WeekViewProps {
@@ -33,16 +34,17 @@ export const WeekView: React.FC<WeekViewProps> = ({
         {days.map((date, idx) => {
           const isToday = date.toDateString() === new Date().toDateString()
           const isWeekend = date.getDay() === 0 || date.getDay() === 6
+          const holiday = getHolidayForDate(date)
           return (
             <div
               key={`header-${date.toISOString()}`}
               className={`border-r border-slate-700 p-3 text-center last:border-r-0 ${
-                isWeekend ? 'bg-slate-700' : ''
+                holiday ? 'bg-red-900/50' : isWeekend ? 'bg-slate-700' : ''
               }`}
             >
               <div
                 className={`text-xs font-medium uppercase tracking-wider ${
-                  isWeekend ? 'text-amber-400' : 'text-slate-400'
+                  holiday ? 'text-red-300' : isWeekend ? 'text-amber-400' : 'text-slate-400'
                 }`}
               >
                 {dayNamesShort[idx]}
@@ -56,8 +58,8 @@ export const WeekView: React.FC<WeekViewProps> = ({
               >
                 {date.getDate()}
               </div>
-              <div className="mt-0.5 text-[10px] text-slate-500">
-                {monthNames[date.getMonth()].slice(0, 3)}
+              <div className={`mt-0.5 text-[10px] ${holiday ? 'text-red-300' : 'text-slate-500'}`}>
+                {holiday || monthNames[date.getMonth()].slice(0, 3)}
               </div>
             </div>
           )

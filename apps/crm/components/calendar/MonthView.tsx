@@ -4,6 +4,7 @@ import React from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useCalendarEvents'
+import { getHolidayForDate } from '@/lib/utils/austrianHolidays'
 import { EventCard } from './EventCard'
 
 interface MonthViewProps {
@@ -36,6 +37,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
     const events = getEventsForDate(date)
     const isToday = date.toDateString() === new Date().toDateString()
     const isWeekend = date.getDay() === 0 || date.getDay() === 6
+    const holiday = getHolidayForDate(date)
     const weekNumber = date.getDate() === 1 || date.getDay() === 1 ? getWeekNumber(date) : null
 
     return (
@@ -43,21 +45,26 @@ export const MonthView: React.FC<MonthViewProps> = ({
         ref={setNodeRef}
         onClick={() => onDayClick(date)}
         className={`group relative min-h-[130px] cursor-pointer border-b border-r border-slate-200 p-1.5 transition-all md:min-h-[160px] md:p-2 ${
-          isWeekend ? 'bg-slate-50/80' : 'bg-white hover:bg-slate-50'
+          holiday ? 'bg-red-50/70' : isWeekend ? 'bg-slate-50/80' : 'bg-white hover:bg-slate-50'
         } ${!isInCurrentMonth ? 'opacity-40' : ''} ${
           isOver ? 'bg-amber-50 ring-2 ring-inset ring-amber-400' : ''
         }`}
       >
         <div className="mb-1 flex items-start justify-between">
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             {weekNumber && (
               <span className="rounded bg-slate-100 px-1 text-[9px] font-medium text-slate-400">
                 KW{weekNumber}
               </span>
             )}
+            {holiday && (
+              <span className="truncate rounded bg-red-100 px-1 text-[9px] font-medium text-red-700" title={holiday}>
+                {holiday}
+              </span>
+            )}
           </div>
           <span
-            className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold transition-all ${
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all ${
               isToday ? 'bg-amber-500 text-white' : 'text-slate-600 group-hover:bg-slate-200'
             }`}
           >
