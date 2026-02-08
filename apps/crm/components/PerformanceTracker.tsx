@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { reportWebVitals, usePageLoadTracking } from '@/lib/utils/performance'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * Client component for performance tracking
@@ -92,7 +93,7 @@ export function PerformanceTracker() {
         }
       } catch (error) {
         // PerformanceObserver not supported or error
-        console.warn('PerformanceObserver not available:', error)
+        logger.warn('PerformanceObserver not available', { component: 'PerformanceTracker', error: String(error) })
       }
     }
   }, [])

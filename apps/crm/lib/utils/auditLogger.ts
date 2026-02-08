@@ -3,6 +3,8 @@
  * Calls the API to log audit events
  */
 
+import { logger } from '@/lib/utils/logger'
+
 export interface AuditLogData {
   action: string
   entityType: string
@@ -30,11 +32,11 @@ export async function logAudit(data: AuditLogData): Promise<void> {
     })
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}))
-      console.warn('Audit-Log POST fehlgeschlagen:', res.status, errBody?.error ?? res.statusText)
+      logger.warn('Audit-Log POST fehlgeschlagen', { component: 'auditLogger', status: res.status, error: errBody?.error ?? res.statusText })
     }
   } catch (error) {
     // Don't throw - audit logging should not break the main operation
-    console.error('Failed to log audit event:', error)
+    logger.error('Failed to log audit event', { component: 'auditLogger' }, error instanceof Error ? error : new Error(String(error)))
   }
 }
 

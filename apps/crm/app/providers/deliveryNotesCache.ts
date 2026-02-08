@@ -5,6 +5,7 @@ import {
   getDeliveryNotes,
 } from '@/lib/supabase/services'
 import { CACHE_DURATION_MS } from './projectsCache'
+import { logger } from '@/lib/utils/logger'
 
 export async function refreshDeliveryNotesWithCache(opts: {
   force?: boolean
@@ -39,7 +40,7 @@ export async function refreshDeliveryNotesWithCache(opts: {
     if (errMessage.includes('aborted') || errName === 'AbortError') {
       return
     }
-    console.error('Error loading delivery notes:', error)
+    logger.error('Error loading delivery notes', { component: 'deliveryNotesCache' }, error instanceof Error ? error : new Error(String(error)))
   } finally {
     opts.setIsLoading(false)
     opts.isRefreshingRef.current = false

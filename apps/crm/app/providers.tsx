@@ -23,6 +23,7 @@ import { refreshAppointmentsWithCache } from './providers/appointmentsCache'
 import { scheduleDeliveryDateBackgroundCheck } from './providers/deliveryDateBackground'
 import { schedulePaymentScheduleCheck } from './providers/paymentScheduleBackground'
 import { useAuth } from '@/hooks/useAuth'
+import { logger } from '@/lib/utils/logger'
 
 interface AppContextType {
   // Projects
@@ -185,7 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         })
         setProjects(prev => prev.map(p => (p.id === project.id ? updated : p)))
       } catch (error) {
-        console.error('Error adding document:', error)
+        logger.error('Error adding document', { component: 'AppProvider' }, error instanceof Error ? error : new Error(String(error)))
       }
     }
   }

@@ -12,6 +12,7 @@ import {
 import { ListInvoice, toListInvoice } from '@/hooks/useInvoiceFilters'
 import { getCompanySettings } from '@/lib/supabase/services/company'
 import { getInvoicesWithProject } from '@/lib/supabase/services/invoices'
+import { logger } from '@/lib/utils/logger'
 
 interface RemindersTabProps {
   projects: CustomerProject[]
@@ -152,7 +153,7 @@ export function RemindersTab({ projects, onProjectUpdate }: RemindersTabProps) {
       )
       if (onProjectUpdate) onProjectUpdate()
     } catch (error: unknown) {
-      console.error('Error sending reminder:', error)
+      logger.error('Error sending reminder', { component: 'RemindersTab' }, error instanceof Error ? error : new Error(String(error)))
       alert(
         `Fehler beim Senden der Mahnung: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
       )

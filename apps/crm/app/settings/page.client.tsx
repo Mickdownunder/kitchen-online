@@ -24,6 +24,7 @@ import AuditLogTab from './components/AuditLogTab'
 import { useCompanySettingsData } from '@/hooks/useCompanySettingsData'
 import { useUserManagement } from '@/hooks/useUserManagement'
 import { useToast } from '@/components/providers/ToastProvider'
+import { logger } from '@/lib/utils/logger'
 
 type TabType = 'company' | 'bank' | 'employees' | 'invoice' | 'agb' | 'auftrag' | 'users' | 'audit'
 
@@ -84,7 +85,7 @@ export default function SettingsPageClient() {
       await saveCompany()
       success('Firmendaten erfolgreich gespeichert')
     } catch (err) {
-      console.error('Error saving company:', err)
+      logger.error('Error saving company', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
       error('Fehler beim Speichern der Firmendaten')
     }
   }
@@ -94,7 +95,7 @@ export default function SettingsPageClient() {
       await saveBank()
       success('Bankverbindung erfolgreich gespeichert')
     } catch (err) {
-      console.error('Error saving bank:', err)
+      logger.error('Error saving bank', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
       error('Fehler beim Speichern der Bankverbindung')
     }
   }
@@ -105,7 +106,7 @@ export default function SettingsPageClient() {
       await removeBank(id)
       success('Bankverbindung erfolgreich gelöscht')
     } catch (err) {
-      console.error('Error deleting bank:', err)
+      logger.error('Error deleting bank', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
       error('Fehler beim Löschen der Bankverbindung')
     }
   }
@@ -115,7 +116,7 @@ export default function SettingsPageClient() {
       await saveEmployeeEntry()
       success('Mitarbeiter erfolgreich gespeichert')
     } catch (err) {
-      console.error('Error saving employee:', err)
+      logger.error('Error saving employee', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
       error('Fehler beim Speichern des Mitarbeiters')
     }
   }
@@ -126,7 +127,7 @@ export default function SettingsPageClient() {
       await removeEmployee(id)
       success('Mitarbeiter erfolgreich gelöscht')
     } catch (err) {
-      console.error('Error deleting employee:', err)
+      logger.error('Error deleting employee', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
       error('Fehler beim Löschen des Mitarbeiters')
     }
   }

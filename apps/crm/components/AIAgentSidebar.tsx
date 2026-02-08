@@ -313,7 +313,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
 
       if (isTTSEnabled && finalText) speakText(finalText)
     } catch (error: unknown) {
-      console.error('Agent Error:', error)
+      logger.error('Agent Error', { component: 'AIAgentSidebar' }, error instanceof Error ? error : new Error(String(error)))
       const err = error as { name?: string; message?: string }
       const errorMessage =
         err.name === 'AbortError'

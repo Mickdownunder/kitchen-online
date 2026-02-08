@@ -10,6 +10,7 @@ import {
   getSecondPaymentDueDate,
 } from '@/lib/utils/paymentSchedule'
 import { updateProject, createInvoice } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 
 interface DueSecondPaymentsListProps {
   projects: CustomerProject[]
@@ -55,7 +56,7 @@ export function DueSecondPaymentsList({ projects, onProjectUpdate }: DueSecondPa
       if (onProjectUpdate) onProjectUpdate()
       alert(`Zweite Anzahlung "${newInvoice.invoiceNumber}" erfolgreich erstellt!`)
     } catch (error) {
-      console.error('Error creating second payment:', error)
+      logger.error('Error creating second payment', { component: 'DueSecondPaymentsList' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Erstellen der zweiten Anzahlung.')
     }
   }

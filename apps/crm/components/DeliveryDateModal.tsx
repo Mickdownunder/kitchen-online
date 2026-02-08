@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { CustomerProject, ProjectStatus } from '@/types'
 import { updateProject } from '@/lib/supabase/services'
 import { createAppointment } from '@/lib/supabase/services/appointments'
+import { logger } from '@/lib/utils/logger'
 
 interface DeliveryDateModalProps {
   project: CustomerProject
@@ -59,14 +60,14 @@ export default function DeliveryDateModal({
         if (errMessage.includes('aborted') || errName === 'AbortError') {
           // Silent ignore
         } else {
-          console.error('Error creating calendar appointment:', appointmentError)
+          logger.error('Error creating calendar appointment', { component: 'DeliveryDateModal' }, appointmentError instanceof Error ? appointmentError : new Error(String(appointmentError)))
         }
       }
 
       if (onSuccess) onSuccess()
       onClose()
     } catch (error: unknown) {
-      console.error('Error saving delivery date:', error)
+      logger.error('Error saving delivery date', { component: 'DeliveryDateModal' }, error instanceof Error ? error : new Error(String(error)))
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler'
       alert(`Fehler beim Speichern: ${errorMessage}`)
     } finally {

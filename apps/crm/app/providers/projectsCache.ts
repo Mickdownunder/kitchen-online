@@ -1,6 +1,7 @@
 import type React from 'react'
 import type { CustomerProject } from '@/types'
 import { getProjects } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 
 export const CACHE_DURATION_MS = 5 * 60 * 1000
 
@@ -27,7 +28,7 @@ export async function refreshProjectsWithCache(opts: {
     opts.setProjects(data || [])
     opts.setLastRefresh(Date.now())
   } catch (error) {
-    console.error('Error loading projects from Supabase:', error)
+    logger.error('Error loading projects from Supabase', { component: 'projectsCache' }, error instanceof Error ? error : new Error(String(error)))
     opts.setProjects([])
   } finally {
     if (!silent) opts.setIsLoading(false)

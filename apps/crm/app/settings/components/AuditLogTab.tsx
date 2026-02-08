@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Clock, User, FileText, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { logger } from '@/lib/utils/logger'
 
 const PAGE_SIZE = 50
 
@@ -115,7 +116,7 @@ export default function AuditLogTab() {
       }
       setLogs(data.logs || [])
     } catch (error) {
-      console.error('Error loading audit logs:', error)
+      logger.error('Error loading audit logs', { component: 'AuditLogTab' }, error instanceof Error ? error : new Error(String(error)))
       setLoadError('Audit-Logs konnten nicht geladen werden.')
       setLogs([])
     } finally {

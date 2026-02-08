@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { Mail, Copy, Send, FileText, Package, Building2, Check } from 'lucide-react'
 import { Complaint, CustomerProject, InvoiceItem } from '@/types'
+import { logger } from '@/lib/utils/logger'
 
 interface ComplaintEmailGeneratorProps {
   complaint: Complaint
@@ -199,7 +200,7 @@ Mit freundlichen Grüßen
 
       alert('✅ E-Mail erfolgreich versendet!')
     } catch (error: unknown) {
-      console.error('Fehler beim Versenden der E-Mail:', error)
+      logger.error('Fehler beim Versenden der E-Mail', { component: 'ComplaintEmailGenerator' }, error instanceof Error ? error : new Error(String(error)))
       alert(
         `❌ Fehler beim Versenden der E-Mail: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
       )

@@ -18,6 +18,7 @@ import AIAgentButton from '@/components/AIAgentButton'
 import { useToast } from '@/components/providers/ToastProvider'
 import { supabase } from '@/lib/supabase/client'
 import { getCurrentCompanyId } from '@/lib/supabase/services/permissions'
+import { logger } from '@/lib/utils/logger'
 
 interface Ticket {
   id: string
@@ -172,7 +173,7 @@ function TicketsContent() {
       setTickets(data.data.tickets)
       setStats(data.data.stats)
     } catch (err) {
-      console.error('Error loading tickets:', err)
+      logger.error('Error loading tickets', { component: 'TicketsClient' }, err instanceof Error ? err : new Error(String(err)))
       showError('Fehler beim Laden der Kundenanfragen')
     } finally {
       if (showSpinner) {

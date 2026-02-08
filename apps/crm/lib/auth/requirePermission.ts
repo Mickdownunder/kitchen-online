@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/utils/logger'
 
 export async function requireUser() {
   const supabase = await createClient()
@@ -21,7 +22,8 @@ export async function requirePermission(permissionCode: string) {
     return { supabase, user }
   }
 
-  console.warn('[requirePermission] Access denied', {
+  logger.warn('Access denied', {
+    component: 'requirePermission',
     permissionCode,
     error: rpcError?.message,
   })

@@ -1,5 +1,6 @@
 import { PlanningAppointment } from '@/types'
 import { getAppointments } from '@/lib/supabase/services/appointments'
+import { logger } from '@/lib/utils/logger'
 
 export const CACHE_DURATION_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -24,7 +25,7 @@ export async function refreshAppointmentsWithCache(opts: {
     opts.setAppointments(data || [])
     opts.setLastRefresh(Date.now())
   } catch (error) {
-    console.error('Error loading appointments from Supabase:', error)
+    logger.error('Error loading appointments from Supabase', { component: 'appointmentsCache' }, error instanceof Error ? error : new Error(String(error)))
     opts.setAppointments([])
   } finally {
     opts.setIsLoading(false)

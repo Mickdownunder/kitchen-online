@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { signOut } from '@/lib/supabase/services'
 import { useRouter } from 'next/navigation'
+import { logger } from '@/lib/utils/logger'
 
 export default function LogoutPage() {
   const router = useRouter()
@@ -20,7 +21,7 @@ export default function LogoutPage() {
         // Redirect to login
         window.location.href = '/login'
       } catch (error) {
-        console.error('Logout error:', error)
+        logger.error('Logout error', { component: 'LogoutPage' }, error instanceof Error ? error : new Error(String(error)))
         // Force redirect anyway
         window.location.href = '/login'
       }

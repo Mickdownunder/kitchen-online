@@ -31,6 +31,7 @@ import {
   CreateSupplierInvoiceInput,
 } from '@/lib/supabase/services/supplierInvoices'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
+import { logger } from '@/lib/utils/logger'
 
 // Kategorie-Labels
 const CATEGORY_LABELS: Record<SupplierInvoiceCategory, string> = {
@@ -125,7 +126,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
         onStatsChangeRef.current({ totalTax, count: data.length })
       }
     } catch (error) {
-      console.error('Fehler beim Laden der Eingangsrechnungen:', error)
+      logger.error('Fehler beim Laden der Eingangsrechnungen', { component: 'SupplierInvoicesView' }, error instanceof Error ? error : new Error(String(error)))
     } finally {
       setLoading(false)
     }
@@ -217,7 +218,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
       setEditingInvoice(null)
       resetForm()
     } catch (error) {
-      console.error('Fehler beim Speichern:', error)
+      logger.error('Fehler beim Speichern', { component: 'SupplierInvoicesView' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Speichern der Rechnung')
     } finally {
       setSaving(false)
@@ -366,7 +367,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
       await loadCustomCategories()
       setFormData(prev => ({ ...prev, category: added.name }))
     } catch (e) {
-      console.error(e)
+      logger.error('Fehler beim Hinzufügen der Kategorie', { component: 'SupplierInvoicesView' }, e instanceof Error ? e : new Error(String(e)))
       alert(e instanceof Error ? e.message : 'Kategorie konnte nicht hinzugefügt werden.')
     }
   }
@@ -381,7 +382,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
       await deleteSupplierInvoice(invoice.id)
       await loadInvoices()
     } catch (error) {
-      console.error('Fehler beim Löschen:', error)
+      logger.error('Fehler beim Löschen', { component: 'SupplierInvoicesView' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Löschen der Rechnung')
     }
   }
@@ -393,7 +394,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
       await loadInvoices()
       setPayingInvoice(null)
     } catch (error) {
-      console.error('Fehler:', error)
+      logger.error('Fehler beim Markieren als bezahlt', { component: 'SupplierInvoicesView' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Markieren als bezahlt')
     }
   }
@@ -403,7 +404,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
       await markSupplierInvoiceUnpaid(invoice.id)
       await loadInvoices()
     } catch (error) {
-      console.error('Fehler:', error)
+      logger.error('Fehler beim Zurücksetzen', { component: 'SupplierInvoicesView' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Zurücksetzen')
     }
   }

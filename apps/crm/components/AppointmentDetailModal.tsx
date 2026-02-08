@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Calendar, Clock, User, Phone, Save, Edit2, Check, Trash2 } from 'lucide-react'
 import { PlanningAppointment, CustomerProject } from '@/types'
+import { logger } from '@/lib/utils/logger'
 
 interface AppointmentDetailModalProps {
   appointment: PlanningAppointment | null
@@ -67,7 +68,7 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
       onUpdate(updated)
       setIsEditing(false)
     } catch (error) {
-      console.error('Error saving appointment:', error)
+      logger.error('Error saving appointment', { component: 'AppointmentDetailModal' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Speichern')
     } finally {
       setIsSaving(false)

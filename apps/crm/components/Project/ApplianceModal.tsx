@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Package, Shield, Phone, Mail, ExternalLink, Calendar, Trash2, AlertTriangle } from 'lucide-react'
 import { InvoiceItem } from '@/types'
+import { logger } from '@/lib/utils/logger'
 
 interface ApplianceModalProps {
   item: InvoiceItem
@@ -107,7 +108,7 @@ export function ApplianceModal({ item, isOpen, onClose, onSave }: ApplianceModal
           throw new Error('Löschen fehlgeschlagen')
         }
       } catch (error) {
-        console.error('Error removing appliance data:', error)
+        logger.error('Error removing appliance data', { component: 'ApplianceModal' }, error instanceof Error ? error : new Error(String(error)))
         alert('Fehler beim Entfernen. Bitte versuchen Sie es erneut.')
         setSaving(false)
         return
@@ -155,7 +156,7 @@ export function ApplianceModal({ item, isOpen, onClose, onSave }: ApplianceModal
           throw new Error('Speichern fehlgeschlagen')
         }
       } catch (error) {
-        console.error('Error saving appliance data:', error)
+        logger.error('Error saving appliance data', { component: 'ApplianceModal' }, error instanceof Error ? error : new Error(String(error)))
         alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.')
         setSaving(false)
         return

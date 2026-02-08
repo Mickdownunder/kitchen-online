@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { CustomerProject } from '@/types'
+import { logger } from '@/lib/utils/logger'
 
 export interface AddressSuggestion {
   display: string
@@ -74,7 +75,7 @@ export function useAddressAutocomplete({ formData, setFormData }: UseAddressAuto
             setAddressSuggestions([])
           }
         } catch (error) {
-          console.error('Error fetching address suggestions:', error)
+          logger.error('Error fetching address suggestions', { component: 'useAddressAutocomplete' }, error instanceof Error ? error : new Error(String(error)))
           setAddressSuggestions([])
         } finally {
           setIsLoadingAddress(false)

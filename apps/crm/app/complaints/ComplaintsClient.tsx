@@ -12,6 +12,7 @@ import AIAgentButton from '@/components/AIAgentButton'
 import { getComplaints, createComplaint, updateComplaint } from '@/lib/supabase/services'
 import { createAppointment } from '@/lib/supabase/services/appointments'
 import { useToast } from '@/components/providers/ToastProvider'
+import { logger } from '@/lib/utils/logger'
 
 function ComplaintsPageContent() {
   const { projects } = useApp()
@@ -38,7 +39,7 @@ function ComplaintsPageContent() {
       const data = await getComplaints(undefined, excludeResolved)
       setComplaints(data)
     } catch (err) {
-      console.error('Error loading complaints:', err)
+      logger.error('Error loading complaints', { component: 'ComplaintsClient' }, err instanceof Error ? err : new Error(String(err)))
       showError('Fehler beim Laden der Reklamationen')
     } finally {
       setLoading(false)
@@ -156,7 +157,7 @@ function ComplaintsPageContent() {
       await loadComplaints()
       success('Status aktualisiert')
     } catch (err) {
-      console.error('Error updating complaint status:', err)
+      logger.error('Error updating complaint status', { component: 'ComplaintsClient' }, err instanceof Error ? err : new Error(String(err)))
       showError('Fehler beim Aktualisieren des Status')
     }
   }
@@ -172,13 +173,13 @@ function ComplaintsPageContent() {
       setIsCreateModalOpen(false)
     } catch (err: unknown) {
       const errObj = err as Error & { code?: string; details?: string; hint?: string }
-      console.error('Error creating complaint:', {
+      logger.error('Error creating complaint', {
+        component: 'ComplaintsClient',
         message: errObj?.message,
         code: errObj?.code,
         details: errObj?.details,
         hint: errObj?.hint,
-        fullError: errObj,
-      })
+      }, errObj instanceof Error ? errObj : new Error(String(errObj)))
 
       // Show user-friendly error message
       const errorMessage =
@@ -232,7 +233,7 @@ function ComplaintsPageContent() {
         success('Reklamation aktualisiert')
       }
     } catch (err) {
-      console.error('Error updating complaint:', err)
+      logger.error('Error updating complaint', { component: 'ComplaintsClient' }, err instanceof Error ? err : new Error(String(err)))
       const errorMessage = err instanceof Error ? err.message : 'Unbekannter Fehler'
       showError(`Fehler beim Aktualisieren: ${errorMessage}`)
     }
@@ -261,7 +262,7 @@ function ComplaintsPageContent() {
       await loadComplaints()
       success('Nachmontage-Termin erstellt')
     } catch (err) {
-      console.error('Error creating appointment:', err)
+      logger.error('Error creating appointment', { component: 'ComplaintsClient' }, err instanceof Error ? err : new Error(String(err)))
       showError('Fehler beim Erstellen des Termins')
     }
   }

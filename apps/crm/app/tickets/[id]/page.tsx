@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/components/providers/ToastProvider'
 import { supabase } from '@/lib/supabase/client'
+import { logger } from '@/lib/utils/logger'
 
 interface Ticket {
   id: string
@@ -171,7 +172,7 @@ export default function TicketDetailPage() {
       setCustomer(data.data.customer)
       setMessages(data.data.messages || [])
     } catch (err) {
-      console.error('Error loading ticket:', err)
+      logger.error('Error loading ticket', { component: 'TicketDetailPage' }, err instanceof Error ? err : new Error(String(err)))
       setError('Fehler beim Laden')
     } finally {
       if (showSpinner) {
@@ -239,7 +240,7 @@ export default function TicketDetailPage() {
       success('Antwort gesendet')
       await loadData(false)
     } catch (err) {
-      console.error('Send error:', err)
+      logger.error('Send error', { component: 'TicketDetailPage' }, err instanceof Error ? err : new Error(String(err)))
       showError('Fehler beim Senden der Antwort')
     } finally {
       setIsSending(false)
@@ -264,7 +265,7 @@ export default function TicketDetailPage() {
       success('Status aktualisiert')
       await loadData()
     } catch (err) {
-      console.error('Status update error:', err)
+      logger.error('Status update error', { component: 'TicketDetailPage' }, err instanceof Error ? err : new Error(String(err)))
       showError('Fehler beim Aktualisieren des Status')
     } finally {
       setIsUpdatingStatus(false)

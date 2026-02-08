@@ -37,7 +37,7 @@ export function useChatSession() {
         setCurrentSessionId(sessions[0].id)
       }
     } catch (error) {
-      console.error('Error loading chat sessions:', error)
+      logger.error('Error loading chat sessions', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [currentSessionId])
 
@@ -53,7 +53,7 @@ export function useChatSession() {
         setMessages(formattedMessages)
       }
     } catch (error) {
-      console.error('Error loading chat history:', error)
+      logger.error('Error loading chat history', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [])
 
@@ -74,7 +74,7 @@ export function useChatSession() {
         setShowHistory(false)
         return session
       } catch (error) {
-        console.error('Error creating new session:', error)
+        logger.error('Error creating new session', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
         return null
       }
     },
@@ -106,7 +106,7 @@ export function useChatSession() {
         await loadChatSessions()
         return true
       } catch (error: unknown) {
-        console.error('[Chat] Error deleting chat session:', error)
+        logger.error('Error deleting chat session', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
         await loadChatSessions()
         return false
       }
@@ -124,7 +124,7 @@ export function useChatSession() {
       try {
         await saveChatMessage(currentSessionId, 'user', content)
       } catch (error) {
-        console.error('Error saving user message:', error)
+        logger.error('Error saving user message', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
       }
     },
     [currentSessionId]
@@ -139,7 +139,7 @@ export function useChatSession() {
       try {
         await saveChatMessage(currentSessionId, 'model', content, functionCalls)
       } catch (error) {
-        console.error('Error saving model message:', error)
+        logger.error('Error saving model message', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
       }
     },
     [currentSessionId]
@@ -155,7 +155,7 @@ export function useChatSession() {
         await loadChatSessions()
         return session.id
       } catch (error) {
-        console.error('Error creating session:', error)
+        logger.error('Error creating session', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
         return null
       }
     },
@@ -169,7 +169,7 @@ export function useChatSession() {
         const history = await getChatMessages(currentSessionId)
         return history.slice(-limit)
       } catch (error) {
-        console.error('Error loading chat history for context:', error)
+        logger.error('Error loading chat history for context', { component: 'useChatSession' }, error instanceof Error ? error : new Error(String(error)))
         return []
       }
     },

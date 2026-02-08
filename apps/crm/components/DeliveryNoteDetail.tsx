@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { DeliveryNote, CustomerProject } from '@/types'
 import { matchDeliveryNoteToProject, createGoodsReceipt } from '@/lib/supabase/services'
+import { logger } from '@/lib/utils/logger'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -64,7 +65,7 @@ export default function DeliveryNoteDetail({
       onUpdate()
       onBack()
     } catch (error: unknown) {
-      console.error('Error deleting delivery note:', error)
+      logger.error('Error deleting delivery note', { component: 'DeliveryNoteDetail' }, error instanceof Error ? error : new Error(String(error)))
       alert(`Fehler beim Löschen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`)
     } finally {
       setDeleting(false)
@@ -80,7 +81,7 @@ export default function DeliveryNoteDetail({
       onUpdate()
       onBack()
     } catch (error) {
-      console.error('Error matching project:', error)
+      logger.error('Error matching project', { component: 'DeliveryNoteDetail' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Zuordnen des Projekts')
     } finally {
       setLoading(false)
@@ -121,7 +122,7 @@ export default function DeliveryNoteDetail({
       onUpdate()
       onBack()
     } catch (error) {
-      console.error('Error booking goods receipt:', error)
+      logger.error('Error booking goods receipt', { component: 'DeliveryNoteDetail' }, error instanceof Error ? error : new Error(String(error)))
       alert('Fehler beim Buchen des Wareneingangs')
     } finally {
       setLoading(false)

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { logger } from '@/lib/utils/logger'
 import { 
   MessageSquare, 
   Clock, 
@@ -66,7 +67,7 @@ export function ProjectTicketsTab({ projectId }: ProjectTicketsTabProps) {
 
         setTickets(data.data.tickets || [])
       } catch (err) {
-        console.error('Error loading tickets:', err)
+        logger.error('Error loading tickets', { component: 'ProjectTicketsTab' }, err instanceof Error ? err : new Error(String(err)))
         setError('Fehler beim Laden der Anfragen')
       } finally {
         setLoading(false)
