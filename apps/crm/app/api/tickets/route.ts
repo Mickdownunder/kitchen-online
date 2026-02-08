@@ -26,39 +26,12 @@ export async function GET(request: NextRequest) {
     // Use service client for database operations
     const supabase = await createServiceClient()
 
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/88795722-4a41-4d8b-9b7c-39ae75620258',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tickets/route.ts:pre',message:'before getCompanyIdForUser',data:{userId:user.id,role:user.app_metadata?.role,hasServiceKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now(),hypothesisId:'H3-H4'})}).catch(()=>{});
-    // #endregion
-
-    // #region agent log — direct queries for debug
-    const { data: dbgMember, error: dbgMemberErr } = await supabase
-      .from('company_members')
-      .select('company_id, is_active, role')
-      .eq('user_id', user.id)
-    const { data: dbgSettings, error: dbgSettingsErr } = await supabase
-      .from('company_settings')
-      .select('id, company_name')
-      .eq('user_id', user.id)
-    // #endregion
-
     const companyId = await getCompanyIdForUser(user.id, supabase)
 
     if (!companyId) {
       logger.warn('Tickets NO_COMPANY', { component: 'api/tickets', userId: user.id })
       return NextResponse.json(
-        {
-          success: false,
-          error: 'NO_COMPANY',
-          debug: {
-            userId: user.id,
-            memberRows: dbgMember,
-            memberError: dbgMemberErr?.message || null,
-            settingsRows: dbgSettings,
-            settingsError: dbgSettingsErr?.message || null,
-            hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-            supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-          },
-        },
+        { success: false, error: 'NO_COMPANY' },
         { status: 403 }
       )
     }

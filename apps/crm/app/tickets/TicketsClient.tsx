@@ -167,9 +167,6 @@ function TicketsContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        // #region agent log
-        if (data.debug) console.error('[DEBUG tickets]', JSON.stringify(data.debug, null, 2))
-        // #endregion
         throw new Error(data.error || 'Fehler beim Laden')
       }
 
