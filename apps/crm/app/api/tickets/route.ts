@@ -28,15 +28,10 @@ export async function GET(request: NextRequest) {
 
     const companyId = await getCompanyIdForUser(user.id, supabase)
 
-    logger.debug('Tickets API request', {
-      component: 'api/tickets',
-      userId: user.id,
-      companyId,
-    })
-
     if (!companyId) {
+      logger.warn('Tickets NO_COMPANY', { component: 'api/tickets', userId: user.id })
       return NextResponse.json(
-        { success: false, error: 'NO_COMPANY' },
+        { success: false, error: 'NO_COMPANY', debug: { userId: user.id } },
         { status: 403 }
       )
     }

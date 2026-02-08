@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '../client'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * Holt company_id für einen User: zuerst company_members, Fallback company_settings.
@@ -9,22 +10,31 @@ export async function getCompanyIdForUser(
   userId: string,
   client: SupabaseClient
 ): Promise<string | null> {
-  const { data: member } = await client
+  const { data: member, error: memberError } = await client
     .from('company_members')
     .select('company_id')
     .eq('user_id', userId)
     .eq('is_active', true)
     .maybeSingle()
 
+  if (memberError) {
+    logger.warn('getCompanyIdForUser company_members error', { userId, error: memberError.message })
+  }
   if (member?.company_id) return member.company_id
 
-  const { data: settings } = await client
+  const { data: settings, error: settingsError } = await client
     .from('company_settings')
     .select('id')
     .eq('user_id', userId)
     .maybeSingle()
 
-  return settings?.id ?? null
+  if (settingsError) {
+    logger.warn('getCompanyIdForUser company_settings error', { userId, error: settingsError.message })
+  }
+  if (settings?.id) return settings.id
+
+  logger.warn('getCompanyIdForUser no company found', { userId })
+  return null
 }
 import { BankAccount, CompanySettings, Employee } from '@/types'
 import { getCurrentUser } from './auth'

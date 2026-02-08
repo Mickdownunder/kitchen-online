@@ -167,7 +167,10 @@ function TicketsContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Fehler beim Laden')
+        const msg = data.debug?.userId
+          ? `${data.error || 'Fehler'} (userId: ${data.debug.userId})`
+          : (data.error || 'Fehler beim Laden')
+        throw new Error(msg)
       }
 
       setTickets(data.data.tickets)
