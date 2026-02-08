@@ -39,7 +39,6 @@ export async function getCompanyIdForUser(
 import { BankAccount, CompanySettings, Employee } from '@/types'
 import { getCurrentUser } from './auth'
 import { audit, logAudit } from '@/lib/utils/auditLogger'
-import { logger } from '@/lib/utils/logger'
 
 export async function getCompanySettings(): Promise<CompanySettings | null> {
   try {
