@@ -55,7 +55,7 @@ export const DayView: React.FC<DayViewProps> = ({
         </div>
       </div>
 
-      <div className="max-h-[550px] overflow-y-auto">
+      <div className="max-h-[70vh] overflow-y-auto">
         {timeSlots.map((time, timeIdx) => {
           const events = allEvents.filter(e => {
             if (!e.time) return timeIdx === 2

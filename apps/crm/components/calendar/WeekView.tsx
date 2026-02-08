@@ -64,7 +64,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
         })}
       </div>
 
-      <div className="max-h-[500px] overflow-y-auto">
+      <div className="max-h-[70vh] overflow-y-auto">
         {timeSlots.map((time, timeIdx) => (
           <div
             key={`time-${time}`}

@@ -1608,6 +1608,35 @@ export type Database = {
           },
         ]
       }
+      appointment_reminder_log: {
+        Row: {
+          id: string
+          appointment_id: string
+          reminder_type: string
+          sent_at: string | null
+        }
+        Insert: {
+          id?: string
+          appointment_id: string
+          reminder_type: string
+          sent_at?: string | null
+        }
+        Update: {
+          id?: string
+          appointment_id?: string
+          reminder_type?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_reminder_log_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "planning_appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       processed_webhooks: {
         Row: {
           created_at: string

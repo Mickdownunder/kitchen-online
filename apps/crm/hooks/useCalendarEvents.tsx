@@ -8,7 +8,8 @@ import { formatDate as formatDateUtil, getStatusColor as getStatusColorUtil } fr
 
 export type CalendarEvent = {
   id: string
-  type: 'Aufmaß' | 'Montage' | 'Planung' | 'Abholung'
+  type: 'Aufmaß' | 'Montage' | 'Planung' | 'Abholung' | 'Lieferung'
+  typeLabel?: string
   customer: string
   project: CustomerProject | null
   appointment: PlanningAppointment | null
@@ -18,7 +19,72 @@ export type CalendarEvent = {
   borderColor: string
   icon: React.ReactNode
   date: string
+  assignedUserId?: string
+  assignedUserName?: string
 }
+
+/** Farben pro Termin-Typ – eindeutig, damit man lernt: Farbe = Typ */
+const TYPE_COLORS: Record<
+  string,
+  { color: string; bgColor: string; borderColor: string; label: string }
+> = {
+  Consultation: {
+    color: 'text-emerald-800',
+    bgColor: 'bg-emerald-100',
+    borderColor: 'border-emerald-500',
+    label: 'Beratung / Planung',
+  },
+  FirstMeeting: {
+    color: 'text-sky-800',
+    bgColor: 'bg-sky-100',
+    borderColor: 'border-sky-500',
+    label: 'Erstgespräch',
+  },
+  Measurement: {
+    color: 'text-indigo-800',
+    bgColor: 'bg-indigo-100',
+    borderColor: 'border-indigo-500',
+    label: 'Aufmaß',
+  },
+  Installation: {
+    color: 'text-amber-800',
+    bgColor: 'bg-amber-100',
+    borderColor: 'border-amber-500',
+    label: 'Montage',
+  },
+  Service: {
+    color: 'text-violet-800',
+    bgColor: 'bg-violet-100',
+    borderColor: 'border-violet-500',
+    label: 'Service / Wartung',
+  },
+  ReMeasurement: {
+    color: 'text-cyan-800',
+    bgColor: 'bg-cyan-100',
+    borderColor: 'border-cyan-500',
+    label: 'Nachmessung',
+  },
+  Delivery: {
+    color: 'text-orange-800',
+    bgColor: 'bg-orange-100',
+    borderColor: 'border-orange-500',
+    label: 'Abholung',
+  },
+  Lieferung: {
+    color: 'text-teal-800',
+    bgColor: 'bg-teal-100',
+    borderColor: 'border-teal-500',
+    label: 'Lieferung',
+  },
+  Other: {
+    color: 'text-slate-800',
+    bgColor: 'bg-slate-100',
+    borderColor: 'border-slate-500',
+    label: 'Sonstiges',
+  },
+}
+
+const DEFAULT_TYPE_COLOR = TYPE_COLORS.Other
 
 interface UseCalendarEventsOptions {
   projects: CustomerProject[]
@@ -27,6 +93,8 @@ interface UseCalendarEventsOptions {
   userId?: string | null
   debouncedSearchQuery: string
   sortBy: 'name' | 'date' | 'status'
+  /** Map of user_id -> full_name for employee color coding */
+  teamMap?: Record<string, string>
 }
 
 const formatDateString = (date: Date): string => {
@@ -36,7 +104,7 @@ const formatDateString = (date: Date): string => {
 }
 
 export function useCalendarEvents(options: UseCalendarEventsOptions) {
-  const { projects, appointments, showOnlyMyAppointments, userId, debouncedSearchQuery, sortBy } =
+  const { projects, appointments, showOnlyMyAppointments, userId, debouncedSearchQuery, sortBy, teamMap } =
     options
 
   const getEventsForDate = useCallback(
@@ -52,7 +120,8 @@ export function useCalendarEvents(options: UseCalendarEventsOptions) {
           const hasUserAppointment = appointments.some(
             a =>
               a.assignedUserId === userId &&
-              (a.customerName === p.customerName || a.customerId === p.customerId)
+              (a.customerName === p.customerName ||
+                (a.customerId && p.customerId && a.customerId === p.customerId))
           )
           return (
             hasUserAppointment ||
@@ -74,9 +143,9 @@ export function useCalendarEvents(options: UseCalendarEventsOptions) {
             appointment: null,
             time: p.measurementTime,
             date: dateStr,
-            color: 'text-indigo-700',
-            bgColor: 'bg-indigo-50',
-            borderColor: 'border-indigo-400',
+            color: 'text-indigo-800',
+            bgColor: 'bg-indigo-100',
+            borderColor: 'border-indigo-500',
             icon: <Ruler className="h-3 w-3" />,
           })
         }
@@ -89,24 +158,25 @@ export function useCalendarEvents(options: UseCalendarEventsOptions) {
             appointment: null,
             time: p.installationTime,
             date: dateStr,
-            color: 'text-amber-700',
-            bgColor: 'bg-amber-50',
-            borderColor: 'border-amber-400',
+            color: 'text-amber-800',
+            bgColor: 'bg-amber-100',
+            borderColor: 'border-amber-500',
             icon: <Truck className="h-3 w-3" />,
           })
         }
         if (p.deliveryDate === dateStr) {
+          const isLieferung = p.deliveryType === 'delivery'
           events.push({
             id: `project-${p.id}-delivery`,
-            type: 'Abholung',
+            type: isLieferung ? 'Lieferung' : 'Abholung',
             customer: p.customerName,
             project: p,
             appointment: null,
             time: p.deliveryTime,
             date: dateStr,
-            color: 'text-orange-700',
-            bgColor: 'bg-orange-50',
-            borderColor: 'border-orange-400',
+            color: isLieferung ? 'text-teal-800' : 'text-orange-800',
+            bgColor: isLieferung ? 'bg-teal-100' : 'bg-orange-100',
+            borderColor: isLieferung ? 'border-teal-500' : 'border-orange-500',
             icon: <Package className="h-3 w-3" />,
           })
         }
@@ -117,27 +187,47 @@ export function useCalendarEvents(options: UseCalendarEventsOptions) {
         .filter(a => a.date === dateStr)
         .map(a => {
           const associatedProject = projects.find(
-            p => p.customerName === a.customerName || p.customerId === a.customerId
+            p =>
+              p.customerName === a.customerName ||
+              (a.customerId && p.customerId && a.customerId === p.customerId)
           )
+          const assignedUserId = a.assignedUserId
+          const assignedUserName = assignedUserId && teamMap ? teamMap[assignedUserId] : undefined
+          const typeColor = TYPE_COLORS[a.type] || DEFAULT_TYPE_COLOR
 
           return {
             id: `appointment-${a.id}`,
             type: 'Planung' as const,
+            typeLabel: typeColor.label,
             customer: a.customerName,
             time: a.time,
             project: associatedProject || null,
             appointment: a,
             date: dateStr,
-            color: 'text-emerald-700',
-            bgColor: 'bg-emerald-50',
-            borderColor: 'border-emerald-400',
+            assignedUserId,
+            assignedUserName,
+            color: typeColor.color,
+            bgColor: typeColor.bgColor,
+            borderColor: typeColor.borderColor,
             icon: <ChefHat className="h-3 w-3" />,
           }
         })
 
       return [...projectEvents, ...planningEvents]
     },
-    [projects, appointments, showOnlyMyAppointments, userId]
+    [projects, appointments, showOnlyMyAppointments, userId, teamMap]
+  )
+
+  const typeLegendEntries = useMemo(
+    () =>
+      Object.entries(TYPE_COLORS).map(([key, val]) => ({
+        key,
+        label: val.label,
+        color: val.color,
+        bgColor: val.bgColor,
+        borderColor: val.borderColor,
+      })),
+    []
   )
 
   const projectsToAssign = useMemo(() => {
@@ -193,5 +283,6 @@ export function useCalendarEvents(options: UseCalendarEventsOptions) {
     projectsToAssign,
     getStatusColor,
     formatDate,
+    typeLegendEntries,
   }
 }

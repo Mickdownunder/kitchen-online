@@ -55,6 +55,26 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     project: CustomerProject | null
   } | null>(null)
   const [showOnlyMyAppointments, setShowOnlyMyAppointments] = useState(false)
+  const [teamMap, setTeamMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const fetchTeam = async () => {
+      try {
+        const res = await fetch('/api/calendar/team')
+        if (res.ok) {
+          const { team } = await res.json()
+          const map: Record<string, string> = {}
+          ;(team || []).forEach((t: { id: string; fullName: string }) => {
+            map[t.id] = t.fullName || ''
+          })
+          setTeamMap(map)
+        }
+      } catch {
+        // Silently ignore - team colors are optional
+      }
+    }
+    fetchTeam()
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -78,14 +98,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     getWeekNumber,
   } = useCalendarNavigation()
 
-  const { getEventsForDate, projectsToAssign, getStatusColor, formatDate } = useCalendarEvents({
-    projects,
-    appointments,
-    showOnlyMyAppointments,
-    userId: user?.id,
-    debouncedSearchQuery,
-    sortBy,
-  })
+  const { getEventsForDate, projectsToAssign, getStatusColor, formatDate, typeLegendEntries } =
+    useCalendarEvents({
+      projects,
+      appointments,
+      showOnlyMyAppointments,
+      userId: user?.id,
+      debouncedSearchQuery,
+      sortBy,
+      teamMap,
+    })
 
   const { sensors, collisionDetection, draggedEvent, handleDragStart, handleDragEnd } =
     useCalendarDragDrop({
@@ -94,6 +116,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       onUpdateAppointment,
       onUpdateProject,
     })
+
+  const handleQuickAddAppointment = () => {
+    setSelectedDate(currentDate)
+    setIsAssignModalOpen(true)
+    setIsCreatingNewAppointment(true)
+  }
 
   const handleDayClick = (date: Date) => {
     setSelectedDate(date)
@@ -126,9 +154,33 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     setIsAssignModalOpen(false)
   }
 
+  const hasAppointmentConflict = (
+    dateStr: string,
+    time: string,
+    assignedUserId: string | undefined
+  ): boolean => {
+    if (!assignedUserId) return false
+    return appointments.some(
+      a =>
+        a.assignedUserId === assignedUserId &&
+        a.date === dateStr &&
+        (a.time || '') === (time || '')
+    )
+  }
+
   const createPlanningAppointment = () => {
     if (!selectedDate || !newAppointmentName) return
     const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+
+    const assignedUserId = user?.id
+    if (
+      hasAppointmentConflict(dateStr, newAppointmentTime, assignedUserId) &&
+      !confirm(
+        `Sie haben bereits einen Termin um ${newAppointmentTime} Uhr am ${selectedDate.toLocaleDateString('de-DE')}. Trotzdem anlegen?`
+      )
+    ) {
+      return
+    }
 
     const newAppt: PlanningAppointment = {
       id: 'appt-' + Date.now(),
@@ -137,7 +189,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       time: newAppointmentTime,
       type: newAppointmentType,
       notes: newAppointmentNotes || undefined,
-      assignedUserId: user?.id,
+      assignedUserId,
     }
 
     onAddAppointment(newAppt)
@@ -179,7 +231,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="animate-in fade-in space-y-6 duration-500">
+      <div className="animate-in fade-in flex min-h-[calc(100vh-14rem)] flex-col gap-6 duration-500">
         <CalendarHeader
           headerText={formatHeaderDate()}
           viewMode={viewMode}
@@ -189,8 +241,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           onPrev={goToPrev}
           onNext={goToNext}
           onToday={goToToday}
+          onQuickAddAppointment={handleQuickAddAppointment}
         />
 
+        <div className="min-h-0 flex-1">
         {viewMode === 'month' ? (
           <MonthView
             days={daysForView}
@@ -223,17 +277,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             onEventClick={handleEventClick}
           />
         )}
+        </div>
 
         <CalendarLegend
           totalAppointments={
             projects.filter(p => p.installationDate || p.measurementDate || p.deliveryDate).length +
             appointments.length
           }
+          typeLegendEntries={typeLegendEntries}
         />
 
         <QuickAssignModal
           isOpen={isAssignModalOpen}
           selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
           monthNames={monthNames}
           isCreatingNewAppointment={isCreatingNewAppointment}
           setIsCreatingNewAppointment={setIsCreatingNewAppointment}
@@ -283,7 +340,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       ? 'Aufmaß'
                       : updatedAppointment.type === 'Installation'
                         ? 'Montage'
-                        : 'Abholung'
+                        : updatedProject.deliveryType === 'delivery'
+                          ? 'Lieferung'
+                          : 'Abholung'
                   updatedProject.notes =
                     `${updatedProject.notes || ''}\n${timestamp}: Termin-Notizen (${typeLabel}): ${updatedAppointment.notes}`.trim()
                 }
@@ -310,7 +369,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             >
               <div className="mb-0.5 flex items-center gap-1.5">
                 {draggedEvent.icon}
-                <span className="text-[10px] font-semibold uppercase">{draggedEvent.type}</span>
+                <span className="text-[10px] font-semibold uppercase">
+                  {draggedEvent.typeLabel || draggedEvent.type}
+                </span>
                 {draggedEvent.time && (
                   <span className="ml-auto text-[10px] opacity-70">{draggedEvent.time}</span>
                 )}

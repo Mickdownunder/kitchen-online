@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Calendar as CalendarIcon, User, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar as CalendarIcon, User, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import type { ViewMode } from '@/hooks/useCalendarNavigation'
 
 interface CalendarHeaderProps {
@@ -13,6 +13,7 @@ interface CalendarHeaderProps {
   onPrev: () => void
   onNext: () => void
   onToday: () => void
+  onQuickAddAppointment?: () => void
 }
 
 export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
@@ -24,6 +25,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onPrev,
   onNext,
   onToday,
+  onQuickAddAppointment,
 }) => {
   return (
     <div className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center">
@@ -71,6 +73,15 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           </button>
         </div>
 
+        {onQuickAddAppointment && (
+          <button
+            onClick={onQuickAddAppointment}
+            className="flex items-center gap-2 rounded-xl border border-emerald-500 bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-emerald-600"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Neuer Termin</span>
+          </button>
+        )}
         <button
           onClick={onToggleMyAppointments}
           className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${

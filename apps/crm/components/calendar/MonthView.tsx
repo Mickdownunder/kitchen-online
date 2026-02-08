@@ -42,7 +42,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
       <div
         ref={setNodeRef}
         onClick={() => onDayClick(date)}
-        className={`group relative min-h-[100px] cursor-pointer border-b border-r border-slate-200 p-1.5 transition-all md:min-h-[120px] md:p-2 ${
+        className={`group relative min-h-[130px] cursor-pointer border-b border-r border-slate-200 p-1.5 transition-all md:min-h-[160px] md:p-2 ${
           isWeekend ? 'bg-slate-50/80' : 'bg-white hover:bg-slate-50'
         } ${!isInCurrentMonth ? 'opacity-40' : ''} ${
           isOver ? 'bg-amber-50 ring-2 ring-inset ring-amber-400' : ''
@@ -65,7 +65,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
           </span>
         </div>
 
-        <div className="max-h-[60px] space-y-1 overflow-y-auto md:max-h-[80px]">
+        <div className="max-h-[90px] space-y-1 overflow-y-auto md:max-h-[120px]">
           {events.slice(0, 3).map(e => (
             <EventCard key={e.id} event={e} compact onClick={() => onEventClick(e)} />
           ))}
@@ -105,8 +105,8 @@ export const MonthView: React.FC<MonthViewProps> = ({
           if (!date) {
             return (
               <div
-                key={`empty-${idx}`}
-                className="min-h-[100px] border-b border-r border-slate-200 bg-slate-50/50 md:min-h-[120px]"
+              key={`empty-${idx}`}
+              className="min-h-[130px] border-b border-r border-slate-200 bg-slate-50/50 md:min-h-[160px]"
               ></div>
             )
           }

@@ -16,6 +16,7 @@ import type { CustomerProject, PlanningAppointment, ProjectStatus } from '@/type
 interface QuickAssignModalProps {
   isOpen: boolean
   selectedDate: Date | null
+  setSelectedDate: (date: Date | null) => void
   monthNames: string[]
   isCreatingNewAppointment: boolean
   setIsCreatingNewAppointment: (value: boolean) => void
@@ -45,6 +46,7 @@ interface QuickAssignModalProps {
 export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({
   isOpen,
   selectedDate,
+  setSelectedDate,
   monthNames,
   isCreatingNewAppointment,
   setIsCreatingNewAppointment,
@@ -186,9 +188,14 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({
                         </button>
                         <button
                           onClick={() => assignDateToProject(p, 'delivery')}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-2 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600"
+                          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-white transition-colors ${
+                            p.deliveryType === 'delivery'
+                              ? 'bg-teal-500 hover:bg-teal-600'
+                              : 'bg-orange-500 hover:bg-orange-600'
+                          }`}
                         >
-                          <Package className="h-3.5 w-3.5" /> Abholung
+                          <Package className="h-3.5 w-3.5" />{' '}
+                          {p.deliveryType === 'delivery' ? 'Lieferung' : 'Abholung'}
                         </button>
                       </div>
                     </div>
@@ -207,13 +214,47 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Datum
+                  </label>
+                  <input
+                    type="date"
+                    autoFocus
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    value={
+                      selectedDate
+                        ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+                        : ''
+                    }
+                    onChange={e => {
+                      const val = e.target.value
+                      if (val) {
+                        const d = new Date(val + 'T12:00:00')
+                        setSelectedDate(d)
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Uhrzeit
+                  </label>
+                  <input
+                    type="time"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    value={newAppointmentTime}
+                    onChange={e => setNewAppointmentTime(e.target.value)}
+                  />
+                </div>
+              </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
                   Kundenname
                 </label>
                 <input
                   required
-                  autoFocus
                   placeholder="z.B. Familie Müller"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                   value={newAppointmentName}
@@ -240,17 +281,6 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({
                   <option value="Delivery">Lieferung</option>
                   <option value="Other">Sonstiges</option>
                 </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Uhrzeit
-                </label>
-                <input
-                  type="time"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                  value={newAppointmentTime}
-                  onChange={e => setNewAppointmentTime(e.target.value)}
-                />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">
