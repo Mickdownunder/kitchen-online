@@ -1,5 +1,31 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '../client'
+
+/**
+ * Holt company_id für einen User: zuerst company_members, Fallback company_settings.
+ * Für API-Routes: Supabase Service-Client übergeben.
+ */
+export async function getCompanyIdForUser(
+  userId: string,
+  client: SupabaseClient
+): Promise<string | null> {
+  const { data: member } = await client
+    .from('company_members')
+    .select('company_id')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (member?.company_id) return member.company_id
+
+  const { data: settings } = await client
+    .from('company_settings')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  return settings?.id ?? null
+}
 import { BankAccount, CompanySettings, Employee } from '@/types'
 import { getCurrentUser } from './auth'
 import { audit, logAudit } from '@/lib/utils/auditLogger'

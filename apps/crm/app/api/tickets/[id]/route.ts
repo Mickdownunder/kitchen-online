@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getCompanyIdForUser } from '@/lib/supabase/services/company'
 import { z } from 'zod'
 
 const ReplySchema = z.object({
@@ -35,16 +36,9 @@ export async function GET(
     }
 
     const supabase = await createServiceClient()
+    const companyId = await getCompanyIdForUser(user.id, supabase)
 
-    // Get user's company_id via company_members
-    const { data: companyMember } = await supabase
-      .from('company_members')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
-
-    if (!companyMember?.company_id) {
+    if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'NO_COMPANY' },
         { status: 403 }
@@ -67,7 +61,7 @@ export async function GET(
         company_id
       `)
       .eq('id', ticketId)
-      .eq('company_id', companyMember.company_id)
+      .eq('company_id', companyId)
       .single()
 
     if (ticketError || !ticket) {
@@ -156,16 +150,9 @@ export async function POST(
     const { message } = parsed.data
 
     const supabase = await createServiceClient()
+    const companyId = await getCompanyIdForUser(user.id, supabase)
 
-    // Get user's company_id via company_members
-    const { data: companyMember } = await supabase
-      .from('company_members')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
-
-    if (!companyMember?.company_id) {
+    if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'NO_COMPANY' },
         { status: 403 }
@@ -184,7 +171,7 @@ export async function POST(
       .from('tickets')
       .select('id, company_id, status')
       .eq('id', ticketId)
-      .eq('company_id', companyMember.company_id)
+      .eq('company_id', companyId)
       .single()
 
     if (ticketError || !ticket) {
@@ -283,16 +270,9 @@ export async function PATCH(
     const { status } = parsed.data
 
     const supabase = await createServiceClient()
+    const companyId = await getCompanyIdForUser(user.id, supabase)
 
-    // Get user's company_id via company_members
-    const { data: companyMember } = await supabase
-      .from('company_members')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
-
-    if (!companyMember?.company_id) {
+    if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'NO_COMPANY' },
         { status: 403 }
@@ -304,7 +284,7 @@ export async function PATCH(
       .from('tickets')
       .update({ status })
       .eq('id', ticketId)
-      .eq('company_id', companyMember.company_id)
+      .eq('company_id', companyId)
       .select('id, status')
       .single()
 

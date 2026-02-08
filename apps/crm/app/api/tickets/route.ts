@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getCompanyIdForUser } from '@/lib/supabase/services/company'
 import { logger } from '@/lib/utils/logger'
 
 /**
@@ -25,21 +26,15 @@ export async function GET(request: NextRequest) {
     // Use service client for database operations
     const supabase = await createServiceClient()
 
-    // Get user's company_id via company_members
-    const { data: companyMember } = await supabase
-      .from('company_members')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
+    const companyId = await getCompanyIdForUser(user.id, supabase)
 
     logger.debug('Tickets API request', {
       component: 'api/tickets',
       userId: user.id,
-      companyId: companyMember?.company_id,
+      companyId,
     })
 
-    if (!companyMember?.company_id) {
+    if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'NO_COMPANY' },
         { status: 403 }
@@ -61,7 +56,7 @@ export async function GET(request: NextRequest) {
         updated_at,
         company_id
       `)
-      .eq('company_id', companyMember.company_id)
+      .eq('company_id', companyId)
       .order('updated_at', { ascending: false })
 
     if (status && status !== 'all') {
@@ -76,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     logger.debug('Tickets query result', {
       component: 'api/tickets',
-      companyId: companyMember.company_id,
+      companyId,
       ticketCount: tickets?.length || 0,
     })
 
