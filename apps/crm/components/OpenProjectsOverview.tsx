@@ -70,9 +70,11 @@ function buildPaymentRow(project: CustomerProject, allInvoices: Invoice[]): Proj
 
   const totalPaid = projectInvoices.filter(inv => inv.isPaid).reduce((s, inv) => s + inv.amount, 0)
   const totalOpen = project.totalAmount - totalPaid
-  const openTax = projectInvoices
-    .filter(inv => !inv.isPaid)
-    .reduce((s, inv) => s + (inv.taxAmount ?? 0), 0)
+
+  // Offene USt: Steuerverhältnis des Projekts auf den offenen Betrag anwenden
+  // Damit wird der tatsächliche Steuersatz (20%, 13%, 10%, gemischt) korrekt berücksichtigt
+  const taxRatio = project.totalAmount > 0 ? project.taxAmount / project.totalAmount : 0
+  const openTax = (totalOpen > 0 ? totalOpen : 0) * taxRatio
 
   return {
     project,
