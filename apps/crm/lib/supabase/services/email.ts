@@ -107,10 +107,8 @@ export async function sendDeliveryNoteEmail(
   deliveryNoteId: string,
   recipientEmail: string
 ): Promise<void> {
-  // TODO: Hole Lieferschein-Daten aus DB
-  // TODO: Generiere PDF
-  // TODO: Verwende Email-Template
-
+  // STUB: Delivery note email is not yet implemented (no callers).
+  // Needs: fetch delivery note from DB, generate PDF, use email template.
   await sendEmail({
     to: recipientEmail,
     subject: 'Ihr Lieferschein',
@@ -127,10 +125,8 @@ export async function sendInvoiceEmail(
   invoiceId: string,
   recipientEmail: string
 ): Promise<void> {
-  // TODO: Hole Rechnungs-Daten aus DB
-  // TODO: Generiere PDF
-  // TODO: Verwende Email-Template
-
+  // STUB: Invoice email is not yet implemented (no callers).
+  // Needs: fetch invoice from DB, generate PDF, use email template.
   await sendEmail({
     to: recipientEmail,
     subject: 'Ihre Rechnung',

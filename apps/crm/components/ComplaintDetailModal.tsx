@@ -133,7 +133,7 @@ const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({
     const file = e.target.files?.[0]
     if (!file) return
 
-    // TODO: Upload zu Supabase Storage implementieren
+    // NOTE: File upload to Supabase Storage for complaint attachments not yet implemented
     // Datei wird aktuell nicht gespeichert
 
     // Status automatisch auf 'ab_confirmed' setzen wenn noch nicht gesetzt

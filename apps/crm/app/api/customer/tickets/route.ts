@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. Optional: Notification an CRM senden
-    // TODO: Implement notification system
+    // NOTE: Notification system (email/push) for new tickets not yet implemented
     // await notifyNewTicket(ticket.id, project_id)
 
     // 8. Erfolg

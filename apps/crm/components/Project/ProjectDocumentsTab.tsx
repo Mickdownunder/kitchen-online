@@ -572,7 +572,7 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
         const { downloadCustomerDeliveryNotePDF } = await import('../CustomerDeliveryNotePDF')
         await downloadCustomerDeliveryNotePDF(doc.data.note, doc.data.project, companySettings)
       } else if (doc.type === 'supplier-delivery-note') {
-        // TODO: PDF für Lieferanten-Lieferscheine
+        // NOTE: PDF generation for supplier delivery notes is not yet available
         alert('PDF-Download für Lieferanten-Lieferscheine wird noch implementiert.')
       } else {
         // Für andere Dokumente: Download des ursprünglichen Dokuments

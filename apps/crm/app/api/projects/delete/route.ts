@@ -60,7 +60,7 @@ export async function DELETE(request: NextRequest) {
         return apiErrors.notFound({ component: 'api/projects/delete', projectId: id })
       }
 
-      // TODO: Re-enable soft delete after applying migration: supabase/migrations/20260126113814_add_deleted_at_to_projects.sql
+      // NOTE: Re-enable soft delete after applying migration: supabase/migrations/20260126113814_add_deleted_at_to_projects.sql
       // Soft Delete: Setze deleted_at Timestamp
       // const { error: deleteError } = await supabase
       //   .from('projects')
