@@ -6,6 +6,7 @@ import { inviteUserSchema } from '@/lib/validations/users'
 import { logger } from '@/lib/utils/logger'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 import { logAuditEvent } from '@/lib/supabase/services/audit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 export async function POST(request: NextRequest) {
   const apiLogger = logger.api('/api/users/invite', 'POST')
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     // Rate limiting (stricter for invite endpoint)
@@ -30,36 +31,19 @@ export async function POST(request: NextRequest) {
     if (!limitCheck || !limitCheck.allowed) {
       apiLogger.end(startTime, 429)
       const resetTime = limitCheck?.resetTime || Date.now() + 60000
-      return NextResponse.json(
-        {
-          error: 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.',
-          resetTime,
-        },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString(),
-            'X-RateLimit-Limit': '10',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': resetTime.toString(),
-          },
-        }
-      )
+      return apiErrors.rateLimit(resetTime)
     }
 
     const { data: canManage, error: canManageError } = await supabase.rpc('can_manage_users')
     if (canManageError || !canManage) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zur Benutzerverwaltung' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Validate request body
@@ -76,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       apiLogger.error(new Error(result.error || 'Failed to create invite'), 400)
-      return NextResponse.json({ error: result.error }, { status: 400 })
+      return apiErrors.badRequest()
     }
 
     apiLogger.end(startTime, 200)
@@ -125,9 +109,6 @@ export async function POST(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/users/invite' })
   }
 }

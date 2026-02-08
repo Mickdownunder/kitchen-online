@@ -4,6 +4,7 @@ import { validateRequest } from '@/lib/middleware/validateRequest'
 // upsertRolePermissionSchema removed - using inline validation
 import { z } from 'zod'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 // GET: Get permissions catalog and current role permissions
 export async function GET() {
@@ -21,19 +22,19 @@ export async function GET() {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { data: canManage, error: canManageError } = await supabase.rpc('can_manage_users')
     if (canManageError || !canManage) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Get permissions catalog
@@ -83,10 +84,7 @@ export async function GET() {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/users/permissions' })
   }
 }
 
@@ -106,20 +104,20 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { data: canManage, error: canManageError } = await supabase.rpc('can_manage_users')
     if (canManageError || !canManage) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: currentCompanyId, error: companyError } =
       await supabase.rpc('get_current_company_id')
     if (companyError || !currentCompanyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Validate request body
@@ -156,7 +154,7 @@ export async function POST(request: NextRequest) {
         error as Error
       )
       apiLogger.end(startTime, 400)
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return apiErrors.badRequest()
     }
 
     apiLogger.end(startTime, 200)
@@ -177,9 +175,6 @@ export async function POST(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/users/permissions' })
   }
 }

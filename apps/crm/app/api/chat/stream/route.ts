@@ -5,6 +5,7 @@ import { buildProjectSummary } from '@/lib/ai/projectSummary'
 import { buildSystemInstruction } from '@/lib/ai/systemInstruction'
 import { logger } from '@/lib/utils/logger'
 import { rateLimit } from '@/lib/middleware/rateLimit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 import { createClient } from '@/lib/supabase/server'
 import { executeServerFunctionCall } from '../serverHandlers'
 
@@ -29,58 +30,35 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'edit_projects',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zur Nutzung des AI-Assistenten' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     // Rate limiting
     const userId = user.id
 
     const limitCheck = await rateLimit(request, userId)
-    if (!limitCheck || !limitCheck.allowed) {
-      logger.warn('Rate limit exceeded', { component: 'api/chat/stream', userId })
-      const resetTime = limitCheck?.resetTime || Date.now() + 60000
-      return new Response(
-        JSON.stringify({
-          error: 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.',
-          resetTime,
-        }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString(),
-            'X-RateLimit-Limit': '20',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': resetTime.toString(),
-          },
-        }
-      )
+    if (limitCheck && !limitCheck.allowed) {
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY is not configured' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return apiErrors.internal(new Error('GEMINI_API_KEY is not configured'), { component: 'chat-stream' })
     }
 
     // Parse request body
@@ -107,13 +85,7 @@ export async function POST(request: NextRequest) {
         component: 'api/chat/stream',
         message: errMessage,
       }, parseError as Error)
-      return new Response(
-        JSON.stringify({
-          error: 'Request body zu groß oder ungültig.',
-          details: errMessage,
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
+      return apiErrors.badRequest()
     }
 
     const { message, projects, chatHistory } = requestBody
@@ -123,17 +95,11 @@ export async function POST(request: NextRequest) {
     const MAX_PROJECTS = 500
     const msg = typeof message === 'string' ? message : ''
     if (msg.length > MAX_MESSAGE_LENGTH) {
-      return new Response(
-        JSON.stringify({ error: `Nachricht zu lang (max. ${MAX_MESSAGE_LENGTH} Zeichen).` }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
+      return apiErrors.validation()
     }
     const projectList = Array.isArray(projects) ? projects : []
     if (projectList.length > MAX_PROJECTS) {
-      return new Response(
-        JSON.stringify({ error: `Zu viele Projekte (max. ${MAX_PROJECTS}).` }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
+      return apiErrors.validation()
     }
 
     logger.info('Chat Stream API request received', {
@@ -348,11 +314,6 @@ export async function POST(request: NextRequest) {
     logger.error('Chat Stream API error', {
       component: 'api/chat/stream',
     }, error as Error)
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Failed to process chat message',
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
+    return apiErrors.internal(error as Error, { component: 'chat-stream' })
   }
 }

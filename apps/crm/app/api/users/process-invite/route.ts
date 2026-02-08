@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { processPendingInviteForUser } from '@/lib/supabase/admin'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 // Called after user logs in to check for pending invites
 export async function POST() {
@@ -14,7 +15,7 @@ export async function POST() {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (!user.email) {
@@ -30,9 +31,6 @@ export async function POST() {
     })
   } catch (error: unknown) {
     console.error('Process invite API error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/users/process-invite' })
   }
 }

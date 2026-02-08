@@ -10,6 +10,7 @@ import { getCompanySettings, getBankAccounts } from '@/lib/supabase/services/com
 import { getInvoices } from '@/lib/supabase/services/invoices'
 import { createServiceClient } from '@/lib/supabase/server'
 import { CustomerProject, InvoiceItem } from '@/types'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 type DocumentType = 'invoice' | 'delivery_note' | 'order'
 
@@ -71,33 +72,27 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const body: PublishRequest = await request.json()
     const { documentType, projectId, invoice, project } = body
 
     if (!documentType || !projectId || !project) {
-      return NextResponse.json(
-        { error: 'Fehlende Parameter' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     if (project.id && project.id !== projectId) {
-      return NextResponse.json(
-        { error: 'Projekt-ID stimmt nicht überein' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const permissionCode = documentType === 'invoice' ? 'create_invoices' : 'edit_projects'
@@ -105,7 +100,7 @@ export async function POST(request: NextRequest) {
       p_permission_code: permissionCode,
     })
     if (permError || !hasPermission) {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const serviceClient = await createServiceClient()
@@ -116,7 +111,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !projectRow) {
-      return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     const { data: ownerMembership, error: membershipError } = await serviceClient
@@ -128,7 +123,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (membershipError || !ownerMembership) {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Load company settings and bank account
@@ -301,10 +296,7 @@ export async function POST(request: NextRequest) {
       portalType = 'KAUFVERTRAG'
 
     } else {
-      return NextResponse.json(
-        { error: 'Ungültiger Dokumenttyp oder fehlende Daten' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     // Check if document already exists (prevent duplicates)
@@ -345,10 +337,7 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError)
-      return NextResponse.json(
-        { error: 'Fehler beim Hochladen' },
-        { status: 500 }
-      )
+      return apiErrors.internal(uploadError as unknown as Error, { component: 'api/portal/publish-document' })
     }
 
     // Create document record
@@ -373,10 +362,7 @@ export async function POST(request: NextRequest) {
       console.error('Database insert error:', dbError)
       // Cleanup storage
       await serviceClient.storage.from('documents').remove([storagePath])
-      return NextResponse.json(
-        { error: 'Fehler beim Speichern' },
-        { status: 500 }
-      )
+      return apiErrors.internal(new Error(dbError.message), { component: 'api/portal/publish-document' })
     }
 
     return NextResponse.json({
@@ -388,9 +374,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: unknown) {
     console.error('Error publishing document:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Fehler beim Veröffentlichen' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/portal/publish-document' })
   }
 }

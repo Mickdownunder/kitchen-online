@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 const CreateApplianceSchema = z.object({
   projectId: z.string().uuid(),
@@ -28,19 +29,19 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'UNAUTHORIZED' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     // Check not customer
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ success: false, error: 'FORBIDDEN' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
 
     if (!projectId) {
-      return NextResponse.json({ success: false, error: 'PROJECT_ID_REQUIRED' }, { status: 400 })
+      return apiErrors.badRequest()
     }
 
     // Use service client for database
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!companyMember?.company_id) {
-      return NextResponse.json({ success: false, error: 'NO_COMPANY' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Verify project belongs to company
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!project) {
-      return NextResponse.json({ success: false, error: 'PROJECT_NOT_FOUND' }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     // Get appliances
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching appliances:', error)
-      return NextResponse.json({ success: false, error: 'FETCH_ERROR' }, { status: 500 })
+      return apiErrors.internal(new Error('FETCH_ERROR'), { component: 'api/appliances' })
     }
 
     return NextResponse.json({
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Get appliances error:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR' }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/appliances' })
   }
 }
 
@@ -107,22 +108,18 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'UNAUTHORIZED' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ success: false, error: 'FORBIDDEN' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const body = await request.json()
     const parsed = CreateApplianceSchema.safeParse(body)
     
     if (!parsed.success) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'VALIDATION_ERROR',
-        details: parsed.error.flatten().fieldErrors 
-      }, { status: 400 })
+      return apiErrors.validation()
     }
 
     const data = parsed.data
@@ -142,7 +139,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!companyMember?.company_id) {
-      return NextResponse.json({ success: false, error: 'NO_COMPANY' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Create appliance
@@ -169,7 +166,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating appliance:', error)
-      return NextResponse.json({ success: false, error: 'CREATE_ERROR' }, { status: 500 })
+      return apiErrors.internal(new Error('CREATE_ERROR'), { component: 'api/appliances' })
     }
 
     return NextResponse.json({
@@ -179,6 +176,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Create appliance error:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR' }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/appliances' })
   }
 }

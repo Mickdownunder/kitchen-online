@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/middleware/rateLimit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -13,35 +15,37 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
+    }
+
+    const limitCheck = await rateLimit(request, user.id)
+    if (limitCheck && !limitCheck.allowed) {
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'edit_projects',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+      return apiErrors.internal(new Error('GEMINI_API_KEY is not configured'), { component: 'analyze-document' })
     }
 
     const { base64Data, mimeType, prompt } = await request.json()
     if (!base64Data || !mimeType) {
-      return NextResponse.json(
-        { error: 'base64Data und mimeType sind erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     const response = await ai.models.generateContent({
@@ -60,10 +64,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysis: response.text })
   } catch (error: unknown) {
-    console.error('Document analysis error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to analyze document' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'analyze-document' })
   }
 }

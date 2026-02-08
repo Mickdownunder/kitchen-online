@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 const UpdateApplianceSchema = z.object({
   manufacturer: z.string().min(1).max(100).optional(),
@@ -32,11 +33,11 @@ export async function GET(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'UNAUTHORIZED' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ success: false, error: 'FORBIDDEN' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const db = createServiceClient(
@@ -53,7 +54,7 @@ export async function GET(
       .single()
 
     if (!companyMember?.company_id) {
-      return NextResponse.json({ success: false, error: 'NO_COMPANY' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: appliance, error } = await db
@@ -64,14 +65,14 @@ export async function GET(
       .single()
 
     if (error || !appliance) {
-      return NextResponse.json({ success: false, error: 'NOT_FOUND' }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     return NextResponse.json({ success: true, data: appliance })
 
   } catch (error) {
     console.error('Get appliance error:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR' }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/appliances/[id]' })
   }
 }
 
@@ -90,22 +91,18 @@ export async function PATCH(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'UNAUTHORIZED' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ success: false, error: 'FORBIDDEN' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const body = await request.json()
     const parsed = UpdateApplianceSchema.safeParse(body)
     
     if (!parsed.success) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'VALIDATION_ERROR',
-        details: parsed.error.flatten().fieldErrors 
-      }, { status: 400 })
+      return apiErrors.validation()
     }
 
     const data = parsed.data
@@ -124,7 +121,7 @@ export async function PATCH(
       .single()
 
     if (!companyMember?.company_id) {
-      return NextResponse.json({ success: false, error: 'NO_COMPANY' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Build update object
@@ -151,14 +148,14 @@ export async function PATCH(
 
     if (error || !appliance) {
       console.error('Error updating appliance:', error)
-      return NextResponse.json({ success: false, error: 'UPDATE_ERROR' }, { status: 500 })
+      return apiErrors.internal(new Error('UPDATE_ERROR'), { component: 'api/appliances/[id]' })
     }
 
     return NextResponse.json({ success: true, data: appliance })
 
   } catch (error) {
     console.error('Update appliance error:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR' }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/appliances/[id]' })
   }
 }
 
@@ -177,11 +174,11 @@ export async function DELETE(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'UNAUTHORIZED' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ success: false, error: 'FORBIDDEN' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const db = createServiceClient(
@@ -198,7 +195,7 @@ export async function DELETE(
       .single()
 
     if (!companyMember?.company_id) {
-      return NextResponse.json({ success: false, error: 'NO_COMPANY' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { error } = await db
@@ -209,13 +206,13 @@ export async function DELETE(
 
     if (error) {
       console.error('Error deleting appliance:', error)
-      return NextResponse.json({ success: false, error: 'DELETE_ERROR' }, { status: 500 })
+      return apiErrors.internal(new Error('DELETE_ERROR'), { component: 'api/appliances/[id]' })
     }
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
     console.error('Delete appliance error:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR' }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/appliances/[id]' })
   }
 }

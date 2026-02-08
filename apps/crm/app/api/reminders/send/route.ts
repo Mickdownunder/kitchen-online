@@ -6,6 +6,7 @@ import { getInvoice, updateInvoice } from '@/lib/supabase/services/invoices'
 import { reminderTemplate } from '@/lib/utils/emailTemplates'
 import { calculateOverdueDays, canSendReminder } from '@/hooks/useInvoiceCalculations'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 import { Reminder } from '@/types'
 import { generatePDF } from '@/lib/pdf/pdfGenerator'
 import { getCompanySettings } from '@/lib/supabase/services/company'
@@ -45,14 +46,14 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     // Check company context
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Check permission
@@ -61,10 +62,7 @@ export async function POST(request: NextRequest) {
     })
     if (permError || !hasPermission) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Versenden von Mahnungen' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     const body = await request.json()
@@ -80,29 +78,23 @@ export async function POST(request: NextRequest) {
 
     if (!projectId || !invoiceId || !reminderType) {
       apiLogger.error(new Error('Missing required fields'), 400)
-      return NextResponse.json(
-        { error: 'Fehlende Parameter: projectId, invoiceId und reminderType sind erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     if (!['first', 'second', 'final'].includes(reminderType)) {
-      return NextResponse.json(
-        { error: 'Ungültiger reminderType. Muss "first", "second" oder "final" sein.' },
-        { status: 400 }
-      )
+      return apiErrors.validation()
     }
 
     // Lade Projekt FRISCH aus der Datenbank
     const project = await getProject(projectId)
     if (!project) {
-      return NextResponse.json({ error: `Projekt ${projectId} nicht gefunden` }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     // Lade Rechnung aus der neuen invoices-Tabelle
     const invoice = await getInvoice(invoiceId)
     if (!invoice) {
-      return NextResponse.json({ error: `Rechnung ${invoiceId} nicht gefunden` }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     // Konvertiere für Kompatibilität
@@ -119,10 +111,7 @@ export async function POST(request: NextRequest) {
 
     // Prüfe ob Rechnung bezahlt ist
     if (invoice.isPaid) {
-      return NextResponse.json(
-        { error: 'Rechnung ist bereits bezahlt. Keine Mahnung erforderlich.' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     // Lade Company Settings für Mahnungs-Einstellungen
@@ -142,12 +131,7 @@ export async function POST(request: NextRequest) {
         daysBetweenReminders
       )
     ) {
-      return NextResponse.json(
-        {
-          error: `Mahnung "${reminderType}" kann derzeit nicht gesendet werden. Prüfe ob Voraussetzungen erfüllt sind.`,
-        },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     // Berechne überfällige Tage
@@ -157,13 +141,7 @@ export async function POST(request: NextRequest) {
     // Bestimme E-Mail-Adresse (Vorschau-Bestätigung kann eigene Adresse übergeben)
     const email = bodyRecipientEmail || project.email
     if (!email) {
-      return NextResponse.json(
-        {
-          error:
-            'Keine E-Mail-Adresse gefunden. Bitte E-Mail-Adresse im Projekt oder als Parameter angeben.',
-        },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     // E-Mail-Inhalt: Vorschau-Overrides oder generiertes Template
@@ -247,12 +225,7 @@ export async function POST(request: NextRequest) {
         },
         error as Error
       )
-      return NextResponse.json(
-        {
-          error: `Fehler beim Versenden der E-Mail: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
-        },
-        { status: 500 }
-      )
+      return apiErrors.internal(error as Error, { component: 'api/reminders/send' })
     }
 
     // Erstelle Reminder-Objekt
@@ -302,9 +275,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     apiLogger.error(error as Error, 500)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Interner Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/reminders/send' })
   }
 }

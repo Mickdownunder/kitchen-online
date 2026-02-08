@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 // PATCH /api/invoice-items/[id]/appliance
 // Updates appliance/warranty fields for an invoice item
@@ -14,18 +15,18 @@ export async function PATCH(
     // Verify user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/invoice-items/appliance' })
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'edit_projects',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/invoice-items/appliance' })
     }
 
     const body = await request.json()
@@ -54,18 +55,12 @@ export async function PATCH(
 
     if (error) {
       console.error('Error updating invoice item appliance data:', error)
-      return NextResponse.json(
-        { error: 'Fehler beim Speichern' },
-        { status: 500 }
-      )
+      return apiErrors.internal(error as unknown as Error, { component: 'api/invoice-items/appliance', itemId: id })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('Error in appliance PATCH:', error)
-    return NextResponse.json(
-      { error: 'Interner Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/invoice-items/appliance' })
   }
 }

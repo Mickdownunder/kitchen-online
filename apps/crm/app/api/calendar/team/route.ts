@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 /**
  * GET: List team members for calendar (id + full_name)
@@ -21,7 +22,7 @@ export async function GET() {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
@@ -29,7 +30,7 @@ export async function GET() {
     })
     if (permError || !hasPermission) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: members, error: membersError } = await supabase.rpc('get_company_members')
@@ -40,7 +41,7 @@ export async function GET() {
         membersError as Error
       )
       apiLogger.end(startTime, 500)
-      return NextResponse.json({ error: 'Fehler beim Laden des Teams' }, { status: 500 })
+      return apiErrors.internal(membersError as Error, { component: 'api/calendar/team' })
     }
 
     const team = (members || [])
@@ -59,9 +60,6 @@ export async function GET() {
       { component: 'api/calendar/team' },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/calendar/team' })
   }
 }

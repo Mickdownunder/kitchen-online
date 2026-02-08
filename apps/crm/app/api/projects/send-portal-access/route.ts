@@ -5,6 +5,7 @@ import { sendEmail } from '@/lib/supabase/services/email'
 import { getCompanySettings } from '@/lib/supabase/services/company'
 import { portalAccessTemplate } from '@/lib/email-templates/portal-access'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 
 function generateAccessCode(length = 12): string {
@@ -34,47 +35,35 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const limitCheck = await rateLimit(request, user.id)
-    if (!limitCheck?.allowed) {
+    if (limitCheck && !limitCheck.allowed) {
       apiLogger.end(startTime, 429)
-      return NextResponse.json(
-        { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
-        { status: 429 }
-      )
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     const body = await request.json()
     const { projectId } = body
 
     if (!projectId || typeof projectId !== 'string') {
-      return NextResponse.json(
-        { error: 'projectId ist erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     const project = await getProject(projectId, supabase)
     if (!project) {
-      return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     const customerEmail = project.email
     if (!customerEmail?.trim()) {
-      return NextResponse.json(
-        {
-          error:
-            'Keine E-Mail-Adresse für den Kunden hinterlegt. Bitte tragen Sie die Kunden-E-Mail in den Stammdaten ein.',
-        },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     let accessCode = project.accessCode
@@ -91,19 +80,10 @@ export async function POST(request: NextRequest) {
           component: 'api/projects/send-portal-access',
           projectId,
         }, updateError as Error)
-        return NextResponse.json(
-          { error: 'Projektcode konnte nicht gespeichert werden' },
-          { status: 500 }
-        )
+        return apiErrors.internal(updateError as Error, { component: 'api/projects/send-portal-access' })
       }
       if (!updated?.length) {
-        return NextResponse.json(
-          {
-            error:
-              'Sie haben keine Berechtigung, den Projektcode zu setzen. Nur der Projekt-Owner oder Kollegen derselben Firma können den Portal-Zugang senden.',
-          },
-          { status: 403 }
-        )
+        return apiErrors.forbidden()
       }
     }
 
@@ -138,12 +118,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     apiLogger.error(error as Error, 500)
-    const message =
-      error instanceof Error
-        ? error.message
-        : typeof error === 'string'
-          ? error
-          : 'Fehler beim Senden des Portal-Zugangs'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/projects/send-portal-access' })
   }
 }

@@ -4,6 +4,7 @@ import { renderToBuffer } from '@react-pdf/renderer'
 import React from 'react'
 import { CustomerDeliveryNotePDFDocumentServer } from '@/lib/pdf/DeliveryNotePDFServer'
 import { getCompanySettings } from '@/lib/supabase/services/company'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,36 +15,30 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/delivery-note/pdf' })
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/delivery-note/pdf' })
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'edit_projects',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Generieren von Lieferscheinen' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden({ component: 'api/delivery-note/pdf' })
     }
 
     const body = await request.json()
     const { deliveryNote, project } = body
 
     if (!deliveryNote || !project) {
-      return NextResponse.json(
-        { error: 'Fehlende Parameter: deliveryNote und project sind erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest({ component: 'api/delivery-note/pdf' })
     }
 
     // Lade Company Settings server-seitig
@@ -79,9 +74,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error('Error generating delivery note PDF:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Fehler beim Generieren der PDF' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/delivery-note/pdf' })
   }
 }

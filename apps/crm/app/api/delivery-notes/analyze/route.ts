@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI, Type } from '@google/genai'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/middleware/rateLimit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -13,36 +15,38 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
+    }
+
+    const limitCheck = await rateLimit(request, user.id)
+    if (limitCheck && !limitCheck.allowed) {
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'edit_projects',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Analysieren von Lieferscheinen' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+      return apiErrors.internal(new Error('GEMINI_API_KEY is not configured'), { component: 'delivery-notes-analyze' })
     }
 
     const { rawText, supplierName } = await request.json()
 
     if (!rawText) {
-      return NextResponse.json({ error: 'rawText is required' }, { status: 400 })
+      return apiErrors.badRequest()
     }
 
     // Get all projects for matching (scoped to company)
@@ -54,7 +58,7 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
 
     if (membersError) {
-      return NextResponse.json({ error: 'Fehler beim Laden der Mitglieder' }, { status: 500 })
+      return apiErrors.internal(new Error('Fehler beim Laden der Mitglieder'), { component: 'delivery-notes-analyze' })
     }
 
     const memberUserIds = (members || []).map(m => m.user_id).filter(Boolean)
@@ -84,7 +88,7 @@ export async function POST(request: NextRequest) {
         .in('user_id', memberUserIds)
 
       if (projectsError) {
-        return NextResponse.json({ error: 'Fehler beim Laden der Projekte' }, { status: 500 })
+        return apiErrors.internal(new Error('Fehler beim Laden der Projekte'), { component: 'delivery-notes-analyze' })
       }
 
       projects = (projectRows || []).map(project => ({
@@ -231,10 +235,6 @@ Antworte mit projectId und confidence (0.0-1.0).`,
       },
     })
   } catch (error: unknown) {
-    console.error('Delivery note analysis error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to analyze delivery note' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'delivery-notes-analyze' })
   }
 }

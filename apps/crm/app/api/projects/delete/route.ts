@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -11,22 +12,19 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Fehlende Parameter: id ist erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest({ component: 'api/projects/delete' })
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/projects/delete' })
     }
 
     // KRITISCH: Permission-Check - prüfe ob User die Berechtigung hat, Projekte zu löschen
@@ -46,10 +44,7 @@ export async function DELETE(request: NextRequest) {
           permError
         )
       }
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Löschen von Projekten' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden({ component: 'api/projects/delete', userId: user.id, projectId: id })
     }
 
     try {
@@ -62,7 +57,7 @@ export async function DELETE(request: NextRequest) {
         .single()
 
       if (fetchError || !projectData) {
-        return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
+        return apiErrors.notFound({ component: 'api/projects/delete', projectId: id })
       }
 
       // TODO: Re-enable soft delete after applying migration: supabase/migrations/20260126113814_add_deleted_at_to_projects.sql
@@ -142,13 +137,10 @@ export async function DELETE(request: NextRequest) {
       )
 
       if (errMsg.includes('nicht gefunden')) {
-        return NextResponse.json({ error: errMsg }, { status: 404 })
+        return apiErrors.notFound({ component: 'api/projects/delete', projectId: id })
       }
 
-      return NextResponse.json(
-        { error: errMsg || 'Fehler beim Löschen des Projekts' },
-        { status: 500 }
-      )
+      return apiErrors.internal(error as Error, { component: 'api/projects/delete', projectId: id })
     }
   } catch (error: unknown) {
     logger.error(
@@ -158,9 +150,6 @@ export async function DELETE(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/projects/delete' })
   }
 }

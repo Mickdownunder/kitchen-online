@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getProject } from '@/lib/supabase/services/projects'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
   try {
     const { id: projectId } = await params
     if (!projectId) {
-      return NextResponse.json({ error: 'Projekt-ID fehlt' }, { status: 400 })
+      return apiErrors.badRequest({ component: 'api/projects/order-sign-audit' })
     }
 
     const supabase = await createClient()
@@ -25,17 +26,17 @@ export async function GET(
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/projects/order-sign-audit' })
     }
 
     // Prüfen ob User Zugriff auf Projekt hat
     const project = await getProject(projectId, supabase)
     if (!project) {
-      return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
+      return apiErrors.notFound({ component: 'api/projects/order-sign-audit', projectId })
     }
 
     const serviceSupabase = await createServiceClient()
@@ -49,18 +50,12 @@ export async function GET(
 
     if (error) {
       console.error('Order sign audit fetch error:', error)
-      return NextResponse.json(
-        { error: 'Keine Audit-Daten gefunden' },
-        { status: 500 }
-      )
+      return apiErrors.internal(error as unknown as Error, { component: 'api/projects/order-sign-audit', projectId })
     }
 
     return NextResponse.json(data || null)
   } catch (error) {
     console.error('Order sign audit API error:', error)
-    return NextResponse.json(
-      { error: 'Ein unerwarteter Fehler ist aufgetreten' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/projects/order-sign-audit' })
   }
 }

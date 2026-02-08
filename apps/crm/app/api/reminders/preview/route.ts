@@ -5,6 +5,7 @@ import { getInvoice } from '@/lib/supabase/services/invoices'
 import { reminderTemplate } from '@/lib/utils/emailTemplates'
 import { calculateOverdueDays, canSendReminder } from '@/hooks/useInvoiceCalculations'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 import { getCompanySettings } from '@/lib/supabase/services/company'
 
 /**
@@ -22,49 +23,40 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'mark_payments',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Versenden von Mahnungen' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     const body = await request.json()
     const { projectId, invoiceId, reminderType } = body
 
     if (!projectId || !invoiceId || !reminderType) {
-      return NextResponse.json(
-        { error: 'Fehlende Parameter: projectId, invoiceId und reminderType sind erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     if (!['first', 'second', 'final'].includes(reminderType)) {
-      return NextResponse.json(
-        { error: 'Ungültiger reminderType. Muss "first", "second" oder "final" sein.' },
-        { status: 400 }
-      )
+      return apiErrors.validation()
     }
 
     const project = await getProject(projectId)
     if (!project) {
-      return NextResponse.json({ error: `Projekt ${projectId} nicht gefunden` }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     const invoice = await getInvoice(invoiceId)
     if (!invoice) {
-      return NextResponse.json({ error: `Rechnung ${invoiceId} nicht gefunden` }, { status: 404 })
+      return apiErrors.notFound()
     }
 
     const invoiceForReminder = {
@@ -79,10 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (invoice.isPaid) {
-      return NextResponse.json(
-        { error: 'Rechnung ist bereits bezahlt. Keine Mahnung erforderlich.' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     const companySettings = await getCompanySettings()
@@ -100,12 +89,7 @@ export async function POST(request: NextRequest) {
         daysBetweenReminders
       )
     ) {
-      return NextResponse.json(
-        {
-          error: `Mahnung "${reminderType}" kann derzeit nicht gesendet werden. Prüfe ob Voraussetzungen erfüllt sind.`,
-        },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     const dueDate = invoiceForReminder.dueDate || invoiceForReminder.date
@@ -149,9 +133,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     logger.error('Reminder preview failed', { component: 'api/reminders/preview' }, error as Error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Interner Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/reminders/preview' })
   }
 }

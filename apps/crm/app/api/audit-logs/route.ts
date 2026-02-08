@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
 import { rateLimit } from '@/lib/middleware/rateLimit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 // GET - Read audit logs (nur für authentifizierte CRM-User mit Admin-Rolle)
 export async function GET(request: NextRequest) {
@@ -15,20 +16,20 @@ export async function GET(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     // Keine Kunden
     if (user.app_metadata?.role === 'customer') {
       apiLogger.error(new Error('No permission - customer role'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/audit-logs' })
     }
 
     // Company-Check
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/audit-logs' })
     }
 
     // Permission-Check: Nur Admin-Rollen dürfen Audit-Logs lesen
@@ -42,16 +43,13 @@ export async function GET(request: NextRequest) {
 
     if (!member || !['geschaeftsfuehrer', 'administration'].includes(member.role)) {
       apiLogger.error(new Error('No permission - insufficient role'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung für Audit-Logs' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/audit-logs' })
     }
 
     // Rate Limiting
     const limitCheck = await rateLimit(request, user.id)
     if (!limitCheck?.allowed) {
-      return NextResponse.json(
-        { error: 'Zu viele Anfragen', resetTime: limitCheck?.resetTime },
-        { status: 429 }
-      )
+      return apiErrors.rateLimit(limitCheck?.resetTime)
     }
 
     const searchParams = request.nextUrl.searchParams
@@ -83,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     if (fetchError) {
       logger.error('Audit logs fetch failed', { component: 'api/audit-logs', message: fetchError.message }, fetchError)
-      return NextResponse.json({ error: 'Fehler beim Laden der Audit-Logs' }, { status: 500 })
+      return apiErrors.internal(fetchError as unknown as Error, { component: 'api/audit-logs' })
     }
 
     const list = (rows || []) as { id: string; user_id: string | null; action: string; entity_type: string; entity_id: string | null; changes: unknown; metadata: unknown; created_at: string }[]
@@ -140,7 +138,7 @@ export async function GET(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json({ error: 'Fehler beim Laden der Audit-Logs' }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/audit-logs' })
   }
 }
 
@@ -156,30 +154,27 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     // Keine Kunden
     if (user.app_metadata?.role === 'customer') {
       apiLogger.error(new Error('No permission - customer role'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/audit-logs' })
     }
 
     // Company-Check
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/audit-logs' })
     }
 
     const body = await request.json()
     const { action, entityType, entityId, changes, metadata } = body
 
     if (!action || !entityType) {
-      return NextResponse.json(
-        { error: 'action und entityType sind erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.validation({ component: 'api/audit-logs' })
     }
 
     // Direkt in audit_logs schreiben mit Service-Client, damit company_id garantiert gesetzt ist
@@ -205,7 +200,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       logger.error('Audit log insert failed', { component: 'api/audit-logs', action }, insertError)
-      return NextResponse.json({ error: 'Fehler beim Schreiben des Audit-Logs' }, { status: 500 })
+      return apiErrors.internal(insertError as unknown as Error, { component: 'api/audit-logs', action })
     }
 
     apiLogger.complete({ logId: row?.id })
@@ -219,6 +214,6 @@ export async function POST(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json({ error: 'Fehler beim Erstellen des Audit-Logs' }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/audit-logs' })
   }
 }

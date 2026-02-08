@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai'
 import { createDeliveryNote } from '@/lib/supabase/services'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -20,13 +21,13 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     // Check company context
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'delivery-notes-api' })
     }
 
     // Check permission
@@ -34,10 +35,7 @@ export async function POST(request: NextRequest) {
       p_permission_code: 'edit_projects',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Hochladen von Lieferscheinen' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden({ component: 'delivery-notes-api' })
     }
 
     // Akzeptiere JSON mit Base64-Daten (zuverlässiger als FormData für große Dateien)
@@ -45,7 +43,7 @@ export async function POST(request: NextRequest) {
     const { base64Data, mimeType, supplierName, deliveryDate } = body
 
     if (!base64Data || !mimeType) {
-      return NextResponse.json({ error: 'base64Data and mimeType are required' }, { status: 400 })
+      return apiErrors.badRequest({ component: 'delivery-notes-api' })
     }
 
     logger.debug('Base64 data received', {
@@ -131,9 +129,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     logger.error('Delivery note upload error', { component: 'delivery-notes-api' }, error as Error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to upload delivery note' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'delivery-notes-api' })
   }
 }

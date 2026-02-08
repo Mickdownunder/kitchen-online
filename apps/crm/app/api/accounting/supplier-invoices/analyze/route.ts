@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import { rateLimit } from '@/lib/middleware/rateLimit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -75,34 +77,30 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
+    }
+
+    const limitCheck = await rateLimit(request, user.id)
+    if (limitCheck && !limitCheck.allowed) {
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'menu_accounting',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json(
-        { error: 'Keine Berechtigung für Buchhaltung' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: 'GEMINI_API_KEY ist nicht konfiguriert' },
-        { status: 500 }
-      )
+      return apiErrors.internal(new Error('GEMINI_API_KEY ist nicht konfiguriert'), { component: 'supplier-invoice-analyze' })
     }
 
     const body = await request.json()
     const { base64Data, mimeType } = body as { base64Data?: string; mimeType?: string }
 
     if (!base64Data || !mimeType) {
-      return NextResponse.json(
-        { error: 'base64Data und mimeType sind erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     const response = await ai.models.generateContent({
@@ -127,18 +125,12 @@ export async function POST(request: NextRequest) {
         { component: 'supplier-invoice-analyze', text: text.slice(0, 300) },
         parseError as Error
       )
-      return NextResponse.json(
-        { error: 'Rechnung konnte nicht ausgelesen werden. Bitte Felder manuell eintragen.' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     return NextResponse.json(result)
   } catch (error) {
     logger.error('Supplier invoice analyze error', { component: 'supplier-invoice-analyze' }, error as Error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Auslesen fehlgeschlagen' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'supplier-invoice-analyze' })
   }
 }

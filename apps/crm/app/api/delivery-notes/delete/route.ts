@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAuditEvent } from '@/lib/supabase/services/audit'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -20,15 +21,12 @@ export async function DELETE(request: NextRequest) {
     const type = searchParams.get('type') || 'supplier' // 'supplier' oder 'customer'
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Fehlende Parameter: id ist erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest({ component: 'api/delivery-notes/delete' })
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden({ component: 'api/delivery-notes/delete' })
     }
 
     // KRITISCH: Permission-Check - prüfe ob User die Berechtigung hat, Lieferscheine zu löschen
@@ -47,10 +45,7 @@ export async function DELETE(request: NextRequest) {
           permError
         )
       }
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Löschen von Lieferscheinen' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden({ component: 'api/delivery-notes/delete', userId: user.id })
     }
 
     try {
@@ -67,7 +62,7 @@ export async function DELETE(request: NextRequest) {
           .single()
 
         if (error || !data) {
-          return NextResponse.json({ error: 'Kunden-Lieferschein nicht gefunden' }, { status: 404 })
+          return apiErrors.notFound({ component: 'api/delivery-notes/delete', deliveryNoteId: id, type: 'customer' })
         }
 
         deliveryNoteData = {
@@ -104,7 +99,7 @@ export async function DELETE(request: NextRequest) {
           .single()
 
         if (error || !data) {
-          return NextResponse.json({ error: 'Lieferschein nicht gefunden' }, { status: 404 })
+          return apiErrors.notFound({ component: 'api/delivery-notes/delete', deliveryNoteId: id, type: 'supplier' })
         }
 
         deliveryNoteData = {
@@ -221,13 +216,10 @@ export async function DELETE(request: NextRequest) {
       )
 
       if (errMsg.includes('nicht gefunden')) {
-        return NextResponse.json({ error: errMsg }, { status: 404 })
+        return apiErrors.notFound({ component: 'api/delivery-notes/delete', deliveryNoteId: id, type })
       }
 
-      return NextResponse.json(
-        { error: errMsg || 'Fehler beim Löschen des Lieferscheins' },
-        { status: 500 }
-      )
+      return apiErrors.internal(error as Error, { component: 'api/delivery-notes/delete', deliveryNoteId: id, type })
     }
   } catch (error: unknown) {
     logger.error(
@@ -237,9 +229,6 @@ export async function DELETE(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/delivery-notes/delete' })
   }
 }

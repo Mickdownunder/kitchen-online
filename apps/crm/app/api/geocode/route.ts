@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -11,17 +12,17 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ suggestions: [] }, { status: 401 })
+    return apiErrors.unauthorized()
   }
 
   if (user.app_metadata?.role === 'customer') {
-    return NextResponse.json({ suggestions: [] }, { status: 403 })
+    return apiErrors.forbidden()
   }
 
   // Rate Limiting
   const limitCheck = await rateLimit(request, user.id)
   if (!limitCheck?.allowed) {
-    return NextResponse.json({ suggestions: [], error: 'RATE_LIMITED' }, { status: 429 })
+    return apiErrors.rateLimit()
   }
 
   const searchParams = request.nextUrl.searchParams
@@ -76,6 +77,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ suggestions })
   } catch (error: unknown) {
     logger.error('Geocoding error', { component: 'api/geocode' }, error as Error)
-    return NextResponse.json({ suggestions: [] }, { status: 500 })
+    return apiErrors.internal(error as Error, { component: 'api/geocode' })
   }
 }

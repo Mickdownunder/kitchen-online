@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI, Type } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import { rateLimit } from '@/lib/middleware/rateLimit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,29 +14,34 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
+    }
+
+    const limitCheck = await rateLimit(request, user.id)
+    if (limitCheck && !limitCheck.allowed) {
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     if (user.app_metadata?.role === 'customer') {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: hasPermission, error: permError } = await supabase.rpc('has_permission', {
       p_permission_code: 'edit_projects',
     })
     if (permError || !hasPermission) {
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Prüfe API-Key
     if (!process.env.GEMINI_API_KEY) {
       logger.error('GEMINI_API_KEY is not configured', { component: 'extract-project' })
-      return NextResponse.json({ error: 'KI-API-Key ist nicht konfiguriert' }, { status: 500 })
+      return apiErrors.internal(new Error('KI-API-Key ist nicht konfiguriert'), { component: 'extract-project' })
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
@@ -43,11 +50,11 @@ export async function POST(request: NextRequest) {
     const { base64Data, mimeType } = await request.json()
 
     if (!base64Data) {
-      return NextResponse.json({ error: 'base64Data ist erforderlich' }, { status: 400 })
+      return apiErrors.badRequest()
     }
 
     if (!mimeType) {
-      return NextResponse.json({ error: 'mimeType ist erforderlich' }, { status: 400 })
+      return apiErrors.badRequest()
     }
 
     logger.debug('Starting AI extraction', { component: 'extract-project' })
@@ -147,12 +154,6 @@ export async function POST(request: NextRequest) {
       errObj
     )
 
-    return NextResponse.json(
-      {
-        error: errObj?.message || 'Fehler beim Extrahieren der Projektdaten',
-        details: process.env.NODE_ENV === 'development' ? errObj?.stack : undefined,
-      },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'extract-project' })
   }
 }

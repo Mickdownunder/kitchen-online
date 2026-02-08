@@ -6,6 +6,8 @@ import { buildProjectSummary } from '@/lib/ai/projectSummary'
 import { buildSystemInstruction } from '@/lib/ai/systemInstruction'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import { rateLimit } from '@/lib/middleware/rateLimit'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -22,25 +24,30 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
+    }
+
+    const limitCheck = await rateLimit(request, user.id)
+    if (limitCheck && !limitCheck.allowed) {
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     if (user.app_metadata?.role === 'customer') {
       apiLogger.error(new Error('No permission - customer role'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // GEMINI_API_KEY vor Body prüfen (fail fast)
     if (!process.env.GEMINI_API_KEY) {
       apiLogger.error(new Error('GEMINI_API_KEY is not configured'), 500)
-      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 })
+      return apiErrors.internal(new Error('GEMINI_API_KEY is not configured'), { component: 'chat' })
     }
 
     // Check company context
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Check permission - AI can mutate data, so requires edit_projects
@@ -49,10 +56,7 @@ export async function POST(request: NextRequest) {
     })
     if (permError || !hasPermission) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zur Nutzung des AI-Assistenten' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     const body = (await request.json()) as {
@@ -67,17 +71,11 @@ export async function POST(request: NextRequest) {
     const MAX_PROJECTS = 500
     if (message.length > MAX_MESSAGE_LENGTH) {
       apiLogger.error(new Error('Message too long'), 400)
-      return NextResponse.json(
-        { error: `Nachricht zu lang (max. ${MAX_MESSAGE_LENGTH} Zeichen). Bitte kürzen.` },
-        { status: 400 }
-      )
+      return apiErrors.validation()
     }
     if (projectList.length > MAX_PROJECTS) {
       apiLogger.error(new Error('Too many projects'), 400)
-      return NextResponse.json(
-        { error: `Zu viele Projekte (max. ${MAX_PROJECTS}). Bitte weniger auswählen.` },
-        { status: 400 }
-      )
+      return apiErrors.validation()
     }
 
     logger.info('Chat API request received', {
@@ -170,12 +168,6 @@ export async function POST(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : 'Failed to process chat message',
-        duration: `${duration}ms`,
-      },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'chat' })
   }
 }

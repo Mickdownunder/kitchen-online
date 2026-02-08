@@ -7,6 +7,8 @@ import { getInvoices } from '@/lib/supabase/services/invoices'
 import { getCompanySettings, getCompanySettingsById } from '@/lib/supabase/services/company'
 import { deliveryNoteTemplate, invoiceTemplate, orderTemplate } from '@/lib/utils/emailTemplates'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
+import { rateLimit } from '@/lib/middleware/rateLimit'
 
 /**
  * API-Route: E-Mail mit PDF-Anhang versenden
@@ -35,19 +37,25 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
+    }
+
+    // Rate Limiting
+    const limitCheck = await rateLimit(request, user.id)
+    if (limitCheck && !limitCheck.allowed) {
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     // Check company context
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Check permission
@@ -56,10 +64,7 @@ export async function POST(request: NextRequest) {
     })
     if (permError || !hasPermission) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json(
-        { error: 'Keine Berechtigung zum Versenden von E-Mails mit PDFs' },
-        { status: 403 }
-      )
+      return apiErrors.forbidden()
     }
 
     const body = await request.json()
@@ -75,10 +80,7 @@ export async function POST(request: NextRequest) {
 
     if (!to || !subject || !pdfType) {
       apiLogger.error(new Error('Missing required fields'), 400)
-      return NextResponse.json(
-        { error: 'Fehlende Parameter: to, subject und pdfType sind erforderlich' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     // KRITISCH: Lade Projekt FRISCH aus der Datenbank (nicht aus Cache!)
@@ -88,10 +90,7 @@ export async function POST(request: NextRequest) {
       try {
         project = await getProject(projectId, supabase)
         if (!project) {
-          return NextResponse.json(
-            { error: `Projekt ${projectId} nicht gefunden` },
-            { status: 404 }
-          )
+          return apiErrors.notFound()
         }
       } catch (error: unknown) {
         logger.error(
@@ -102,12 +101,7 @@ export async function POST(request: NextRequest) {
           },
           error as Error
         )
-        return NextResponse.json(
-          {
-            error: `Fehler beim Laden des Projekts: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
-          },
-          { status: 500 }
-        )
+        return apiErrors.internal(error as Error, { component: 'api/email/send-with-pdf' })
       }
     }
 
@@ -129,10 +123,7 @@ export async function POST(request: NextRequest) {
       switch (pdfType as PDFType) {
         case 'invoice': {
           if (!project) {
-            return NextResponse.json(
-              { error: 'Projekt ist erforderlich für Invoice-PDF' },
-              { status: 400 }
-            )
+            return apiErrors.badRequest()
           }
 
           // Lade Rechnungen aus der invoices-Tabelle
@@ -163,10 +154,7 @@ export async function POST(request: NextRequest) {
           }
 
           if (!invoice) {
-            return NextResponse.json(
-              { error: 'Keine Rechnung gefunden für dieses Projekt' },
-              { status: 404 }
-            )
+            return apiErrors.notFound()
           }
 
           // Map Invoice zu InvoiceInput-Format für generatePDF
@@ -197,10 +185,7 @@ export async function POST(request: NextRequest) {
 
         case 'deliveryNote': {
           if (!project) {
-            return NextResponse.json(
-              { error: 'Projekt ist erforderlich für DeliveryNote-PDF' },
-              { status: 400 }
-            )
+            return apiErrors.badRequest()
           }
 
           // Generiere PDF
@@ -223,10 +208,7 @@ export async function POST(request: NextRequest) {
 
         case 'order': {
           if (!project) {
-            return NextResponse.json(
-              { error: 'Projekt ist erforderlich für Order-PDF' },
-              { status: 400 }
-            )
+            return apiErrors.badRequest()
           }
 
           // Token für Online-Unterschrift erstellen (7 Tage gültig)
@@ -239,12 +221,8 @@ export async function POST(request: NextRequest) {
           try {
             supabaseAdmin = await createServiceClient()
           } catch (svcErr) {
-            const msg = svcErr instanceof Error ? svcErr.message : 'Service-Client fehlgeschlagen'
             logger.error('createServiceClient failed', { component: 'api/email/send-with-pdf' }, svcErr as Error)
-            return NextResponse.json(
-              { error: `Konfiguration: ${msg}. SUPABASE_SERVICE_ROLE_KEY prüfen.` },
-              { status: 500 }
-            )
+            return apiErrors.internal(svcErr as Error, { component: 'api/email/send-with-pdf' })
           }
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -262,18 +240,7 @@ export async function POST(request: NextRequest) {
               code: tokenError.code,
               message: tokenError.message,
             })
-            const isMissingTable =
-              tokenError.message?.includes('does not exist') ||
-              tokenError.code === '42P01' ||
-              tokenError.code === 'PGRST204'
-            return NextResponse.json(
-              {
-                error: isMissingTable
-                  ? 'Tabelle order_sign_tokens fehlt. Bitte Migration 20260202180000_order_contract_sign ausführen.'
-                  : `Token konnte nicht erstellt werden: ${tokenError.message}`,
-              },
-              { status: 500 }
-            )
+            return apiErrors.internal(new Error(tokenError.message), { component: 'api/email/send-with-pdf' })
           }
 
           // Basis-URL aus Request (wo der User die App nutzt) – sonst Env, sonst localhost
@@ -285,10 +252,7 @@ export async function POST(request: NextRequest) {
 
           // Generiere PDF (mit AGB) – companySettings explizit übergeben (getCompanySettings in API oft null)
           if (!companySettings) {
-            return NextResponse.json(
-              { error: 'Firmeneinstellungen fehlen. Bitte Firmenstammdaten unter Einstellungen hinterlegen.' },
-              { status: 400 }
-            )
+            return apiErrors.badRequest()
           }
           generatedPDF = await generatePDF({
             type: 'order',
@@ -316,32 +280,19 @@ export async function POST(request: NextRequest) {
           )
 
         default:
-          return NextResponse.json({ error: `Unbekannter PDF-Typ: ${pdfType}` }, { status: 400 })
+          return apiErrors.badRequest()
       }
     } catch (pdfError: unknown) {
-      const errMsg =
-        pdfError instanceof Error
-          ? pdfError.message
-          : typeof pdfError === 'object' && pdfError !== null && 'message' in pdfError
-            ? String((pdfError as { message?: unknown }).message)
-            : typeof pdfError === 'string'
-              ? pdfError
-              : 'Unbekannter Fehler'
       logger.error(
         'Fehler beim Generieren des PDFs',
         {
           component: 'api/email/send-with-pdf',
           pdfType,
           projectId,
-          errMsg,
-          raw: pdfError,
         },
         pdfError as Error
       )
-      return NextResponse.json(
-        { error: `Fehler beim Generieren des PDFs: ${errMsg}` },
-        { status: 500 }
-      )
+      return apiErrors.internal(pdfError as Error, { component: 'api/email/send-with-pdf' })
     }
 
     // Versende E-Mail mit PDF-Anhang
@@ -389,12 +340,7 @@ export async function POST(request: NextRequest) {
         },
         emailError as Error
       )
-      return NextResponse.json(
-        {
-          error: `Fehler beim Versenden der E-Mail: ${emailError instanceof Error ? emailError.message : 'Unbekannter Fehler'}`,
-        },
-        { status: 500 }
-      )
+      return apiErrors.internal(emailError as Error, { component: 'api/email/send-with-pdf' })
     }
   } catch (error: unknown) {
     apiLogger.error(error as Error, 500)
@@ -405,9 +351,6 @@ export async function POST(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/email/send-with-pdf' })
   }
 }

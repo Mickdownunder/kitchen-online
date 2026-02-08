@@ -5,6 +5,7 @@ import { updateMemberRoleSchema } from '@/lib/validations/users'
 import { logger } from '@/lib/utils/logger'
 import { validateQuery } from '@/lib/middleware/validateRequest'
 import { z } from 'zod'
+import { apiErrors } from '@/lib/utils/errorHandling'
 
 // GET: List company members
 export async function GET() {
@@ -22,19 +23,19 @@ export async function GET() {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { data: canManage, error: canManageError } = await supabase.rpc('can_manage_users')
     if (canManageError || !canManage) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Get members via RPC (handles company scoping automatically)
@@ -50,7 +51,7 @@ export async function GET() {
         membersError as Error
       )
       apiLogger.end(startTime, 500)
-      return NextResponse.json({ error: 'Fehler beim Laden der Mitglieder' }, { status: 500 })
+      return apiErrors.internal(membersError as Error, { component: 'api/users/members' })
     }
 
     // Get pending invites
@@ -83,10 +84,7 @@ export async function GET() {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/users/members' })
   }
 }
 
@@ -106,19 +104,19 @@ export async function PATCH(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { data: canManage, error: canManageError } = await supabase.rpc('can_manage_users')
     if (canManageError || !canManage) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Validate request body
@@ -149,10 +147,7 @@ export async function PATCH(request: NextRequest) {
         error
       )
       apiLogger.end(startTime, 400)
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Fehler' },
-        { status: 400 }
-      )
+      return apiErrors.badRequest()
     }
 
     apiLogger.end(startTime, 200)
@@ -172,10 +167,7 @@ export async function PATCH(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/users/members' })
   }
 }
 
@@ -195,19 +187,19 @@ export async function DELETE(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     const { data: canManage, error: canManageError } = await supabase.rpc('can_manage_users')
     if (canManageError || !canManage) {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Validate query parameters
@@ -244,10 +236,7 @@ export async function DELETE(request: NextRequest) {
           error
         )
         apiLogger.end(startTime, 400)
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : 'Fehler' },
-          { status: 400 }
-        )
+        return apiErrors.badRequest()
       }
     } else if (inviteId) {
       // Delete pending invite
@@ -265,10 +254,7 @@ export async function DELETE(request: NextRequest) {
           error
         )
         apiLogger.end(startTime, 400)
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : 'Fehler' },
-          { status: 400 }
-        )
+        return apiErrors.badRequest()
       }
     }
 
@@ -289,9 +275,6 @@ export async function DELETE(request: NextRequest) {
       },
       error as Error
     )
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Serverfehler' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/users/members' })
   }
 }

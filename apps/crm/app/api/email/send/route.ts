@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { logger } from '@/lib/utils/logger'
+import { apiErrors } from '@/lib/utils/errorHandling'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 import { sendEmailSchema } from '@/lib/validations/email'
 
@@ -20,28 +21,25 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       apiLogger.error(new Error('Not authenticated'), 401)
-      return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+      return apiErrors.unauthorized()
     }
 
     if (user.app_metadata?.role === 'customer') {
       apiLogger.error(new Error('No permission'), 403)
-      return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Rate Limiting (30 Emails pro Minute)
     const limitCheck = await rateLimit(request, user.id)
-    if (!limitCheck?.allowed) {
+    if (limitCheck && !limitCheck.allowed) {
       apiLogger.end(startTime, 429)
-      return NextResponse.json(
-        { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
-        { status: 429 }
-      )
+      return apiErrors.rateLimit(limitCheck.resetTime)
     }
 
     const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
     if (companyError || !companyId) {
       apiLogger.error(new Error('No company assigned'), 403)
-      return NextResponse.json({ error: 'Keine Firma zugeordnet' }, { status: 403 })
+      return apiErrors.forbidden()
     }
 
     // Zod-Validierung
@@ -50,13 +48,7 @@ export async function POST(request: NextRequest) {
 
     if (!parsed.success) {
       apiLogger.error(new Error('Validation failed'), 400)
-      return NextResponse.json(
-        { 
-          error: 'Ungültige Eingabedaten',
-          details: parsed.error.flatten().fieldErrors,
-        },
-        { status: 400 }
-      )
+      return apiErrors.validation()
     }
 
     const { to, subject, html, text, from: requestedFrom, replyTo, attachments } = parsed.data
@@ -114,9 +106,6 @@ export async function POST(request: NextRequest) {
       error as Error
     )
     // Keine internen Fehlerdetails zurückgeben
-    return NextResponse.json(
-      { error: 'Fehler beim Versenden der E-Mail' },
-      { status: 500 }
-    )
+    return apiErrors.internal(error as Error, { component: 'api/email/send' })
   }
 }
