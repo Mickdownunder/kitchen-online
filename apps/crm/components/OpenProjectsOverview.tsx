@@ -33,6 +33,7 @@ interface ProjectPaymentRow {
   otherPayments: { count: number; amount: number; paidAmount: number }
   totalPaid: number
   totalOpen: number
+  openTax: number // USt der offenen (unbezahlten) Rechnungen
 }
 
 interface InvoiceSummary {
@@ -46,16 +47,20 @@ interface InvoiceSummary {
 function buildPaymentRow(project: CustomerProject, allInvoices: Invoice[]): ProjectPaymentRow {
   const projectInvoices = allInvoices.filter(inv => inv.projectId === project.id && inv.type !== 'credit')
 
-  const first = projectInvoices.find(inv => inv.type === 'partial' && inv.scheduleType === 'first')
-  const second = projectInvoices.find(inv => inv.type === 'partial' && inv.scheduleType === 'second')
+  // Match deposits: prefer explicit scheduleType, fall back to chronological order
+  const partials = projectInvoices
+    .filter(inv => inv.type === 'partial')
+    .sort((a, b) => new Date(a.invoiceDate).getTime() - new Date(b.invoiceDate).getTime())
+
+  const first =
+    partials.find(inv => inv.scheduleType === 'first') ?? (partials.length > 0 ? partials[0] : undefined)
+  const second =
+    partials.find(inv => inv.scheduleType === 'second') ??
+    (partials.length > 1 ? partials.find(inv => inv.id !== first?.id) : undefined)
   const final = projectInvoices.find(inv => inv.type === 'final')
 
-  const others = projectInvoices.filter(
-    inv =>
-      inv.id !== first?.id &&
-      inv.id !== second?.id &&
-      inv.id !== final?.id
-  )
+  const matchedIds = new Set([first?.id, second?.id, final?.id].filter(Boolean))
+  const others = projectInvoices.filter(inv => !matchedIds.has(inv.id))
 
   const toSummary = (inv: Invoice | undefined): InvoiceSummary => ({
     exists: !!inv,
@@ -64,8 +69,10 @@ function buildPaymentRow(project: CustomerProject, allInvoices: Invoice[]): Proj
   })
 
   const totalPaid = projectInvoices.filter(inv => inv.isPaid).reduce((s, inv) => s + inv.amount, 0)
-  const totalInvoiced = projectInvoices.reduce((s, inv) => s + inv.amount, 0)
   const totalOpen = project.totalAmount - totalPaid
+  const openTax = projectInvoices
+    .filter(inv => !inv.isPaid)
+    .reduce((s, inv) => s + (inv.taxAmount ?? 0), 0)
 
   return {
     project,
@@ -79,6 +86,7 @@ function buildPaymentRow(project: CustomerProject, allInvoices: Invoice[]): Proj
     },
     totalPaid,
     totalOpen: totalOpen > 0 ? totalOpen : 0,
+    openTax,
   }
 }
 
@@ -115,12 +123,16 @@ function exportExcel(rows: ProjectPaymentRow[]): void {
     'Sonstige €',
     'Bezahlt €',
     'Offen €',
+    'Offene USt €',
   ]
+
+  const totalOpenTax = rows.reduce((s, r) => s + r.openTax, 0)
 
   const data: (string | number)[][] = [
     ['BESTANDSÜBERSICHT – OFFENE AUFTRÄGE'],
     [`Erstellt am: ${new Date().toLocaleDateString('de-AT')}`],
     [`Anzahl Aufträge: ${rows.length}`],
+    [`Offene USt gesamt: ${fmtCurrency(totalOpenTax)} €`],
     [],
     header,
   ]
@@ -141,6 +153,7 @@ function exportExcel(rows: ProjectPaymentRow[]): void {
       r.otherPayments.count > 0 ? Number(r.otherPayments.amount.toFixed(2)) : '',
       Number(r.totalPaid.toFixed(2)),
       Number(r.totalOpen.toFixed(2)),
+      Number(r.openTax.toFixed(2)),
     ])
   }
 
@@ -153,7 +166,7 @@ function exportExcel(rows: ProjectPaymentRow[]): void {
     'SUMME', '', '', Number(totalGross.toFixed(2)),
     '', '', '', '', '', '',
     '', '',
-    Number(totalPaid.toFixed(2)), Number(totalOpen.toFixed(2)),
+    Number(totalPaid.toFixed(2)), Number(totalOpen.toFixed(2)), Number(totalOpenTax.toFixed(2)),
   ])
 
   const ws = XLSX.utils.aoa_to_sheet(data)
@@ -161,7 +174,7 @@ function exportExcel(rows: ProjectPaymentRow[]): void {
     { wch: 22 }, { wch: 16 }, { wch: 12 }, { wch: 12 },
     { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
     { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 },
-    { wch: 12 }, { wch: 12 },
+    { wch: 12 }, { wch: 12 }, { wch: 14 },
   ]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Offene Aufträge')
@@ -174,6 +187,7 @@ function exportPDF(rows: ProjectPaymentRow[]): void {
   const totalGross = rows.reduce((s, r) => s + r.project.totalAmount, 0)
   const totalPaid = rows.reduce((s, r) => s + r.totalPaid, 0)
   const totalOpen = rows.reduce((s, r) => s + r.totalOpen, 0)
+  const totalOpenTax = rows.reduce((s, r) => s + r.openTax, 0)
 
   const statusStr = (s: InvoiceSummary): string => {
     if (!s.exists) return '—'
@@ -190,6 +204,9 @@ function exportPDF(rows: ProjectPaymentRow[]): void {
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; padding: 24px; }
     h1 { font-size: 18px; margin-bottom: 4px; }
     .meta { color: #64748b; font-size: 10px; margin-bottom: 16px; }
+    .summary { display: flex; gap: 24px; margin-bottom: 12px; font-size: 10px; }
+    .summary strong { color: #1e293b; }
+    .summary .tax { color: #7c3aed; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     th { background: #1e293b; color: #fff; padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
     th.r, td.r { text-align: right; }
@@ -204,6 +221,12 @@ function exportPDF(rows: ProjectPaymentRow[]): void {
 <body>
   <h1>Bestandsübersicht – Offene Aufträge</h1>
   <div class="meta">Erstellt am ${new Date().toLocaleDateString('de-AT')} · ${rows.length} Aufträge</div>
+  <div class="summary">
+    <span>Gesamt: <strong>${fmtCurrency(totalGross)} €</strong></span>
+    <span>Bezahlt: <strong style="color:#16a34a">${fmtCurrency(totalPaid)} €</strong></span>
+    <span>Offen: <strong style="color:#dc2626">${fmtCurrency(totalOpen)} €</strong></span>
+    <span class="tax">Offene USt: <strong>${fmtCurrency(totalOpenTax)} €</strong></span>
+  </div>
   <table>
     <thead>
       <tr>
@@ -238,7 +261,7 @@ function exportPDF(rows: ProjectPaymentRow[]): void {
       </tr>
     </tbody>
   </table>
-  <div class="legend">✓ = bezahlt · ○ = erstellt/offen · — = nicht erstellt</div>
+  <div class="legend">✓ = bezahlt · ○ = erstellt/offen · — = nicht erstellt · Offene USt: ${fmtCurrency(totalOpenTax)} €</div>
   <script>window.onload = function() { window.print(); }</script>
 </body>
 </html>`
@@ -288,9 +311,10 @@ export function OpenProjectsOverview({ projects, onClose }: OpenProjectsOverview
     const totalGross = filteredRows.reduce((s, r) => s + r.project.totalAmount, 0)
     const totalPaid = filteredRows.reduce((s, r) => s + r.totalPaid, 0)
     const totalOpen = filteredRows.reduce((s, r) => s + r.totalOpen, 0)
+    const totalOpenTax = filteredRows.reduce((s, r) => s + r.openTax, 0)
     const missingFirst = filteredRows.filter(r => !r.firstDeposit.exists).length
     const missingFinal = filteredRows.filter(r => !r.finalInvoice.exists).length
-    return { totalGross, totalPaid, totalOpen, missingFirst, missingFinal }
+    return { totalGross, totalPaid, totalOpen, totalOpenTax, missingFirst, missingFinal }
   }, [filteredRows])
 
   const handleExportExcel = useCallback(() => exportExcel(filteredRows), [filteredRows])
@@ -339,7 +363,7 @@ export function OpenProjectsOverview({ projects, onClose }: OpenProjectsOverview
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-5 gap-4 border-b border-slate-100 bg-slate-50/50 p-6">
+        <div className="grid grid-cols-3 gap-4 border-b border-slate-100 bg-slate-50/50 p-6 lg:grid-cols-6">
           <div className="rounded-xl bg-white p-4 shadow-sm">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Aufträge</p>
             <p className="mt-1 text-2xl font-black text-slate-900">{filteredRows.length}</p>
@@ -357,7 +381,11 @@ export function OpenProjectsOverview({ projects, onClose }: OpenProjectsOverview
             <p className="mt-1 text-2xl font-black text-red-600">{fmtCurrency(stats.totalOpen)} €</p>
           </div>
           <div className="rounded-xl bg-white p-4 shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Fehlende Rechnungen</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">Offene USt</p>
+            <p className="mt-1 text-2xl font-black text-violet-600">{fmtCurrency(stats.totalOpenTax)} €</p>
+          </div>
+          <div className="rounded-xl bg-white p-4 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Fehlende Rechn.</p>
             <p className="mt-1 text-lg font-black text-amber-600">
               {stats.missingFirst > 0 && <span>{stats.missingFirst} Anz.</span>}
               {stats.missingFirst > 0 && stats.missingFinal > 0 && <span> · </span>}
