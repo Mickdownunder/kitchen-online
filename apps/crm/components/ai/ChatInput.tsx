@@ -76,7 +76,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <div className="animate-in slide-in-from-bottom-3 flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
           <div className="h-3 w-3 animate-pulse rounded-full bg-red-500"></div>
           <p className="text-xs font-bold uppercase tracking-widest text-red-400">
-            Ich höre zu... Sprechen Sie jetzt
+            June hört zu... sprich jetzt
           </p>
         </div>
       )}
@@ -92,7 +92,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <div className="relative flex-1">
           <textarea
             rows={1}
-            placeholder={isListening ? '🎤 Sprechen Sie jetzt...' : 'Frag mich was, Chef...'}
+            placeholder={isListening ? '🎤 Sprich jetzt...' : 'Frag June was...'}
             className={`max-h-32 min-h-[56px] w-full resize-none rounded-2xl border-none bg-slate-900 py-4 pl-6 pr-4 text-base text-white outline-none ring-1 transition-all placeholder:text-slate-600 ${
               isListening
                 ? 'ring-2 ring-red-500 focus:ring-2 focus:ring-red-500'

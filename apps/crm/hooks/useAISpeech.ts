@@ -10,8 +10,6 @@ interface UseAISpeechOptions {
 }
 
 export function useAISpeech(options: UseAISpeechOptions = {}) {
-  const { onTranscript, onInterimTranscript } = options
-
   const [isListening, setIsListening] = useState(false)
   const [isSpeechSupported, setIsSpeechSupported] = useState(false)
   const [isTTSEnabled, setIsTTSEnabled] = useState(false)
@@ -22,7 +20,16 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null)
 
-  // Initialize Speech Recognition
+  // Store callbacks in refs so the useEffect doesn't re-run on every render.
+  // Without this, the inline lambdas passed as options cause the effect to
+  // tear down and recreate SpeechRecognition on every render, killing any
+  // in-progress speech recognition session.
+  const onTranscriptRef = useRef(options.onTranscript)
+  const onInterimTranscriptRef = useRef(options.onInterimTranscript)
+  onTranscriptRef.current = options.onTranscript
+  onInterimTranscriptRef.current = options.onInterimTranscript
+
+  // Initialize Speech Recognition (runs once on mount)
   useEffect(() => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition
     setIsSpeechSupported(!!SpeechRecognitionAPI)
@@ -56,11 +63,11 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
 
         if (interim) {
           setInterimTranscript(interim)
-          onInterimTranscript?.(interim)
+          onInterimTranscriptRef.current?.(interim)
         }
 
         if (final) {
-          onTranscript?.(final.trim())
+          onTranscriptRef.current?.(final.trim())
           setInterimTranscript('')
         }
       }
@@ -74,14 +81,14 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
         switch (event.error) {
           case 'not-allowed':
             errorMessage =
-              'Mikrofon-Zugriff wurde verweigert. Bitte erlauben Sie den Zugriff in den Browser-Einstellungen.'
+              'Mikrofon-Zugriff verweigert. Bitte erlaube den Zugriff in den Browser-Einstellungen.'
             break
           case 'no-speech':
             errorMessage =
-              'Keine Sprache erkannt. Bitte sprechen Sie lauter oder näher zum Mikrofon.'
+              'Keine Sprache erkannt. Bitte sprich lauter oder näher zum Mikrofon.'
             break
           case 'audio-capture':
-            errorMessage = 'Mikrofon nicht verfügbar. Bitte prüfen Sie Ihre Geräteeinstellungen.'
+            errorMessage = 'Mikrofon nicht verfügbar. Bitte prüfe deine Geräteeinstellungen.'
             break
           case 'network':
             errorMessage = 'Netzwerkfehler bei der Spracherkennung.'
@@ -128,7 +135,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
         window.speechSynthesis.cancel()
       }
     }
-  }, [onTranscript, onInterimTranscript])
+  }, []) // stable — callbacks accessed via refs
 
   const toggleListening = useCallback(async () => {
     if (!recognitionRef.current) {
@@ -153,7 +160,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
           })
           if (permissionStatus.state === 'denied') {
             setSpeechError(
-              'Mikrofon-Zugriff wurde verweigert. Bitte erlauben Sie den Zugriff in den Browser-Einstellungen.'
+              'Mikrofon-Zugriff verweigert. Bitte erlaube den Zugriff in den Browser-Einstellungen.'
             )
             setTimeout(() => setSpeechError(null), 5000)
             return
@@ -170,7 +177,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
 
         if (err.name === 'NotAllowedError' || err.message?.includes('not-allowed')) {
           setSpeechError(
-            'Mikrofon-Zugriff wurde verweigert. Bitte erlauben Sie den Zugriff in den Browser-Einstellungen.'
+            'Mikrofon-Zugriff verweigert. Bitte erlaube den Zugriff in den Browser-Einstellungen.'
           )
         } else {
           setSpeechError(

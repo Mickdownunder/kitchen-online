@@ -45,7 +45,7 @@ function getReadableLabel(log: AuditLog): { title: string; detail: string | null
   // KI-Assistent
   if (action === 'ai.assistant.function_called' || entityType === 'ai_action') {
     const label = functionName ? (AI_FUNCTION_LABELS[functionName] || functionName) : 'Aktion ausgeführt'
-    return { title: `KI-Assistent: ${label}`, detail: null }
+    return { title: `June: ${label}`, detail: null }
   }
 
   // Projekt / Auftrag

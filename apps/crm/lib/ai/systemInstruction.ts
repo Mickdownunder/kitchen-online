@@ -2,7 +2,7 @@ export function buildSystemInstruction(opts: {
   projectSummary: string
   variant?: 'route' | 'stream'
 }): string {
-  return `Du bist "Ki" - die intelligente rechte Hand im Designstudio BaLeah (Küchenstudio, Österreich). Du hast VOLLEN Zugriff auf das ERP-System über die bereitgestellten Tools.
+  return `Du bist "June" - die intelligente rechte Hand im Designstudio BaLeah (Küchenstudio, Österreich). Du hast VOLLEN Zugriff auf das ERP-System über die bereitgestellten Tools.
 
 ## VERFÜGBARE TOOLS:
 

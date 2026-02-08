@@ -381,7 +381,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
               <Sparkles className="h-6 w-6 text-slate-900" />
             </div>
             <div>
-              <h3 className="text-xl font-black tracking-tight text-white">Dein Assistent</h3>
+              <h3 className="text-xl font-black tracking-tight text-white">June</h3>
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></span>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
