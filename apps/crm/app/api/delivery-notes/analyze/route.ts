@@ -49,7 +49,14 @@ export async function POST(request: NextRequest) {
       return apiErrors.badRequest()
     }
 
-    // Get all projects for matching (scoped to company)
+    // Get recent ordered projects for matching (scoped to company, limited for token efficiency)
+    const MATCHING_PROJECT_LIMIT = 40
+    const MATCHING_PROJECT_DAYS = 90
+
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - MATCHING_PROJECT_DAYS)
+    const dateFilter = cutoffDate.toISOString().split('T')[0]
+
     const serviceClient = await createServiceClient()
     const { data: members, error: membersError } = await serviceClient
       .from('company_members')
@@ -66,7 +73,6 @@ export async function POST(request: NextRequest) {
       id: string
       customerName?: string
       orderNumber?: string
-      status?: string
       items?: Array<{ description: string; modelNumber?: string | null }>
     }> = []
 
@@ -78,7 +84,6 @@ export async function POST(request: NextRequest) {
           id,
           customer_name,
           order_number,
-          status,
           invoice_items (
             description,
             model_number
@@ -86,6 +91,10 @@ export async function POST(request: NextRequest) {
         `
         )
         .in('user_id', memberUserIds)
+        .eq('is_ordered', true)
+        .gte('created_at', dateFilter)
+        .order('created_at', { ascending: false })
+        .limit(MATCHING_PROJECT_LIMIT)
 
       if (projectsError) {
         return apiErrors.internal(new Error('Fehler beim Laden der Projekte'), { component: 'delivery-notes-analyze' })
@@ -95,7 +104,6 @@ export async function POST(request: NextRequest) {
         id: project.id,
         customerName: project.customer_name || undefined,
         orderNumber: project.order_number || undefined,
-        status: project.status || undefined,
         items: (project.invoice_items || []).map(
           (item: { description: string; model_number?: string | null }) => ({
             description: item.description,
@@ -182,10 +190,13 @@ Lieferschein:
 
 Verfügbare Aufträge:
 ${projects
-  .map(
-    p =>
-      `- ID: ${p.id}, Kunde: ${p.customerName}, Auftrag: ${p.orderNumber}, Status: ${p.status}, Artikel: ${p.items?.map(i => `${i.description} (${i.modelNumber || 'keine'})`).join(', ')}`
-  )
+  .map(p => {
+    const itemsStr = (p.items || [])
+      .slice(0, 5)
+      .map(i => i.modelNumber || i.description?.slice(0, 40) || '?')
+      .join(', ')
+    return `- ID: ${p.id}, Kunde: ${p.customerName}, Auftrag: ${p.orderNumber}, Artikel: ${itemsStr}`
+  })
   .join('\n')}
 
 Finde den besten Match basierend auf:

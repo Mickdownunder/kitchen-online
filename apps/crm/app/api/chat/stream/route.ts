@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     const projectSummary = buildProjectSummary(projectList, invoicesForSummary)
 
     // Model selection - use Flash by default
-    const model = 'gemini-2.5-flash-preview-05-20'
+    const model = 'gemini-3-flash-preview'
 
     logger.debug('Using AI model', { component: 'api/chat/stream', model })
 
