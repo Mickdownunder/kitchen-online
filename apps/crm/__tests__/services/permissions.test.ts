@@ -17,6 +17,8 @@ import {
   getCurrentCompanyId,
   getEffectivePermissions,
   getCompanyMembers,
+  upsertRolePermission,
+  upsertUserPermission,
   type CompanyMemberRole,
 } from '@/lib/supabase/services/permissions'
 
@@ -107,5 +109,30 @@ describe('getCompanyMembers', () => {
     expect(result).toHaveLength(1)
     expect(result[0].role).toBe('verkaeufer')
     expect(result[0].companyId).toBe('comp-1')
+  })
+})
+
+describe('upsertRolePermission', () => {
+  it('succeeds when RPC returns no error', async () => {
+    mockRpcResult({ data: null, error: null })
+
+    await expect(
+      upsertRolePermission('comp-1', 'verkaeufer', 'menu_projects', true)
+    ).resolves.toBeUndefined()
+  })
+})
+
+describe('upsertUserPermission', () => {
+  it('succeeds when RPC returns no error', async () => {
+    mockRpcResult({ data: null, error: null })
+
+    await expect(
+      upsertUserPermission(
+        'comp-1',
+        '550e8400-e29b-41d4-a716-446655440000',
+        'menu_tickets',
+        true
+      )
+    ).resolves.toBeUndefined()
   })
 })

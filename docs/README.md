@@ -14,7 +14,6 @@
 | [SECURITY.md](./SECURITY.md) | Auth-Flows, RLS, Env-Sicherheit |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Vercel, CRON, Webhooks, Env |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Typische Fehler, Checklisten |
-| [REFACTORING_ANALYSIS.md](./REFACTORING_ANALYSIS.md) | Große Dateien, Refactoring-Empfehlungen |
 
 ---
 
@@ -34,7 +33,6 @@
 | Dokument | Inhalt |
 |----------|--------|
 | [../apps/crm/docs/BOOKING_WEBHOOK_SETUP.md](../apps/crm/docs/BOOKING_WEBHOOK_SETUP.md) | Cal.com Webhook: Setup, Troubleshooting |
-| [PLAN_TESTABDECKUNG.md](./PLAN_TESTABDECKUNG.md) | Test-Plan, Coverage |
 
 ---
 

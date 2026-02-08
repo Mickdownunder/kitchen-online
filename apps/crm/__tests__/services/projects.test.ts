@@ -6,7 +6,10 @@ import { mockQueryResult, resetMock } from './__mocks__/supabase'
 
 jest.mock('@/lib/supabase/client', () => require('./__mocks__/supabase'))
 jest.mock('@/lib/supabase/services/auth', () => ({ getCurrentUser: jest.fn() }))
-jest.mock('@/lib/supabase/services/company', () => ({ getNextOrderNumber: jest.fn() }))
+const mockGetNextOrderNumber = jest.fn()
+jest.mock('@/lib/supabase/services/company', () => ({
+  getNextOrderNumber: (...args: unknown[]) => mockGetNextOrderNumber(...args),
+}))
 jest.mock('@/lib/supabase/services/invoices', () => ({
   createInvoice: jest.fn(),
   getInvoices: jest.fn(),
@@ -15,10 +18,10 @@ jest.mock('@/lib/utils/logger', () => ({
   logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
 }))
 jest.mock('@/lib/utils/auditLogger', () => ({
-  audit: { projectCreated: jest.fn(), projectDeleted: jest.fn() },
+  audit: { projectCreated: jest.fn(), projectDeleted: jest.fn(), projectUpdated: jest.fn() },
 }))
 
-import { getProject, getProjects } from '@/lib/supabase/services/projects'
+import { getProject, getProjects, createProject, updateProject, deleteProject } from '@/lib/supabase/services/projects'
 import { supabase } from './__mocks__/supabase'
 import { getCurrentUser } from '@/lib/supabase/services/auth'
 
@@ -39,6 +42,7 @@ const PROJECT_ROW = {
 
 beforeEach(() => {
   resetMock()
+  mockGetNextOrderNumber.mockResolvedValue('K-2026-0001')
 })
 
 describe('getProject', () => {
@@ -114,5 +118,105 @@ describe('getProjects', () => {
     const result = await getProjects()
 
     expect(result).toEqual([])
+  })
+})
+
+describe('createProject', () => {
+  it('throws when no user', async () => {
+    mockGetCurrentUser.mockResolvedValue(null)
+
+    await expect(
+      createProject({
+        customerName: 'Test',
+        orderNumber: 'K-2026-0001',
+        status: 'Planung',
+        items: [],
+        totalAmount: 0,
+        netAmount: 0,
+        taxAmount: 0,
+        depositAmount: 0,
+        isDepositPaid: false,
+        isFinalPaid: false,
+        isMeasured: false,
+        isOrdered: false,
+        isInstallationAssigned: false,
+        documents: [],
+        complaints: [],
+        notes: '',
+      })
+    ).rejects.toThrow('Not authenticated')
+  })
+
+  it('creates project with minimal data', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: { ...PROJECT_ROW, id: 'proj-new', customer_name: 'Neuer Kunde' },
+      error: null,
+    })
+    mockQueryResult({
+      data: { ...PROJECT_ROW, id: 'proj-new', customer_name: 'Neuer Kunde' },
+      error: null,
+    })
+
+    const result = await createProject({
+      customerName: 'Neuer Kunde',
+      orderNumber: 'K-2026-0002',
+      status: 'Planung',
+      items: [],
+      totalAmount: 0,
+      netAmount: 0,
+      taxAmount: 0,
+      depositAmount: 0,
+      isDepositPaid: false,
+      isFinalPaid: false,
+      isMeasured: false,
+      isOrdered: false,
+      isInstallationAssigned: false,
+      documents: [],
+      complaints: [],
+      notes: '',
+    })
+
+    expect(result.id).toBe('proj-new')
+    expect(result.customerName).toBe('Neuer Kunde')
+  })
+})
+
+describe('updateProject', () => {
+  it('throws when no user', async () => {
+    mockGetCurrentUser.mockResolvedValue(null)
+
+    await expect(
+      updateProject('proj-1', { customerName: 'Updated' })
+    ).rejects.toThrow('Not authenticated')
+  })
+
+  it('updates project', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: null })
+    mockQueryResult({
+      data: { ...PROJECT_ROW, customer_name: 'Updated Name' },
+      error: null,
+    })
+
+    const result = await updateProject('proj-1', { customerName: 'Updated Name' })
+
+    expect(result.customerName).toBe('Updated Name')
+  })
+})
+
+describe('deleteProject', () => {
+  it('deletes project', async () => {
+    mockQueryResult({ data: PROJECT_ROW, error: null })
+    mockQueryResult({ data: null, error: null })
+
+    await expect(deleteProject('proj-1')).resolves.toBeUndefined()
+  })
+
+  it('deletes project when getProject fails', async () => {
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+    mockQueryResult({ data: null, error: null })
+
+    await expect(deleteProject('proj-1')).resolves.toBeUndefined()
   })
 })

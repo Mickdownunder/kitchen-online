@@ -39,6 +39,9 @@ import {
   createCreditNote,
   getInvoice,
   getInvoices,
+  getInvoiceByNumber,
+  getOpenInvoices,
+  getOverdueInvoices,
 } from '@/lib/supabase/services/invoices'
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>
@@ -143,6 +146,65 @@ describe('getInvoices', () => {
     const result = await getInvoices('proj-1')
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.data).toEqual([])
+  })
+})
+
+describe('getInvoiceByNumber', () => {
+  it('returns UNAUTHORIZED when no user', async () => {
+    setUnauthenticated()
+    const result = await getInvoiceByNumber('RE-2026-0001')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('UNAUTHORIZED')
+  })
+
+  it('returns invoice when found', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: INVOICE_ROW, error: null })
+    const result = await getInvoiceByNumber('RE-2026-0001')
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.invoiceNumber).toBe('RE-2026-0001')
+  })
+
+  it('returns NOT_FOUND when PGRST116', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+    const result = await getInvoiceByNumber('RE-NOTFOUND')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('NOT_FOUND')
+  })
+})
+
+describe('getOpenInvoices', () => {
+  it('returns UNAUTHORIZED when no user', async () => {
+    setUnauthenticated()
+    const result = await getOpenInvoices()
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('UNAUTHORIZED')
+  })
+
+  it('returns open invoices when authenticated', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: [INVOICE_ROW], error: null })
+    const result = await getOpenInvoices()
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data).toHaveLength(1)
+  })
+})
+
+describe('getOverdueInvoices', () => {
+  it('returns UNAUTHORIZED when no user', async () => {
+    setUnauthenticated()
+    const result = await getOverdueInvoices()
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('UNAUTHORIZED')
+  })
+
+  it('returns overdue invoices when authenticated', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: [INVOICE_ROW], error: null })
+    const result = await getOverdueInvoices()
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data).toHaveLength(1)
   })
 })
 

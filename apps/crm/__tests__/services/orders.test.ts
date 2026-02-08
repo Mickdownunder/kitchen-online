@@ -13,7 +13,17 @@ jest.mock('@/lib/utils/logger', () => ({
 }))
 
 import { getCurrentUser } from '@/lib/supabase/services/auth'
-import { getOrders, getOrder, getOrderByNumber, getOrderByProject } from '@/lib/supabase/services/orders'
+import {
+  getOrders,
+  getOrder,
+  getOrderByNumber,
+  getOrderByProject,
+  getOrdersWithProject,
+  createOrder,
+  updateOrder,
+  deleteOrder,
+  getOrderStats,
+} from '@/lib/supabase/services/orders'
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>
 
@@ -146,5 +156,98 @@ describe('getOrderByProject', () => {
     const result = await getOrderByProject('proj-1')
     expect(result).not.toBeNull()
     expect(result?.projectId).toBe('proj-1')
+  })
+})
+
+const ORDER_ROW = {
+  id: 'order-1',
+  user_id: 'user-1',
+  project_id: 'proj-1',
+  order_number: 'K-2026-0001',
+  status: 'active',
+  created_at: '2026-01-15T00:00:00Z',
+  updated_at: '2026-01-15T00:00:00Z',
+}
+
+describe('createOrder', () => {
+  it('throws when no user', async () => {
+    mockGetCurrentUser.mockResolvedValue(null)
+    await expect(
+      createOrder({ projectId: 'proj-1', orderNumber: 'K-2026-0001' })
+    ).rejects.toThrow('Not authenticated')
+  })
+
+  it('creates order', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: { ...ORDER_ROW, id: 'order-new' }, error: null })
+
+    const result = await createOrder({ projectId: 'proj-1', orderNumber: 'K-2026-0001' })
+
+    expect(result.id).toBe('order-new')
+  })
+})
+
+describe('updateOrder', () => {
+  it('throws when no user', async () => {
+    mockGetCurrentUser.mockResolvedValue(null)
+    await expect(
+      updateOrder('order-1', { status: 'sent' })
+    ).rejects.toThrow('Not authenticated')
+  })
+
+  it('updates order', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: { ...ORDER_ROW, status: 'sent' }, error: null })
+
+    const result = await updateOrder('order-1', { status: 'sent' })
+
+    expect(result.status).toBe('sent')
+  })
+})
+
+describe('deleteOrder', () => {
+  it('succeeds when user authenticated', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: null })
+
+    await expect(deleteOrder('order-1')).resolves.toBeUndefined()
+  })
+})
+
+describe('getOrdersWithProject', () => {
+  it('returns orders with project data', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: [
+        {
+          id: 'order-1',
+          user_id: 'user-1',
+          project_id: 'proj-1',
+          order_number: 'K-2026-0001',
+          status: 'active',
+          created_at: '2026-01-15T00:00:00Z',
+          updated_at: '2026-01-15T00:00:00Z',
+          projects: { id: 'proj-1', customer_name: 'Test', total_amount: 1000 },
+        },
+      ],
+      error: null,
+    })
+
+    const result = await getOrdersWithProject()
+
+    expect(result).toHaveLength(1)
+    expect(result[0].orderNumber).toBe('K-2026-0001')
+  })
+})
+
+describe('getOrderStats', () => {
+  it('returns order stats', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: [{ status: 'active' }, { status: 'sent' }], error: null })
+
+    const result = await getOrderStats()
+
+    expect(result).toBeDefined()
+    expect(typeof result.total).toBe('number')
   })
 })

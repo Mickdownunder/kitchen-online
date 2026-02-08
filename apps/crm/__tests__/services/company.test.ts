@@ -22,7 +22,12 @@ jest.mock('@/lib/utils/auditLogger', () => ({
   logAudit: jest.fn(),
 }))
 
-import { getCompanyIdForUser, getCompanySettingsById, getCompanySettings } from '@/lib/supabase/services/company'
+import {
+  getCompanyIdForUser,
+  getCompanySettingsById,
+  getCompanySettings,
+  saveCompanySettings,
+} from '@/lib/supabase/services/company'
 
 // ─── Mock Supabase client builder ───────────────────────────────────
 
@@ -224,5 +229,39 @@ describe('getCompanySettings', () => {
 
     expect(result).not.toBeNull()
     expect(result?.companyName).toBe('Test GmbH')
+  })
+})
+
+describe('saveCompanySettings', () => {
+  const { mockQueryResult, resetMock } = require('./__mocks__/supabase')
+
+  beforeEach(() => {
+    mockGetCurrentUser.mockReset()
+    resetMock?.()
+  })
+
+  it('throws when no user', async () => {
+    mockGetCurrentUser.mockResolvedValue(null)
+
+    await expect(
+      saveCompanySettings({ companyName: 'Updated GmbH' })
+    ).rejects.toThrow('Not authenticated')
+  })
+
+  it('saves company settings', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'comp-1',
+        user_id: 'user-1',
+        company_name: 'Updated GmbH',
+        display_name: 'Updated',
+      },
+      error: null,
+    })
+
+    const result = await saveCompanySettings({ companyName: 'Updated GmbH' })
+
+    expect(result.companyName).toBe('Updated GmbH')
   })
 })
