@@ -1,9 +1,15 @@
+jest.mock('@/lib/utils/logger', () => ({
+  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+}))
+
 import {
   isAbortError,
   getErrorMessage,
   toError,
   isApiError,
   handleApiError,
+  apiError,
+  apiErrors,
 } from '@/lib/utils/errorHandling'
 
 // ---------------------------------------------------------------------------
@@ -156,5 +162,94 @@ describe('handleApiError', () => {
   it('uses getErrorMessage for non-ApiError values', () => {
     expect(handleApiError(new Error('generic'))).toBe('generic')
     expect(handleApiError('plain string')).toBe('plain string')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// apiError
+// ---------------------------------------------------------------------------
+describe('apiError', () => {
+  it('returns NextResponse with status and code', () => {
+    const res = apiError({ status: 403, code: 'FORBIDDEN' })
+    expect(res.status).toBe(403)
+  })
+
+  it('includes safe message from SAFE_ERROR_MESSAGES', async () => {
+    const res = apiError({ status: 401, code: 'UNAUTHORIZED' })
+    const body = await res.json()
+    expect(body.error).toBe('Nicht authentifiziert')
+    expect(body.code).toBe('UNAUTHORIZED')
+  })
+
+  it('falls back to INTERNAL_ERROR for unknown codes', async () => {
+    const res = apiError({ status: 500, code: 'UNKNOWN_CODE' })
+    const body = await res.json()
+    expect(body.error).toBe('Ein interner Fehler ist aufgetreten')
+  })
+
+  it('includes originalError in logContext when provided', () => {
+    const err = new Error('DB failed')
+    const res = apiError({ status: 500, code: 'INTERNAL_ERROR', originalError: err })
+    expect(res.status).toBe(500)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// apiErrors
+// ---------------------------------------------------------------------------
+describe('apiErrors', () => {
+  it('unauthorized returns 401', async () => {
+    const res = apiErrors.unauthorized()
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.code).toBe('UNAUTHORIZED')
+  })
+
+  it('forbidden returns 403', async () => {
+    const res = apiErrors.forbidden()
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
+  })
+
+  it('notFound returns 404', async () => {
+    const res = apiErrors.notFound()
+    expect(res.status).toBe(404)
+    expect((await res.json()).code).toBe('NOT_FOUND')
+  })
+
+  it('validation returns 400', async () => {
+    const res = apiErrors.validation()
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('VALIDATION_ERROR')
+  })
+
+  it('badRequest returns 400', async () => {
+    const res = apiErrors.badRequest()
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('BAD_REQUEST')
+  })
+
+  it('internal returns 500 with originalError', async () => {
+    const res = apiErrors.internal(new Error('DB error'))
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.code).toBe('INTERNAL_ERROR')
+  })
+
+  it('rateLimit returns 429 with Retry-After when resetTime provided', async () => {
+    const resetTime = Date.now() + 60000
+    const res = apiErrors.rateLimit(resetTime)
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBeDefined()
+    const body = await res.json()
+    expect(body.code).toBe('RATE_LIMITED')
+    expect(body.resetTime).toBe(resetTime)
+  })
+
+  it('rateLimit returns 429 without Retry-After when no resetTime', async () => {
+    const res = apiErrors.rateLimit()
+    expect(res.status).toBe(429)
+    const body = await res.json()
+    expect(body.code).toBe('RATE_LIMITED')
   })
 })

@@ -1,0 +1,27 @@
+---
+description: Bei Code-Änderungen prüfen ob Dokumentation aktualisiert werden muss
+alwaysApply: true
+---
+
+# Dokumentation aktuell halten
+
+Bei Änderungen an folgenden Bereichen **immer prüfen**, ob die Dokumentation anzupassen ist:
+
+## Trigger-Bereiche
+
+| Änderung | Prüfen |
+|----------|--------|
+| Neue/geänderte API-Route (`app/api/**`) | `docs/API_REFERENCE.md` |
+| Neue Env-Variable (`process.env.*`) | `.env.example` |
+| Auth-Flow, RLS, Permissions | `docs/SECURITY.md` |
+| Neue Services, Architekturänderung | `docs/ARCHITECTURE.md` |
+| Neue Seite, Feature, Modul | `apps/crm/README.md` CRM-Funktionen |
+| Deployment, Cron, Webhook | `docs/DEPLOYMENT.md` |
+
+## Aktion
+
+Nach relevanten Änderungen: Kurz angeben, welche Docs betroffen sind und ob sie aktualisiert werden müssen. Bei Bedarf die entsprechende Doc-Datei anpassen.
+
+## Referenz
+
+Hauptindex: `docs/README.md` – enthält die Doc-Update-Checkliste.

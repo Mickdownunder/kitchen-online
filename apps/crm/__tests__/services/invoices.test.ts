@@ -37,6 +37,8 @@ import {
   getInvoiceStats,
   getRemainingCancellableAmount,
   createCreditNote,
+  getInvoice,
+  getInvoices,
 } from '@/lib/supabase/services/invoices'
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>
@@ -86,6 +88,62 @@ beforeEach(() => {
   resetMock()
   mockGetCurrentUser.mockReset()
   mockGetNextInvoiceNumber.mockReset()
+})
+
+// ─── getInvoice ───────────────────────────────────────────────────────
+
+describe('getInvoice', () => {
+  it('returns UNAUTHORIZED when no user', async () => {
+    setUnauthenticated()
+    const result = await getInvoice('inv-1')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('UNAUTHORIZED')
+  })
+
+  it('returns invoice when found', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: INVOICE_ROW, error: null })
+    const result = await getInvoice('inv-1')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.invoiceNumber).toBe('RE-2026-0001')
+    }
+  })
+
+  it('returns NOT_FOUND when PGRST116', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+    const result = await getInvoice('nonexistent')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('NOT_FOUND')
+  })
+})
+
+// ─── getInvoices ──────────────────────────────────────────────────────
+
+describe('getInvoices', () => {
+  it('returns UNAUTHORIZED when no user', async () => {
+    setUnauthenticated()
+    const result = await getInvoices()
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('UNAUTHORIZED')
+  })
+
+  it('returns invoices when authenticated', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: [INVOICE_ROW], error: null })
+    const result = await getInvoices()
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data).toHaveLength(1)
+  })
+
+  it('filters by projectId when provided', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: [], error: null })
+    const result = await getInvoices('proj-1')
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data).toEqual([])
+  })
 })
 
 // ─── createInvoice ────────────────────────────────────────────────────

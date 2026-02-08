@@ -52,6 +52,8 @@ jest.mock('@/lib/supabase/server', () => ({
   getCurrentUser: jest.fn(),
 }))
 
+const mockGetCompanyIdForUser = jest.fn()
+
 jest.mock('@/lib/utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -100,6 +102,7 @@ jest.mock('@/lib/supabase/services/email', () => ({
   sendInvoiceEmail: jest.fn(),
 }))
 jest.mock('@/lib/supabase/services/company', () => ({
+  getCompanyIdForUser: (...args: unknown[]) => mockGetCompanyIdForUser(...args),
   getCompanySettings: jest.fn(),
   getCompanySettingsById: jest.fn(),
   getNextInvoiceNumber: jest.fn(),
@@ -109,11 +112,42 @@ jest.mock('@/lib/supabase/services/company', () => ({
 jest.mock('@/lib/supabase/services/audit', () => ({
   logAuditEvent: jest.fn(),
 }))
+jest.mock('@/lib/supabase/services/projects', () => ({
+  getProject: jest.fn(),
+}))
+jest.mock('@/lib/supabase/services/invoices', () => ({
+  getInvoice: jest.fn(),
+  updateInvoice: jest.fn(),
+  getInvoices: jest.fn(),
+  getInvoicesWithProject: jest.fn(),
+}))
+jest.mock('@/lib/utils/emailTemplates', () => ({
+  reminderTemplate: jest.fn(),
+}))
+jest.mock('@/hooks/useInvoiceCalculations', () => ({
+  calculateOverdueDays: jest.fn(),
+  canSendReminder: jest.fn(),
+}))
+jest.mock('@/lib/pdf/pdfGenerator', () => ({
+  generatePDF: jest.fn(),
+}))
+jest.mock('@/lib/email-templates/portal-access', () => ({
+  portalAccessTemplate: jest.fn(),
+}))
+jest.mock('@/lib/middleware/validateRequest', () => {
+  const actual = jest.requireActual('@/lib/middleware/validateRequest')
+  return actual
+})
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
 function makeRequest(url: string, options?: RequestInit): NextRequest {
-  return new NextRequest(new URL(url, 'http://localhost'), options)
+  // Strip `signal: null` which global RequestInit allows but Next.js does not
+  const { signal, ...rest } = options ?? {}
+  return new NextRequest(new URL(url, 'http://localhost'), {
+    ...rest,
+    ...(signal ? { signal } : {}),
+  })
 }
 
 function setEmployeeAuth(user: Record<string, unknown> | null, error: unknown = null): void {
@@ -134,6 +168,7 @@ beforeEach(() => {
   mockRpc.mockReset()
   mockFrom.mockReset().mockImplementation(() => createChainBuilder())
   mockRequireCustomerSession.mockReset()
+  mockGetCompanyIdForUser.mockReset()
 })
 
 // =====================================================================
@@ -168,13 +203,15 @@ describe('Employee Auth: GET /api/tickets', () => {
 
   it('returns 403 when user has no company membership', async () => {
     setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'verkaeufer' } })
-    // company_members query returns nothing
-    const builder = createChainBuilder()
-    builder.single = jest.fn().mockResolvedValue({ data: null, error: null })
-    mockFrom.mockImplementation(() => builder)
+    mockGetCompanyIdForUser.mockResolvedValue(null)
 
     const res = await GET(makeRequest('http://localhost/api/tickets'))
+    const body = await res.json()
 
+    if (res.status !== 403) {
+      // eslint-disable-next-line no-console
+      console.error('Unexpected response:', res.status, body)
+    }
     expect(res.status).toBe(403)
   })
 })
@@ -321,5 +358,493 @@ describe('Cron Auth: GET /api/cron/appointment-reminders', () => {
     )
 
     expect(res.status).toBe(401)
+  })
+})
+
+// =====================================================================
+// Employee Auth: GET /api/tickets/[id] - auth + company check
+// =====================================================================
+
+describe('Employee Auth: GET /api/tickets/[id]', () => {
+  let GET: (request: NextRequest, ctx: { params: Promise<{ id: string }> }) => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/tickets/[id]/route')
+    GET = mod.GET
+  })
+
+  const ctx = { params: Promise.resolve({ id: 'ticket-1' }) }
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await GET(makeRequest('http://localhost/api/tickets/ticket-1'), ctx)
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 401 when user has customer role', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'customer' } })
+
+    const res = await GET(makeRequest('http://localhost/api/tickets/ticket-1'), ctx)
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user has no company', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'verkaeufer' } })
+    mockGetCompanyIdForUser.mockResolvedValue(null)
+
+    const res = await GET(makeRequest('http://localhost/api/tickets/ticket-1'), ctx)
+
+    expect(res.status).toBe(403)
+  })
+})
+
+// =====================================================================
+// Employee Auth: POST /api/tickets/[id] - reply auth + company check
+// =====================================================================
+
+describe('Employee Auth: POST /api/tickets/[id]', () => {
+  let POST: (request: NextRequest, ctx: { params: Promise<{ id: string }> }) => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/tickets/[id]/route')
+    POST = mod.POST
+  })
+
+  const ctx = { params: Promise.resolve({ id: 'ticket-1' }) }
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/tickets/ticket-1', {
+        method: 'POST',
+        body: JSON.stringify({ message: 'Hello' }),
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 401 when user is customer', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'customer' } })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/tickets/ticket-1', {
+        method: 'POST',
+        body: JSON.stringify({ message: 'Hello' }),
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user has no company', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'verkaeufer' } })
+    mockGetCompanyIdForUser.mockResolvedValue(null)
+
+    const res = await POST(
+      makeRequest('http://localhost/api/tickets/ticket-1', {
+        method: 'POST',
+        body: JSON.stringify({ message: 'Hello' }),
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 400 when message is empty', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'verkaeufer' } })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/tickets/ticket-1', {
+        method: 'POST',
+        body: JSON.stringify({ message: '' }),
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(400)
+  })
+})
+
+// =====================================================================
+// Employee Auth: PATCH /api/tickets/[id] - status update auth
+// =====================================================================
+
+describe('Employee Auth: PATCH /api/tickets/[id]', () => {
+  let PATCH: (request: NextRequest, ctx: { params: Promise<{ id: string }> }) => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/tickets/[id]/route')
+    PATCH = mod.PATCH
+  })
+
+  const ctx = { params: Promise.resolve({ id: 'ticket-1' }) }
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await PATCH(
+      makeRequest('http://localhost/api/tickets/ticket-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'GESCHLOSSEN' }),
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user has no company', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'verkaeufer' } })
+    mockGetCompanyIdForUser.mockResolvedValue(null)
+
+    const res = await PATCH(
+      makeRequest('http://localhost/api/tickets/ticket-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'GESCHLOSSEN' }),
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 400 when status is invalid', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'verkaeufer' } })
+
+    const res = await PATCH(
+      makeRequest('http://localhost/api/tickets/ticket-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'INVALID_STATUS' }),
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(400)
+  })
+})
+
+// =====================================================================
+// Employee Auth: POST /api/users/invite - auth + permission
+// =====================================================================
+
+describe('Employee Auth: POST /api/users/invite', () => {
+  let POST: (request: NextRequest) => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/users/invite/route')
+    POST = mod.POST
+  })
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/users/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'test@test.de', role: 'verkaeufer' }),
+      }),
+    )
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user cannot manage users', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    // can_manage_users returns false
+    mockRpc.mockResolvedValue({ data: false, error: null })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/users/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'test@test.de', role: 'verkaeufer' }),
+      }),
+    )
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 when no company assigned', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    // can_manage_users returns true, get_current_company_id returns null
+    mockRpc
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/users/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'test@test.de', role: 'verkaeufer' }),
+      }),
+    )
+
+    expect(res.status).toBe(403)
+  })
+})
+
+// =====================================================================
+// Employee Auth: POST /api/projects/send-portal-access - auth + role
+// =====================================================================
+
+describe('Employee Auth: POST /api/projects/send-portal-access', () => {
+  let POST: (request: NextRequest) => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/projects/send-portal-access/route')
+    POST = mod.POST
+  })
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/projects/send-portal-access', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'proj-1' }),
+      }),
+    )
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user is a customer', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'customer' } })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/projects/send-portal-access', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'proj-1' }),
+      }),
+    )
+
+    expect(res.status).toBe(403)
+  })
+})
+
+// =====================================================================
+// Employee Auth: POST /api/reminders/send - auth + company + permission
+// =====================================================================
+
+describe('Employee Auth: POST /api/reminders/send', () => {
+  let POST: (request: NextRequest) => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/reminders/send/route')
+    POST = mod.POST
+  })
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/reminders/send', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'p-1', invoiceId: 'i-1', reminderType: 'first' }),
+      }),
+    )
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when no company assigned', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    // get_current_company_id returns null
+    mockRpc.mockResolvedValue({ data: null, error: null })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/reminders/send', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'p-1', invoiceId: 'i-1', reminderType: 'first' }),
+      }),
+    )
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 when user lacks mark_payments permission', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    // get_current_company_id returns OK, has_permission returns false
+    mockRpc
+      .mockResolvedValueOnce({ data: 'company-1', error: null })
+      .mockResolvedValueOnce({ data: false, error: null })
+
+    const res = await POST(
+      makeRequest('http://localhost/api/reminders/send', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'p-1', invoiceId: 'i-1', reminderType: 'first' }),
+      }),
+    )
+
+    expect(res.status).toBe(403)
+  })
+})
+
+// =====================================================================
+// Employee Auth: GET /api/users/members - auth + can_manage_users + company
+// =====================================================================
+
+describe('Employee Auth: GET /api/users/members', () => {
+  let GET: () => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/users/members/route')
+    GET = mod.GET
+  })
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await GET()
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user cannot manage users', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    mockRpc.mockResolvedValue({ data: false, error: null })
+
+    const res = await GET()
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 when no company assigned', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    mockRpc
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+
+    const res = await GET()
+
+    expect(res.status).toBe(403)
+  })
+})
+
+// =====================================================================
+// Employee Auth: GET /api/users/permissions - auth + can_manage_users + company
+// =====================================================================
+
+describe('Employee Auth: GET /api/users/permissions', () => {
+  let GET: () => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/users/permissions/route')
+    GET = mod.GET
+  })
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await GET()
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user cannot manage users', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    mockRpc.mockResolvedValue({ data: false, error: null })
+
+    const res = await GET()
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 when no company assigned', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    mockRpc
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+
+    const res = await GET()
+
+    expect(res.status).toBe(403)
+  })
+})
+
+// =====================================================================
+// Employee Auth: GET /api/audit-logs - auth + role check + company
+// =====================================================================
+
+describe('Employee Auth: GET /api/audit-logs', () => {
+  let GET: (request: NextRequest) => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/audit-logs/route')
+    GET = mod.GET
+  })
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await GET(makeRequest('http://localhost/api/audit-logs'))
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user has customer role', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: { role: 'customer' } })
+
+    const res = await GET(makeRequest('http://localhost/api/audit-logs'))
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 when no company assigned', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    mockRpc.mockResolvedValue({ data: null, error: null })
+
+    const res = await GET(makeRequest('http://localhost/api/audit-logs'))
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 when user lacks admin role for audit logs', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    mockRpc.mockResolvedValue({ data: 'company-1', error: null })
+    // mockFrom for company_members returns no member or role verkaeufer -> 403
+    const builder = createChainBuilder()
+    builder.single = jest.fn().mockResolvedValue({ data: { role: 'verkaeufer' }, error: null })
+    mockFrom.mockImplementation(() => builder)
+
+    const res = await GET(makeRequest('http://localhost/api/audit-logs'))
+
+    expect(res.status).toBe(403)
+  })
+})
+
+// =====================================================================
+// Employee Auth: GET /api/calendar/team - auth + menu_calendar permission
+// =====================================================================
+
+describe('Employee Auth: GET /api/calendar/team', () => {
+  let GET: () => Promise<NextResponse>
+
+  beforeAll(async () => {
+    const mod = await import('@/app/api/calendar/team/route')
+    GET = mod.GET
+  })
+
+  it('returns 401 when no user', async () => {
+    setEmployeeAuth(null, { message: 'not authenticated' })
+
+    const res = await GET()
+
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when user lacks menu_calendar permission', async () => {
+    setEmployeeAuth({ id: 'u-1', app_metadata: {} })
+    mockRpc.mockResolvedValue({ data: false, error: null })
+
+    const res = await GET()
+
+    expect(res.status).toBe(403)
   })
 })

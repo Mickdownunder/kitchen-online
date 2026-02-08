@@ -34,6 +34,7 @@ export function resetMock(): void {
   _nextResult = { data: null, error: null }
   _resultQueue.length = 0
   _getUserResult = { data: { user: null }, error: null }
+  _rpcResult = { data: null, error: null }
 }
 
 function dequeueResult(): QueryResult {
@@ -92,10 +93,20 @@ export function mockGetUser(user: Record<string, unknown> | null, error: unknown
   _getUserResult = { data: { user }, error }
 }
 
+// ─── RPC mock ────────────────────────────────────────────────────────────
+
+let _rpcResult: { data: unknown; error: unknown } = { data: null, error: null }
+
+/** Sets the result for `supabase.rpc(name)`. */
+export function mockRpcResult(result: Partial<{ data: unknown; error: unknown }>): void {
+  _rpcResult = { data: null, error: null, ...result }
+}
+
 // ─── Supabase client ────────────────────────────────────────────────────
 
 export const supabase = {
   from: jest.fn().mockImplementation(() => createQueryBuilder()),
+  rpc: jest.fn().mockImplementation(() => Promise.resolve(_rpcResult)),
   auth: {
     getUser: jest.fn().mockImplementation(() => Promise.resolve(_getUserResult)),
     signUp: jest.fn(),

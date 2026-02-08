@@ -61,6 +61,7 @@ pnpm --filter @kitchen/crm dev
 
 ## Weitere Infos
 
+- **Dokumentation (Hauptindex):** [docs/README.md](docs/README.md)
 - **CRM + Portal (Setup, API, Tests, Deployment):** [apps/crm/README.md](apps/crm/README.md)
 - **Datenbank (Migrationen, Befehle):** [packages/db/README.md](packages/db/README.md)
 - **Cal.com-Buchungs-Webhook:** [apps/crm/docs/BOOKING_WEBHOOK_SETUP.md](apps/crm/docs/BOOKING_WEBHOOK_SETUP.md)

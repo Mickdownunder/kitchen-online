@@ -1,4 +1,4 @@
-# Allgemeine Geschäftsbedingungen (AGB)
+pnpm test# Allgemeine Geschäftsbedingungen (AGB)
 
 **Michael Labitzke e.U.**  
 UID: ATU 69962114  

@@ -305,9 +305,15 @@ pnpm --filter @kitchen/crm test
 
 | Dokument | Inhalt |
 |----------|--------|
-| `apps/crm/docs/BOOKING_WEBHOOK_SETUP.md` | Cal.com-Webhook: Supabase, Cal.com-Event, Webhook-URL, Env, Test |
-
-Weitere Konventionen/Context für Agents: ggf. `AGENT_CONTEXT.md` im Repo-Root.
+| `docs/README.md` | Hauptindex aller Dokumentation |
+| `docs/API_REFERENCE.md` | API-Routen, Auth, Fehlercodes |
+| `docs/ARCHITECTURE.md` | System-Architektur, Multi-Tenant |
+| `docs/CODE_CONVENTIONS.md` | Code-Stil, Patterns |
+| `docs/SECURITY.md` | Auth-Flows, RLS |
+| `docs/DEPLOYMENT.md` | Vercel, CRON, Env |
+| `docs/TROUBLESHOOTING.md` | Typische Fehler |
+| `apps/crm/docs/BOOKING_WEBHOOK_SETUP.md` | Cal.com-Webhook: Setup, Test |
+| `apps/crm/docs/ONBOARDING.md` | Checkliste für neue Entwickler |
 
 ---
 

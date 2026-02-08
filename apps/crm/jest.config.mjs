@@ -13,6 +13,14 @@ const config = {
     '^.+\\.(t|j)sx?$': ['@swc/jest'],
   },
   clearMocks: true,
+  coverageThreshold: {
+    global: {
+      statements: 41,
+      branches: 31,
+      functions: 51,
+      lines: 43,
+    },
+  },
 }
 
 export default createJestConfig(config)
