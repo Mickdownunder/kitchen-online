@@ -1,45 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-/**
- * Helper: Customer Session aus Request extrahieren
- * Nur noch customer_id erforderlich (kein project_id mehr!)
- */
-async function getCustomerSession(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-  
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  )
-
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-
-  if (error || !user) {
-    return null
-  }
-
-  const customer_id = user.app_metadata?.customer_id
-  const role = user.app_metadata?.role
-
-  if (!customer_id || role !== 'customer') {
-    return null
-  }
-
-  return { customer_id, user_id: user.id }
-}
+import { requireCustomerSession } from '@/lib/auth/requireCustomerSession'
 
 /**
  * GET /api/customer/appliances
@@ -50,28 +10,11 @@ async function getCustomerSession(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCustomerSession(request)
-    
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
+    const result = await requireCustomerSession(request)
+    if (result instanceof NextResponse) return result
+    const { customer_id, supabase } = result
 
-    const { customer_id } = session
     const requestedProjectId = request.nextUrl.searchParams.get('projectId')
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
 
     // 1. Get project IDs for this customer
     let projectIds: string[] = []

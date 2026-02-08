@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { requireCustomerSession } from '@/lib/auth/requireCustomerSession'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 function extractStoragePath(fileUrlOrPath: string) {
   const bucketMarker = '/documents/'
@@ -8,42 +9,6 @@ function extractStoragePath(fileUrlOrPath: string) {
     return fileUrlOrPath.substring(markerIndex + bucketMarker.length)
   }
   return fileUrlOrPath
-}
-
-async function getCustomerSession(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  )
-
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-
-  if (error || !user) {
-    return null
-  }
-
-  const customer_id = user.app_metadata?.customer_id
-  const role = user.app_metadata?.role
-
-  if (!customer_id || role !== 'customer') {
-    return null
-  }
-
-  return { customer_id }
 }
 
 async function isCustomerProject(
@@ -74,24 +39,9 @@ export async function GET(
   try {
     const { id: ticketId, messageId } = await params
 
-    const session = await getCustomerSession(request)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    const result = await requireCustomerSession(request)
+    if (result instanceof NextResponse) return result
+    const { customer_id, supabase } = result
 
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
@@ -106,7 +56,7 @@ export async function GET(
       )
     }
 
-    const ownsProject = await isCustomerProject(supabase, session.customer_id, ticket.project_id)
+    const ownsProject = await isCustomerProject(supabase, customer_id, ticket.project_id)
     if (!ownsProject) {
       return NextResponse.json(
         { success: false, error: 'FORBIDDEN' },

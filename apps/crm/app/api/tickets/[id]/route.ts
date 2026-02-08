@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const ReplySchema = z.object({
@@ -15,38 +14,6 @@ const UpdateStatusSchema = z.object({
 })
 
 /**
- * Helper: Employee Session aus Request extrahieren (uses SSR client)
- */
-async function getEmployeeSession() {
-  const supabase = await createClient()
-  
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
-
-  // Check if NOT a customer (employees don't have 'customer' role)
-  const role = user.app_metadata?.role
-  if (role === 'customer') return null
-
-  return { user_id: user.id }
-}
-
-/**
- * Helper: Create service client for database operations
- */
-function createDbClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  )
-}
-
-/**
  * GET /api/tickets/[id]
  * 
  * Holt Ticket-Details mit Nachrichten (für CRM)
@@ -58,21 +25,22 @@ export async function GET(
   try {
     const { id: ticketId } = await params
 
-    const session = await getEmployeeSession()
-    if (!session) {
+    const authClient = await createClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user || user.app_metadata?.role === 'customer') {
       return NextResponse.json(
         { success: false, error: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
 
-    const supabase = createDbClient()
+    const supabase = await createServiceClient()
 
     // Get user's company_id via company_members
     const { data: companyMember } = await supabase
       .from('company_members')
       .select('company_id')
-      .eq('user_id', session.user_id)
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .single()
 
@@ -166,8 +134,9 @@ export async function POST(
   try {
     const { id: ticketId } = await params
 
-    const session = await getEmployeeSession()
-    if (!session) {
+    const authClient = await createClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user || user.app_metadata?.role === 'customer') {
       return NextResponse.json(
         { success: false, error: 'UNAUTHORIZED' },
         { status: 401 }
@@ -186,13 +155,13 @@ export async function POST(
 
     const { message } = parsed.data
 
-    const supabase = createDbClient()
+    const supabase = await createServiceClient()
 
     // Get user's company_id via company_members
     const { data: companyMember } = await supabase
       .from('company_members')
       .select('company_id')
-      .eq('user_id', session.user_id)
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .single()
 
@@ -207,7 +176,7 @@ export async function POST(
     const { data: userProfile } = await supabase
       .from('user_profiles')
       .select('full_name')
-      .eq('id', session.user_id)
+      .eq('id', user.id)
       .single()
 
     // Verify ticket belongs to employee's company
@@ -231,7 +200,7 @@ export async function POST(
       .insert({
         ticket_id: ticketId,
         author_id: null, // Not a customer
-        employee_id: session.user_id,
+        employee_id: user.id,
         message,
         is_customer: false,
         author_type: 'employee',
@@ -292,8 +261,9 @@ export async function PATCH(
   try {
     const { id: ticketId } = await params
 
-    const session = await getEmployeeSession()
-    if (!session) {
+    const authClient = await createClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user || user.app_metadata?.role === 'customer') {
       return NextResponse.json(
         { success: false, error: 'UNAUTHORIZED' },
         { status: 401 }
@@ -312,13 +282,13 @@ export async function PATCH(
 
     const { status } = parsed.data
 
-    const supabase = createDbClient()
+    const supabase = await createServiceClient()
 
     // Get user's company_id via company_members
     const { data: companyMember } = await supabase
       .from('company_members')
       .select('company_id')
-      .eq('user_id', session.user_id)
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .single()
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { requireCustomerSession } from '@/lib/auth/requireCustomerSession'
 
 const ALLOWED_TYPES = [
   'PLANE',
@@ -10,42 +11,6 @@ const ALLOWED_TYPES = [
   'AUSMESSBERICHT',
   'KUNDEN_DOKUMENT',
 ]
-
-async function getCustomerSession(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  )
-
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-
-  if (error || !user) {
-    return null
-  }
-
-  const customer_id = user.app_metadata?.customer_id
-  const role = user.app_metadata?.role
-
-  if (!customer_id || role !== 'customer') {
-    return null
-  }
-
-  return { customer_id }
-}
 
 async function isCustomerProject(
   supabase: SupabaseClient,
@@ -75,24 +40,9 @@ export async function GET(
   try {
     const { id: documentId } = await params
 
-    const session = await getCustomerSession(request)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    const result = await requireCustomerSession(request)
+    if (result instanceof NextResponse) return result
+    const { customer_id, supabase } = result
 
     const { data: document, error: fetchError } = await supabase
       .from('documents')
@@ -100,14 +50,14 @@ export async function GET(
       .eq('id', documentId)
       .single()
 
-    if (fetchError || !document) {
+    if (fetchError || !document || !document.project_id) {
       return NextResponse.json(
         { success: false, error: 'DOCUMENT_NOT_FOUND' },
         { status: 404 }
       )
     }
 
-    const ownsProject = await isCustomerProject(supabase, session.customer_id, document.project_id)
+    const ownsProject = await isCustomerProject(supabase, customer_id, document.project_id)
     if (!ownsProject) {
       return NextResponse.json(
         { success: false, error: 'FORBIDDEN' },
@@ -115,7 +65,7 @@ export async function GET(
       )
     }
 
-    if (!ALLOWED_TYPES.includes(document.type)) {
+    if (!document.type || !ALLOWED_TYPES.includes(document.type)) {
       return NextResponse.json(
         { success: false, error: 'FORBIDDEN' },
         { status: 403 }

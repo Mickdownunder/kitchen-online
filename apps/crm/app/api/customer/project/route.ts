@@ -1,46 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-/**
- * Helper: Customer Session aus Request extrahieren
- * Nur noch customer_id erforderlich (kein project_id mehr!)
- */
-async function getCustomerSession(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-  
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  )
-
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-
-  if (error || !user) {
-    return null
-  }
-
-  const customer_id = user.app_metadata?.customer_id
-  const role = user.app_metadata?.role
-
-  // Nur customer_id und role=customer erforderlich
-  if (!customer_id || role !== 'customer') {
-    return null
-  }
-
-  return { customer_id, user_id: user.id }
-}
+import { requireCustomerSession } from '@/lib/auth/requireCustomerSession'
 
 /**
  * GET /api/customer/project
@@ -52,28 +11,9 @@ async function getCustomerSession(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // 1. Session prüfen
-    const session = await getCustomerSession(request)
-    
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-
-    const { customer_id } = session
-
-    // 2. Supabase Admin Client
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    const result = await requireCustomerSession(request)
+    if (result instanceof NextResponse) return result
+    const { customer_id, supabase } = result
 
     // 3. Alle Projekte des Kunden laden (inkl. Termin-Daten)
     const { data: allProjects, error: projectsError } = await supabase

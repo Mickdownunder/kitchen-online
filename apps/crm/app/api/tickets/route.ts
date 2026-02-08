@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
-
-/**
- * Helper: Employee Session aus Request extrahieren (uses SSR client)
- */
-async function getEmployeeSession() {
-  const supabase = await createClient()
-  
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
-
-  // Check if NOT a customer (employees don't have 'customer' role)
-  const role = user.app_metadata?.role
-  if (role === 'customer') return null
-
-  return { user_id: user.id }
-}
 
 /**
  * GET /api/tickets
@@ -26,8 +9,9 @@ async function getEmployeeSession() {
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getEmployeeSession()
-    if (!session) {
+    const authClient = await createClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user || user.app_metadata?.role === 'customer') {
       return NextResponse.json(
         { success: false, error: 'UNAUTHORIZED' },
         { status: 401 }
@@ -39,28 +23,19 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get('projectId') // Optional filter
 
     // Use service client for database operations
-    const supabase = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    const supabase = await createServiceClient()
 
     // Get user's company_id via company_members
     const { data: companyMember } = await supabase
       .from('company_members')
       .select('company_id')
-      .eq('user_id', session.user_id)
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .single()
 
     logger.debug('Tickets API request', {
       component: 'api/tickets',
-      userId: session.user_id,
+      userId: user.id,
       companyId: companyMember?.company_id,
     })
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { requireCustomerSession } from '@/lib/auth/requireCustomerSession'
 
 // Types for database queries
 interface ProjectIdRow {
@@ -15,45 +16,6 @@ interface DocumentRow {
 // Upload Limits
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic']
-
-/**
- * Helper: Customer Session aus Request extrahieren
- */
-async function getCustomerSession(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-  
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  )
-
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-
-  if (error || !user) {
-    return null
-  }
-
-  const customer_id = user.app_metadata?.customer_id
-  const role = user.app_metadata?.role
-
-  if (!customer_id || role !== 'customer') {
-    return null
-  }
-
-  return { customer_id, user_id: user.id }
-}
 
 async function resolveProjectId(
   supabase: SupabaseClient,
@@ -94,16 +56,9 @@ async function resolveProjectId(
 export async function POST(request: NextRequest) {
   try {
     // 1. Session prüfen
-    const session = await getCustomerSession(request)
-    
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-
-    const { customer_id } = session
+    const result = await requireCustomerSession(request)
+    if (result instanceof NextResponse) return result
+    const { customer_id, supabase } = result
 
     // 2. FormData parsen
     const formData = await request.formData()
@@ -131,18 +86,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    // 4. Supabase Admin Client
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
 
     const projectId = await resolveProjectId(supabase, customer_id, requestedProjectId)
     if (!projectId) {
