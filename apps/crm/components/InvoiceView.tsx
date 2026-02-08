@@ -40,8 +40,9 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
   // Lade frische Rechnungsdaten beim Mount
   useEffect(() => {
     const loadFreshInvoice = async () => {
-      try {
-        const freshInvoice = await getInvoice(invoiceProp.id)
+      const result = await getInvoice(invoiceProp.id)
+      if (result.ok) {
+        const freshInvoice = result.data
         if (freshInvoice) {
           // Merge mit ListInvoice Feldern
           setCurrentInvoice({
@@ -51,8 +52,8 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
             status: freshInvoice.isPaid ? 'paid' : 'sent',
           } as ListInvoice)
         }
-      } catch (error) {
-        logger.error('Error loading fresh invoice', { component: 'InvoiceView' }, error as Error)
+      } else {
+        logger.error('Error loading fresh invoice', { component: 'InvoiceView' }, new Error(result.message))
       }
     }
     loadFreshInvoice()
@@ -81,7 +82,8 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
   useEffect(() => {
     const loadPartials = async () => {
       if (!isDeposit && (project?.id || invoice.projectId)) {
-        const allInvoices = await getInvoices(project?.id || invoice.projectId)
+        const result = await getInvoices(project?.id || invoice.projectId)
+        const allInvoices = result.ok ? result.data : []
         const partials = allInvoices.filter(inv => inv.type === 'partial')
         setPartialInvoices(partials as unknown as ListInvoice[])
       }
@@ -155,8 +157,8 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
     setIsGenerating(true)
     try {
       // Always fetch the latest invoice data to ensure isPaid status is current
-      const freshInvoice = await getInvoice(invoice.id)
-      const currentInvoice = freshInvoice || invoice
+      const result = await getInvoice(invoice.id)
+      const currentInvoice = result.ok && result.data ? result.data : invoice
 
       // Konvertiere partialInvoices zu PartialPayment-Format für PDF-Kompatibilität
       const partialPaymentsForPDF = partialInvoices.map(inv => ({

@@ -92,10 +92,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Lade Rechnung aus der neuen invoices-Tabelle
-    const invoice = await getInvoice(invoiceId)
-    if (!invoice) {
+    const invoiceResult = await getInvoice(invoiceId)
+    if (!invoiceResult.ok) {
       return apiErrors.notFound()
     }
+    const invoice = invoiceResult.data
 
     // Konvertiere für Kompatibilität
     const invoiceForReminder = {
@@ -240,19 +241,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Speichere Reminder in der neuen invoices-Tabelle
-    try {
-      const updatedReminders = [...(invoice.reminders || []), reminder]
-      await updateInvoice(invoiceId, {
-        reminders: updatedReminders,
-      })
+    const updatedReminders = [...(invoice.reminders || []), reminder]
+    const updateResult = await updateInvoice(invoiceId, {
+      reminders: updatedReminders,
+    })
 
+    if (updateResult.ok) {
       logger.info('Reminder erfolgreich gespeichert', {
         component: 'api/reminders/send',
         projectId,
         invoiceId,
         reminderType,
       })
-    } catch (error: unknown) {
+    } else {
       logger.error(
         'Fehler beim Speichern des Reminders',
         {
@@ -261,7 +262,6 @@ export async function POST(request: NextRequest) {
           invoiceId,
           reminderType,
         },
-        error as Error
       )
       // E-Mail wurde bereits gesendet, aber Reminder konnte nicht gespeichert werden
       // Das ist nicht kritisch, aber sollte geloggt werden

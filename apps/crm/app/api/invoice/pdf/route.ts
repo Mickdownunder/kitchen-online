@@ -69,13 +69,11 @@ export async function POST(request: NextRequest) {
       description?: string
     }[] = []
     if (invoiceType === 'final' && project.id) {
-      try {
-        const projectInvoices = await getInvoices(project.id)
-        priorInvoices = projectInvoices
+      const invoicesResult = await getInvoices(project.id)
+      if (invoicesResult.ok) {
+        priorInvoices = invoicesResult.data
           .filter(inv => inv.type === 'partial' && inv.invoiceNumber !== invoice.invoiceNumber)
           .map(invoiceToPriorInfo)
-      } catch (error) {
-        console.error('Error loading prior invoices:', error)
       }
     }
 

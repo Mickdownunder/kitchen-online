@@ -127,7 +127,8 @@ export async function POST(request: NextRequest) {
           }
 
           // Lade Rechnungen aus der invoices-Tabelle
-          const invoices = await getInvoices(projectId)
+          const invoicesResult = await getInvoices(projectId)
+          const invoices = invoicesResult.ok ? invoicesResult.data : []
           let invoice = null
 
           if (invoiceId) {

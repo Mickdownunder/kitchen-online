@@ -106,11 +106,9 @@ const AccountingView: React.FC<AccountingViewProps> = ({ projects }) => {
 
   // Lade alle Rechnungen aus der neuen invoices-Tabelle
   const loadInvoices = useCallback(async () => {
-    try {
-      const invoices = await getInvoicesWithProject()
-      setDbInvoices(invoices)
-    } catch (error) {
-      logger.error('Fehler beim Laden der Rechnungen', { component: 'AccountingView' }, error as Error)
+    const result = await getInvoicesWithProject()
+    if (result.ok) {
+      setDbInvoices(result.data)
     }
   }, [])
 

@@ -158,14 +158,11 @@ async function generateInvoicePDF(
   // For final invoices, load prior partial invoices from DB if not provided
   let priorPayments = priorInvoices || []
   if (invoiceType === 'final' && !priorInvoices) {
-    try {
-      const projectInvoices = await getInvoices(project.id)
-      priorPayments = projectInvoices.filter(
+    const invoicesResult = await getInvoices(project.id)
+    if (invoicesResult.ok) {
+      priorPayments = invoicesResult.data.filter(
         inv => inv.type === 'partial' && inv.invoiceNumber !== invoice.invoiceNumber
       )
-    } catch (error) {
-      console.error('Error loading prior invoices:', error)
-      priorPayments = []
     }
   }
 
@@ -174,15 +171,12 @@ async function generateInvoicePDF(
   let recipientPhone = project.phone || ''
   let recipientEmail = project.email || ''
   if (!recipientAddress && project.customerId) {
-    try {
-      const customer = await getCustomer(project.customerId)
-      if (customer) {
-        recipientAddress = formatCustomerAddress(customer)
-        if (!recipientPhone && customer.contact?.phone) recipientPhone = customer.contact.phone
-        if (!recipientEmail && customer.contact?.email) recipientEmail = customer.contact.email
-      }
-    } catch {
-      // Fallback: Projekt-Daten beibehalten
+    const result = await getCustomer(project.customerId)
+    if (result.ok) {
+      const customer = result.data
+      recipientAddress = formatCustomerAddress(customer)
+      if (!recipientPhone && customer.contact?.phone) recipientPhone = customer.contact.phone
+      if (!recipientEmail && customer.contact?.email) recipientEmail = customer.contact.email
     }
   }
   // Fallback: Adresse aus Einzelfeldern bauen (wenn im Projekt vorhanden)

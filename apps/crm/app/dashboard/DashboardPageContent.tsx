@@ -27,7 +27,7 @@ export default function DashboardPageContent() {
 
     async function fetchDashboardData() {
       try {
-        const [invoices, ticketResponse] = await Promise.all([
+        const [invoicesResult, ticketResponse] = await Promise.all([
           getOpenInvoices(),
           fetch('/api/tickets')
             .then(r => r.ok ? r.json() : { data: { stats: { total: 0, open: 0, inProgress: 0, closed: 0 } } })
@@ -35,6 +35,7 @@ export default function DashboardPageContent() {
         ])
 
         if (!cancelled) {
+          const invoices = invoicesResult.ok ? invoicesResult.data : []
           setOpenInvoices(invoices)
           if (ticketResponse?.data?.stats) {
             setTicketStats(ticketResponse.data.stats)

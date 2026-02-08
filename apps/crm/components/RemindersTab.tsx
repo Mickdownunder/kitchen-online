@@ -30,11 +30,9 @@ export function RemindersTab({ projects, onProjectUpdate }: RemindersTabProps) {
 
   // Lade Rechnungen aus der neuen invoices-Tabelle
   const loadInvoices = useCallback(async () => {
-    try {
-      const invoices = await getInvoicesWithProject()
-      setDbInvoices(invoices)
-    } catch (error) {
-      console.error('Error loading invoices for reminders:', error)
+    const result = await getInvoicesWithProject()
+    if (result.ok) {
+      setDbInvoices(result.data)
     }
   }, [])
 

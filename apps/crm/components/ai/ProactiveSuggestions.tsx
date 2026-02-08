@@ -18,11 +18,9 @@ export const ProactiveSuggestions: React.FC<ProactiveSuggestionsProps> = ({
   const [openInvoices, setOpenInvoices] = useState<Invoice[]>([])
 
   const loadOpenInvoices = useCallback(async () => {
-    try {
-      const invoices = await getOpenInvoices()
-      setOpenInvoices(invoices)
-    } catch (error) {
-      console.error('Error loading open invoices for suggestions:', error)
+    const result = await getOpenInvoices()
+    if (result.ok) {
+      setOpenInvoices(result.data)
     }
   }, [])
 

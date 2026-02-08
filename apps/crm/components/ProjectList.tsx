@@ -106,16 +106,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
   }, [])
 
   const loadInvoices = async () => {
-    try {
-      const data = await getInvoices()
-      setInvoices(data)
-    } catch (err: unknown) {
-      const errMessage = err instanceof Error ? err.message : ''
-      const errName = err instanceof Error ? err.name : ''
-      if (errMessage.includes('aborted') || errName === 'AbortError') {
-        return
-      }
-      logger.error('Error loading invoices for indicators', { component: 'ProjectList' }, err as Error)
+    const result = await getInvoices()
+    if (result.ok) {
+      setInvoices(result.data)
     }
   }
 
@@ -158,17 +151,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
   }, [initialOpenProjectId, projects, modals.openProjectModal])
 
   const loadCustomers = async () => {
-    try {
-      const data = await getCustomers()
-      setCustomers(data)
-    } catch (error: unknown) {
-      // Ignore aborted requests (normal during page navigation)
-      const errMessage = error instanceof Error ? error.message : ''
-      const errName = error instanceof Error ? error.name : ''
-      if (errMessage.includes('aborted') || errName === 'AbortError') {
-        return
-      }
-      logger.error('Error loading customers', { component: 'ProjectList' }, error as Error)
+    const result = await getCustomers()
+    if (result.ok) {
+      setCustomers(result.data)
     }
   }
 

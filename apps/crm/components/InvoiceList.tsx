@@ -67,14 +67,11 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   // silent=true: Kein Lade-Spinner, Liste bleibt sichtbar (für Live-Updates bei Status-Änderung)
   const loadInvoices = useCallback(async (silent = false) => {
     if (!silent) setLoadingInvoices(true)
-    try {
-      const invoices = await getInvoicesWithProject()
-      setDbInvoices(invoices)
-    } catch (error) {
-      logger.error('Error loading invoices', { component: 'InvoiceList' }, error as Error)
-    } finally {
-      if (!silent) setLoadingInvoices(false)
+    const result = await getInvoicesWithProject()
+    if (result.ok) {
+      setDbInvoices(result.data)
     }
+    if (!silent) setLoadingInvoices(false)
   }, [])
 
   useEffect(() => {
@@ -129,33 +126,21 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
 
   const handleMarkAsPaid = async (invoice: ListInvoice) => {
     setSaving(true)
-    try {
-      await markInvoicePaid(invoice.id, paidDateInput)
-      setMarkingPaidId(null)
-      // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
-      await loadInvoices(true)
-      if (onProjectUpdate) onProjectUpdate()
-    } catch (error) {
-      logger.error('Error marking as paid', { component: 'InvoiceList' }, error as Error)
-      showError('Fehler beim Speichern')
-    } finally {
-      setSaving(false)
-    }
+    await markInvoicePaid(invoice.id, paidDateInput)
+    setMarkingPaidId(null)
+    // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
+    await loadInvoices(true)
+    if (onProjectUpdate) onProjectUpdate()
+    setSaving(false)
   }
 
   const handleUnmarkAsPaid = async (invoice: ListInvoice) => {
     setSaving(true)
-    try {
-      await markInvoiceUnpaid(invoice.id)
-      // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
-      await loadInvoices(true)
-      if (onProjectUpdate) onProjectUpdate()
-    } catch (error) {
-      logger.error('Error unmarking as paid', { component: 'InvoiceList' }, error as Error)
-      showError('Fehler beim Speichern')
-    } finally {
-      setSaving(false)
-    }
+    await markInvoiceUnpaid(invoice.id)
+    // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
+    await loadInvoices(true)
+    if (onProjectUpdate) onProjectUpdate()
+    setSaving(false)
   }
 
   const { filteredInvoices, availableYears } = useInvoiceFilters({

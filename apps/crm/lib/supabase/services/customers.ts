@@ -1,123 +1,148 @@
 import { supabase } from '../client'
-import { Customer } from '@/types'
 import { getCurrentUser } from './auth'
+import type { Customer } from '@/types'
+import type { ServiceResult, Row, Insert, Update } from '@/lib/types/service'
+import { ok, fail } from '@/lib/types/service'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CustomerRow = Record<string, any>
+type CustomerRow = Row<'customers'>
+type CustomerInsert = Insert<'customers'>
+type CustomerUpdate = Update<'customers'>
 
-export async function getCustomers(): Promise<Customer[]> {
+// ─────────────────────────────────────────────────────
+// Queries
+// ─────────────────────────────────────────────────────
+
+export async function getCustomers(): Promise<ServiceResult<Customer[]>> {
   const { data, error } = await supabase
     .from('customers')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) throw error
-  return data.map(mapCustomerFromDB)
+  if (error) return fail('INTERNAL', error.message, error)
+  return ok(data.map(mapCustomerFromDB))
 }
 
-export async function getCustomer(id: string): Promise<Customer | null> {
-  const { data, error } = await supabase.from('customers').select('*').eq('id', id).single()
-
-  if (error) throw error
-  return data ? mapCustomerFromDB(data) : null
-}
-
-export async function createCustomer(
-  customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>
-): Promise<Customer> {
-  const user = await getCurrentUser()
-  if (!user) throw new Error('Not authenticated')
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getCustomer(id: string): Promise<ServiceResult<Customer>> {
   const { data, error } = await supabase
     .from('customers')
-    .insert({
-      user_id: user.id,
-      salutation: customer.salutation,
-      first_name: customer.firstName,
-      last_name: customer.lastName,
-      company_name: customer.companyName,
-      street: customer.address.street,
-      house_number: customer.address.houseNumber,
-      postal_code: customer.address.postalCode,
-      city: customer.address.city,
-      country: customer.address.country || 'Österreich',
-      phone: customer.contact.phone,
-      mobile: customer.contact.mobile,
-      email: customer.contact.email,
-      alternative_email: customer.contact.alternativeEmail,
-      tax_id: customer.taxId,
-      payment_terms: customer.paymentTerms || 14,
-      notes: customer.notes,
-    } as any)
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) return fail('NOT_FOUND', `Customer ${id} not found`, error)
+  return ok(mapCustomerFromDB(data))
+}
+
+// ─────────────────────────────────────────────────────
+// Mutations
+// ─────────────────────────────────────────────────────
+
+export async function createCustomer(
+  customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<ServiceResult<Customer>> {
+  const user = await getCurrentUser()
+  if (!user) return fail('UNAUTHORIZED', 'Not authenticated')
+
+  const insert: CustomerInsert = {
+    user_id: user.id,
+    salutation: customer.salutation as CustomerInsert['salutation'],
+    first_name: customer.firstName,
+    last_name: customer.lastName,
+    company_name: customer.companyName,
+    street: customer.address.street,
+    house_number: customer.address.houseNumber,
+    postal_code: customer.address.postalCode,
+    city: customer.address.city,
+    country: customer.address.country || 'Österreich',
+    phone: customer.contact.phone,
+    mobile: customer.contact.mobile,
+    email: customer.contact.email,
+    alternative_email: customer.contact.alternativeEmail,
+    tax_id: customer.taxId,
+    payment_terms: customer.paymentTerms ?? 14,
+    notes: customer.notes,
+  }
+
+  const { data, error } = await supabase
+    .from('customers')
+    .insert(insert)
     .select()
     .single()
 
-  if (error) throw error
-  return mapCustomerFromDB(data)
+  if (error) return fail('INTERNAL', error.message, error)
+  return ok(mapCustomerFromDB(data))
 }
 
-export async function updateCustomer(id: string, customer: Partial<Customer>): Promise<Customer> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function updateCustomer(
+  id: string,
+  customer: Partial<Customer>,
+): Promise<ServiceResult<Customer>> {
+  const update: CustomerUpdate = {
+    salutation: customer.salutation as CustomerUpdate['salutation'],
+    first_name: customer.firstName,
+    last_name: customer.lastName,
+    company_name: customer.companyName,
+    street: customer.address?.street,
+    house_number: customer.address?.houseNumber,
+    postal_code: customer.address?.postalCode,
+    city: customer.address?.city,
+    country: customer.address?.country,
+    phone: customer.contact?.phone,
+    mobile: customer.contact?.mobile,
+    email: customer.contact?.email,
+    alternative_email: customer.contact?.alternativeEmail,
+    tax_id: customer.taxId,
+    payment_terms: customer.paymentTerms,
+    notes: customer.notes,
+  }
+
   const { data, error } = await supabase
     .from('customers')
-    .update({
-      salutation: customer.salutation,
-      first_name: customer.firstName,
-      last_name: customer.lastName,
-      company_name: customer.companyName,
-      street: customer.address?.street,
-      house_number: customer.address?.houseNumber,
-      postal_code: customer.address?.postalCode,
-      city: customer.address?.city,
-      country: customer.address?.country,
-      phone: customer.contact?.phone,
-      mobile: customer.contact?.mobile,
-      email: customer.contact?.email,
-      alternative_email: customer.contact?.alternativeEmail,
-      tax_id: customer.taxId,
-      payment_terms: customer.paymentTerms,
-      notes: customer.notes,
-    } as any)
+    .update(update)
     .eq('id', id)
     .select()
     .single()
 
-  if (error) throw error
-  return mapCustomerFromDB(data)
+  if (error) return fail('INTERNAL', error.message, error)
+  return ok(mapCustomerFromDB(data))
 }
 
-export async function deleteCustomer(id: string): Promise<void> {
+export async function deleteCustomer(id: string): Promise<ServiceResult<void>> {
   const { error } = await supabase.from('customers').delete().eq('id', id)
 
-  if (error) throw error
+  if (error) return fail('INTERNAL', error.message, error)
+  return ok(undefined)
 }
 
-function mapCustomerFromDB(dbCustomer: CustomerRow): Customer {
+// ─────────────────────────────────────────────────────
+// Mapping
+// ─────────────────────────────────────────────────────
+
+function mapCustomerFromDB(row: CustomerRow): Customer {
   return {
-    id: dbCustomer.id,
-    userId: dbCustomer.user_id,
-    firstName: dbCustomer.first_name,
-    lastName: dbCustomer.last_name,
-    companyName: dbCustomer.company_name,
-    salutation: dbCustomer.salutation,
+    id: row.id,
+    userId: row.user_id ?? undefined,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    companyName: row.company_name ?? undefined,
+    salutation: row.salutation ?? undefined,
     address: {
-      street: dbCustomer.street,
-      houseNumber: dbCustomer.house_number,
-      postalCode: dbCustomer.postal_code,
-      city: dbCustomer.city,
-      country: dbCustomer.country,
+      street: row.street,
+      houseNumber: row.house_number ?? undefined,
+      postalCode: row.postal_code,
+      city: row.city,
+      country: row.country ?? undefined,
     },
     contact: {
-      phone: dbCustomer.phone,
-      mobile: dbCustomer.mobile,
-      email: dbCustomer.email,
-      alternativeEmail: dbCustomer.alternative_email,
+      phone: row.phone,
+      mobile: row.mobile ?? undefined,
+      email: row.email,
+      alternativeEmail: row.alternative_email ?? undefined,
     },
-    taxId: dbCustomer.tax_id,
-    paymentTerms: dbCustomer.payment_terms,
-    notes: dbCustomer.notes,
-    createdAt: dbCustomer.created_at,
-    updatedAt: dbCustomer.updated_at,
+    taxId: row.tax_id ?? undefined,
+    paymentTerms: row.payment_terms ?? undefined,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at ?? '',
+    updatedAt: row.updated_at ?? '',
   }
 }

@@ -281,7 +281,9 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
 
       // 1. Rechnungen aus der neuen invoices-Tabelle
       try {
-        const invoices = await getInvoices(project.id)
+        const invoicesResult = await getInvoices(project.id)
+        if (!invoicesResult.ok) throw new Error('Failed to load invoices')
+        const invoices = invoicesResult.data
         invoices.forEach((invoice: Invoice) => {
           const isPartial = invoice.type === 'partial'
           const isCredit = invoice.type === 'credit'
@@ -487,7 +489,9 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
         }[] = []
 
         try {
-          const allInvoices = await getInvoices(project.id)
+          const allInvoicesResult = await getInvoices(project.id)
+          if (!allInvoicesResult.ok) throw new Error('Failed to load invoices')
+          const allInvoices = allInvoicesResult.data
           
           // Find the current invoice with fresh data (works for both partial and final)
           currentInvoice = allInvoices.find(inv => inv.id === doc.id) || null
@@ -635,7 +639,9 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
         }[] = []
 
         try {
-          const allInvoices = await getInvoices(project.id)
+          const allInvoicesResult = await getInvoices(project.id)
+          if (!allInvoicesResult.ok) throw new Error('Failed to load invoices')
+          const allInvoices = allInvoicesResult.data
           
           // Find the current invoice with fresh data (works for both partial and final)
           currentInvoice = allInvoices.find(inv => inv.id === doc.id) || null

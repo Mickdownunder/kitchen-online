@@ -88,15 +88,12 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
   const [loadingInvoices, setLoadingInvoices] = useState(true)
 
   const loadInvoices = useCallback(async () => {
-    try {
-      setLoadingInvoices(true)
-      const data = await getInvoicesWithProject()
-      setInvoices(data)
-    } catch (error) {
-      logger.error('Error loading invoices for statistics', { component: 'StatisticsView' }, error as Error)
-    } finally {
-      setLoadingInvoices(false)
+    setLoadingInvoices(true)
+    const result = await getInvoicesWithProject()
+    if (result.ok) {
+      setInvoices(result.data)
     }
+    setLoadingInvoices(false)
   }, [])
 
   useEffect(() => {

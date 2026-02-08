@@ -54,10 +54,11 @@ export async function POST(request: NextRequest) {
       return apiErrors.notFound()
     }
 
-    const invoice = await getInvoice(invoiceId)
-    if (!invoice) {
+    const invoiceResult = await getInvoice(invoiceId)
+    if (!invoiceResult.ok) {
       return apiErrors.notFound()
     }
+    const invoice = invoiceResult.data
 
     const invoiceForReminder = {
       id: invoice.id,

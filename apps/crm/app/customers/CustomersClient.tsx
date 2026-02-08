@@ -19,38 +19,32 @@ export default function CustomersClient() {
   }, [])
 
   const loadCustomers = async () => {
-    try {
-      const data = await getCustomers()
-      setCustomers(data)
-    } catch (error) {
-      console.error('Error loading customers:', error)
-    } finally {
-      setLoading(false)
+    const result = await getCustomers()
+    if (result.ok) {
+      setCustomers(result.data)
     }
+    setLoading(false)
   }
 
   const handleSaveCustomer = async (customer: Customer) => {
-    try {
-      if (customer.id && customers.find(c => c.id === customer.id)) {
-        await updateCustomer(customer.id, customer)
-      } else {
-        await createCustomer(customer)
-      }
-      await loadCustomers()
-    } catch (error) {
-      console.error('Error saving customer:', error)
+    const result = customer.id && customers.find(c => c.id === customer.id)
+      ? await updateCustomer(customer.id, customer)
+      : await createCustomer(customer)
+
+    if (!result.ok) {
       alert('Fehler beim Speichern des Kunden')
+      return
     }
+    await loadCustomers()
   }
 
   const handleDeleteCustomer = async (id: string) => {
-    try {
-      await deleteCustomer(id)
-      await loadCustomers()
-    } catch (error) {
-      console.error('Error deleting customer:', error)
+    const result = await deleteCustomer(id)
+    if (!result.ok) {
       alert('Fehler beim Löschen des Kunden')
+      return
     }
+    await loadCustomers()
   }
 
   if (loading) {

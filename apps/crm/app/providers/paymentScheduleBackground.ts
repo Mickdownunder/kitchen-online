@@ -44,7 +44,7 @@ export function schedulePaymentScheduleCheck(opts: {
           if (amounts && project.paymentSchedule) {
             try {
               // Erstelle Rechnung über den neuen invoices-Service
-              const newInvoice = await createInvoice({
+              const createResult = await createInvoice({
                 projectId: project.id,
                 type: 'partial',
                 amount: amounts.second,
@@ -52,6 +52,8 @@ export function schedulePaymentScheduleCheck(opts: {
                 dueDate: dueDate ? dueDate.toISOString().split('T')[0] : undefined,
                 scheduleType: 'second',
               })
+              if (!createResult.ok) throw new Error(createResult.message)
+              const newInvoice = createResult.data
 
               // Markiere als erstellt
               await updateProject(project.id, {

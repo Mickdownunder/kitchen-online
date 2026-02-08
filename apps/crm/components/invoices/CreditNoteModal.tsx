@@ -39,15 +39,16 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({
 
     canCancelInvoice(invoice.id)
       .then(result => {
-        setCanCancel(result.canCancel)
-        setReason(result.reason || '')
-        setRemainingAmount(result.remainingAmount || invoice.amount)
-        setPartialAmount('')
-        setCancelType('full')
-      })
-      .catch(err => {
-        setError(err.message || 'Fehler beim Prüfen')
-        setCanCancel(false)
+        if (result.ok) {
+          setCanCancel(result.data.canCancel)
+          setReason(result.data.reason || '')
+          setRemainingAmount(result.data.remainingAmount || invoice.amount)
+          setPartialAmount('')
+          setCancelType('full')
+        } else {
+          setError(result.message || 'Fehler beim Prüfen')
+          setCanCancel(false)
+        }
       })
       .finally(() => setChecking(false))
   }, [isOpen, invoice])
@@ -58,27 +59,26 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({
     setLoading(true)
     setError(null)
 
-    try {
-      const amount = cancelType === 'partial' ? parseFloat(partialAmount) : undefined
+    const amount = cancelType === 'partial' ? parseFloat(partialAmount) : undefined
 
-      if (cancelType === 'partial' && (!amount || amount <= 0)) {
-        setError('Bitte geben Sie einen gültigen Betrag ein')
-        setLoading(false)
-        return
-      }
+    if (cancelType === 'partial' && (!amount || amount <= 0)) {
+      setError('Bitte geben Sie einen gültigen Betrag ein')
+      setLoading(false)
+      return
+    }
 
-      await createCreditNote({
-        invoiceId: invoice.id,
-        partialAmount: amount,
-      })
+    const result = await createCreditNote({
+      invoiceId: invoice.id,
+      partialAmount: amount,
+    })
 
+    if (result.ok) {
       onSuccess()
       onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Erstellen der Stornorechnung')
-    } finally {
-      setLoading(false)
+    } else {
+      setError(result.message || 'Fehler beim Erstellen der Stornorechnung')
     }
+    setLoading(false)
   }
 
   if (!isOpen) return null

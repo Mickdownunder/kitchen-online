@@ -21,11 +21,14 @@ function InvoicesPageContent() {
   useEffect(() => {
     if (invoiceId) {
       setLoadingInvoice(true)
-      getInvoice(invoiceId).then(invoice => {
-        if (invoice) {
-          const project = projects.find(p => p.id === invoice.projectId)
-          if (project) {
-            setDirectInvoice(toListInvoice(invoice, project))
+      getInvoice(invoiceId).then(result => {
+        if (result.ok) {
+          const invoice = result.data
+          if (invoice) {
+            const project = projects.find(p => p.id === invoice.projectId)
+            if (project) {
+              setDirectInvoice(toListInvoice(invoice, project))
+            }
           }
         }
         setLoadingInvoice(false)

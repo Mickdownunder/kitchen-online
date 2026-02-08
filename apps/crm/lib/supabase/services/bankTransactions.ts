@@ -242,7 +242,8 @@ export async function assignTransactionToOutgoingInvoice(
 
   if (error) throw error
 
-  await markInvoicePaid(invoiceId, (tx as DBBankTransaction).transaction_date)
+  const markResult = await markInvoicePaid(invoiceId, (tx as DBBankTransaction).transaction_date)
+  if (!markResult.ok) throw new Error(markResult.message)
 
   return mapFromDB(data as DBBankTransaction)
 }

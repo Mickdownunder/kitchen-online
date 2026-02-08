@@ -40,24 +40,22 @@ export default function ArticlesClient() {
 
   const loadArticles = useCallback(async () => {
     setLoading(true)
-    try {
-      const result = await getArticlesPaginated({
-        page,
-        pageSize: PAGE_SIZE,
-        search: searchDebounced || undefined,
-        category: categoryFilter,
-        sortField,
-        sortDirection,
-      })
-      setArticles(result.data)
-      setTotal(result.total)
-    } catch (error: unknown) {
-      console.error('[ArticlesPage] Error loading articles:', error)
+    const result = await getArticlesPaginated({
+      page,
+      pageSize: PAGE_SIZE,
+      search: searchDebounced || undefined,
+      category: categoryFilter,
+      sortField,
+      sortDirection,
+    })
+    if (result.ok) {
+      setArticles(result.data.data)
+      setTotal(result.data.total)
+    } else {
       setArticles([])
       setTotal(0)
-    } finally {
-      setLoading(false)
     }
+    setLoading(false)
   }, [page, searchDebounced, categoryFilter, sortField, sortDirection])
 
   useEffect(() => {
@@ -69,27 +67,24 @@ export default function ArticlesClient() {
   }
 
   const handleSaveArticle = async (article: Article) => {
-    try {
-      if (article.id && articles.find(a => a.id === article.id)) {
-        await updateArticle(article.id, article)
-      } else {
-        await createArticle(article)
-      }
-      await loadArticles()
-    } catch (error) {
-      console.error('Error saving article:', error)
+    const result = article.id && articles.find(a => a.id === article.id)
+      ? await updateArticle(article.id, article)
+      : await createArticle(article)
+
+    if (!result.ok) {
       alert('Fehler beim Speichern des Artikels')
+      return
     }
+    await loadArticles()
   }
 
   const handleDeleteArticle = async (id: string) => {
-    try {
-      await deleteArticle(id)
-      await loadArticles()
-    } catch (error) {
-      console.error('Error deleting article:', error)
+    const result = await deleteArticle(id)
+    if (!result.ok) {
       alert('Fehler beim Löschen des Artikels')
+      return
     }
+    await loadArticles()
   }
 
   if (loading && articles.length === 0) {

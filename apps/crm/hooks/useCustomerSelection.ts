@@ -44,11 +44,9 @@ export function useCustomerSelection({
   }, [existingCustomers.length])
 
   const loadCustomers = async () => {
-    try {
-      const data = await getCustomers()
-      setCustomers(data)
-    } catch (error) {
-      console.error('Error loading customers:', error)
+    const result = await getCustomers()
+    if (result.ok) {
+      setCustomers(result.data)
     }
   }
 

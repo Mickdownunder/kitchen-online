@@ -26,15 +26,9 @@ export function useArticleSelection({ formData, setFormData }: UseArticleSelecti
 
   const searchArticles = useCallback(async (term: string) => {
     setArticleSearchLoading(true)
-    try {
-      const data = await getArticlesSearch(term, ARTICLE_SEARCH_LIMIT)
-      setArticles(data)
-    } catch (error) {
-      console.error('Error searching articles:', error)
-      setArticles([])
-    } finally {
-      setArticleSearchLoading(false)
-    }
+    const result = await getArticlesSearch(term, ARTICLE_SEARCH_LIMIT)
+    setArticles(result.ok ? result.data : [])
+    setArticleSearchLoading(false)
   }, [])
 
   useEffect(() => {

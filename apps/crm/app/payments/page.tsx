@@ -46,14 +46,11 @@ function PaymentsPageContent() {
   // Lade Rechnungen für das ausgewählte Projekt
   const loadProjectInvoices = useCallback(async (projectId: string) => {
     setLoadingInvoices(true)
-    try {
-      const projectInvoices = await getInvoices(projectId)
-      setInvoices(projectInvoices)
-    } catch (error) {
-      console.error('Error loading invoices:', error)
-    } finally {
-      setLoadingInvoices(false)
+    const result = await getInvoices(projectId)
+    if (result.ok) {
+      setInvoices(result.data)
     }
+    setLoadingInvoices(false)
   }, [])
 
   // Lade Rechnungen wenn Projekt ausgewählt wird
@@ -176,149 +173,119 @@ function PaymentsPageContent() {
 
     const amountRounded = roundTo2Decimals(newPaymentForm.amount)
 
-    try {
-      if (editingPaymentId) {
-        // Bestehende Rechnung aktualisieren
-        await updateInvoice(editingPaymentId, {
-          amount: amountRounded,
-          description: newPaymentForm.description,
-          invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
-        })
-      } else {
-        // Prüfe ob die Rechnungsnummer bereits existiert
-        if (invoiceNumber) {
-          const existingInvoice = await getInvoiceByNumber(invoiceNumber)
-          if (existingInvoice) {
-            alert(`Die Rechnungsnummer "${invoiceNumber}" ist bereits vergeben. Bitte wählen Sie eine andere Nummer.`)
-            return
-          }
+    if (editingPaymentId) {
+      const result = await updateInvoice(editingPaymentId, {
+        amount: amountRounded,
+        description: newPaymentForm.description,
+        invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
+      })
+      if (!result.ok) {
+        alert('Fehler beim Speichern der Zahlung')
+        return
+      }
+    } else {
+      // Prüfe ob die Rechnungsnummer bereits existiert
+      if (invoiceNumber) {
+        const existing = await getInvoiceByNumber(invoiceNumber)
+        if (existing.ok) {
+          alert(`Die Rechnungsnummer "${invoiceNumber}" ist bereits vergeben. Bitte wählen Sie eine andere Nummer.`)
+          return
         }
-        
-        // Neue Anzahlungsrechnung erstellen
-        await createInvoice({
-          projectId,
-          type: 'partial',
-          amount: amountRounded,
-          invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
-          description: newPaymentForm.description,
-          invoiceNumber: invoiceNumber || undefined,
-        })
       }
 
-      // Rechnungen neu laden
-      await loadProjectInvoices(projectId)
-      resetForm()
-    } catch (error) {
-      console.error('Error saving payment:', error)
-      alert('Fehler beim Speichern der Zahlung')
+      const result = await createInvoice({
+        projectId,
+        type: 'partial',
+        amount: amountRounded,
+        invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
+        description: newPaymentForm.description,
+        invoiceNumber: invoiceNumber || undefined,
+      })
+      if (!result.ok) {
+        alert('Fehler beim Speichern der Zahlung')
+        return
+      }
     }
+
+    await loadProjectInvoices(projectId)
+    resetForm()
   }
 
   const handleDeletePayment = async (projectId: string, paymentId: string) => {
     if (!confirm('Möchten Sie diese Zahlung wirklich löschen?')) return
-
-    try {
-      await deleteInvoice(paymentId)
-      // Rechnungen neu laden
-      await loadProjectInvoices(projectId)
-    } catch (error) {
-      console.error('Error deleting payment:', error)
-    }
+    await deleteInvoice(paymentId)
+    await loadProjectInvoices(projectId)
   }
 
   const handleMarkPaymentPaid = async (paymentId: string, paidDate: string) => {
     if (!selectedProject) return
-
-    try {
-      await markInvoicePaid(paymentId, paidDate)
-      await loadProjectInvoices(selectedProject.id)
-    } catch (error) {
-      console.error('Error marking payment as paid:', error)
-    }
+    await markInvoicePaid(paymentId, paidDate)
+    await loadProjectInvoices(selectedProject.id)
   }
 
   const handleUnmarkPaymentPaid = async (paymentId: string) => {
     if (!selectedProject) return
-
-    try {
-      await markInvoiceUnpaid(paymentId)
-      await loadProjectInvoices(selectedProject.id)
-    } catch (error) {
-      console.error('Error unmarking payment:', error)
-    }
+    await markInvoiceUnpaid(paymentId)
+    await loadProjectInvoices(selectedProject.id)
   }
 
   const handleGenerateFinalInvoice = async (invoiceDate: string) => {
     if (!selectedProject) return
     const projectId = selectedProject.id
 
-    try {
-      const project = projects.find(p => p.id === projectId)
-      if (!project) return
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
 
-      // Berechne aus den neuen Invoices
-      const totalPartial = partialPayments.reduce((sum, p) => sum + p.amount, 0)
-      const remaining = project.totalAmount - totalPartial
+    const totalPartial = partialPayments.reduce((sum, p) => sum + p.amount, 0)
+    const remaining = project.totalAmount - totalPartial
 
-      if (remaining <= 0) {
-        alert('Es gibt keinen verbleibenden Betrag für die Schlussrechnung.')
-        return
-      }
-
-      if (partialPayments.some(p => !p.isPaid)) {
-        alert(
-          '⚠️ Schlussrechnungen können erst erzeugt werden, wenn alle Anzahlungen bezahlt sind.'
-        )
-        return
-      }
-
-      // Prüfe ob bereits eine Schlussrechnung existiert
-      if (finalInvoice) {
-        alert('Es existiert bereits eine Schlussrechnung für dieses Projekt.')
-        return
-      }
-
-      // Neue Schlussrechnung erstellen (mit wählbarem Datum)
-      await createInvoice({
-        projectId,
-        type: 'final',
-        amount: remaining,
-        description: 'Schlussrechnung',
-        invoiceDate: invoiceDate || new Date().toISOString().split('T')[0],
-      })
-
-      // Rechnungen neu laden
-      await loadProjectInvoices(projectId)
-      alert('Schlussrechnung wurde erstellt!')
-    } catch (error) {
-      console.error('Error generating final invoice:', error)
-      alert('Fehler beim Erstellen der Schlussrechnung')
+    if (remaining <= 0) {
+      alert('Es gibt keinen verbleibenden Betrag für die Schlussrechnung.')
+      return
     }
+
+    if (partialPayments.some(p => !p.isPaid)) {
+      alert(
+        '⚠️ Schlussrechnungen können erst erzeugt werden, wenn alle Anzahlungen bezahlt sind.',
+      )
+      return
+    }
+
+    if (finalInvoice) {
+      alert('Es existiert bereits eine Schlussrechnung für dieses Projekt.')
+      return
+    }
+
+    const result = await createInvoice({
+      projectId,
+      type: 'final',
+      amount: remaining,
+      description: 'Schlussrechnung',
+      invoiceDate: invoiceDate || new Date().toISOString().split('T')[0],
+    })
+
+    if (!result.ok) {
+      alert('Fehler beim Erstellen der Schlussrechnung')
+      return
+    }
+
+    await loadProjectInvoices(projectId)
+    alert('Schlussrechnung wurde erstellt!')
   }
 
   const handleMarkFinalInvoicePaid = async (paidDate: string) => {
     if (!finalInvoice) return
-
-    try {
-      await markInvoicePaid(finalInvoice.id, paidDate)
-      if (selectedProject) {
-        await loadProjectInvoices(selectedProject.id)
-      }
-    } catch (error) {
-      console.error('Error marking final invoice as paid:', error)
+    await markInvoicePaid(finalInvoice.id, paidDate)
+    if (selectedProject) {
+      await loadProjectInvoices(selectedProject.id)
     }
   }
 
   const handleUnmarkFinalInvoicePaid = async () => {
     if (!finalInvoice) return
-
-    try {
-      await markInvoiceUnpaid(finalInvoice.id)
-      if (selectedProject) {
-        await loadProjectInvoices(selectedProject.id)
-      }
-    } catch (error) {
-      console.error('Error unmarking final invoice:', error)
+    await markInvoiceUnpaid(finalInvoice.id)
+    if (selectedProject) {
+      await loadProjectInvoices(selectedProject.id)
     }
   }
 
@@ -330,13 +297,12 @@ function PaymentsPageContent() {
       : 'Möchten Sie die Schlussrechnung wirklich löschen?'
     if (!confirm(confirmMessage)) return
 
-    try {
-      await deleteInvoice(finalInvoice.id)
-      await loadProjectInvoices(selectedProject.id)
-    } catch (error) {
-      console.error('Error deleting final invoice:', error)
+    const result = await deleteInvoice(finalInvoice.id)
+    if (!result.ok) {
       alert('Fehler beim Löschen der Schlussrechnung')
+      return
     }
+    await loadProjectInvoices(selectedProject.id)
   }
 
   const startNewPayment = async () => {

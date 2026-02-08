@@ -119,7 +119,7 @@ export default function BankReconciliationView() {
     try {
       const [supplier, outgoing] = await Promise.all([
         getOpenSupplierInvoices(),
-        getInvoicesWithProject().then(list => list.filter(inv => !inv.isPaid)),
+        getInvoicesWithProject().then(result => result.ok ? result.data.filter(inv => !inv.isPaid) : []),
       ])
       setOpenSupplierInvoices(supplier)
       setOpenOutgoingInvoices(outgoing)
