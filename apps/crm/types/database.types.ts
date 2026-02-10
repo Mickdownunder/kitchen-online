@@ -239,7 +239,18 @@ export type Database = {
           order_email: string | null
           phone: string | null
           contact_person: string | null
+          contact_person_internal: string | null
+          contact_person_internal_phone: string | null
+          contact_person_internal_email: string | null
+          contact_person_external: string | null
+          contact_person_external_phone: string | null
+          contact_person_external_email: string | null
           address: string | null
+          street: string | null
+          house_number: string | null
+          postal_code: string | null
+          city: string | null
+          country: string | null
           notes: string | null
           created_at: string | null
           updated_at: string | null
@@ -252,7 +263,18 @@ export type Database = {
           order_email?: string | null
           phone?: string | null
           contact_person?: string | null
+          contact_person_internal?: string | null
+          contact_person_internal_phone?: string | null
+          contact_person_internal_email?: string | null
+          contact_person_external?: string | null
+          contact_person_external_phone?: string | null
+          contact_person_external_email?: string | null
           address?: string | null
+          street?: string | null
+          house_number?: string | null
+          postal_code?: string | null
+          city?: string | null
+          country?: string | null
           notes?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -265,7 +287,18 @@ export type Database = {
           order_email?: string | null
           phone?: string | null
           contact_person?: string | null
+          contact_person_internal?: string | null
+          contact_person_internal_phone?: string | null
+          contact_person_internal_email?: string | null
+          contact_person_external?: string | null
+          contact_person_external_phone?: string | null
+          contact_person_external_email?: string | null
           address?: string | null
+          street?: string | null
+          house_number?: string | null
+          postal_code?: string | null
+          city?: string | null
+          country?: string | null
           notes?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -276,6 +309,275 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_orders: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string
+          supplier_id: string
+          order_number: string
+          status: string
+          delivery_calendar_week: string | null
+          installation_reference_date: string | null
+          created_by_type: string
+          approved_by_user_id: string | null
+          approved_at: string | null
+          sent_to_email: string | null
+          sent_at: string | null
+          booked_at: string | null
+          idempotency_key: string | null
+          template_version: string
+          template_snapshot: Json | null
+          ab_number: string | null
+          ab_confirmed_delivery_date: string | null
+          ab_deviations: Json
+          ab_received_at: string | null
+          supplier_delivery_note_id: string | null
+          goods_receipt_id: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id: string
+          supplier_id: string
+          order_number: string
+          status?: string
+          delivery_calendar_week?: string | null
+          installation_reference_date?: string | null
+          created_by_type?: string
+          approved_by_user_id?: string | null
+          approved_at?: string | null
+          sent_to_email?: string | null
+          sent_at?: string | null
+          booked_at?: string | null
+          idempotency_key?: string | null
+          template_version?: string
+          template_snapshot?: Json | null
+          ab_number?: string | null
+          ab_confirmed_delivery_date?: string | null
+          ab_deviations?: Json
+          ab_received_at?: string | null
+          supplier_delivery_note_id?: string | null
+          goods_receipt_id?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string
+          supplier_id?: string
+          order_number?: string
+          status?: string
+          delivery_calendar_week?: string | null
+          installation_reference_date?: string | null
+          created_by_type?: string
+          approved_by_user_id?: string | null
+          approved_at?: string | null
+          sent_to_email?: string | null
+          sent_at?: string | null
+          booked_at?: string | null
+          idempotency_key?: string | null
+          template_version?: string
+          template_snapshot?: Json | null
+          ab_number?: string | null
+          ab_confirmed_delivery_date?: string | null
+          ab_deviations?: Json
+          ab_received_at?: string | null
+          supplier_delivery_note_id?: string | null
+          goods_receipt_id?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_orders_approved_by_user_id_fkey"
+            columns: ["approved_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_orders_goods_receipt_id_fkey"
+            columns: ["goods_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_orders_supplier_delivery_note_id_fkey"
+            columns: ["supplier_delivery_note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_order_items: {
+        Row: {
+          id: string
+          supplier_order_id: string
+          invoice_item_id: string | null
+          article_id: string | null
+          position_number: number
+          description: string
+          model_number: string | null
+          manufacturer: string | null
+          quantity: number
+          quantity_confirmed: number | null
+          unit: string
+          expected_delivery_date: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          supplier_order_id: string
+          invoice_item_id?: string | null
+          article_id?: string | null
+          position_number?: number
+          description: string
+          model_number?: string | null
+          manufacturer?: string | null
+          quantity: number
+          quantity_confirmed?: number | null
+          unit?: string
+          expected_delivery_date?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          supplier_order_id?: string
+          invoice_item_id?: string | null
+          article_id?: string | null
+          position_number?: number
+          description?: string
+          model_number?: string | null
+          manufacturer?: string | null
+          quantity?: number
+          quantity_confirmed?: number | null
+          unit?: string
+          expected_delivery_date?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_order_items_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_order_items_invoice_item_id_fkey"
+            columns: ["invoice_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_order_items_supplier_order_id_fkey"
+            columns: ["supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_order_dispatch_logs: {
+        Row: {
+          id: string
+          supplier_order_id: string
+          user_id: string
+          sent_by_type: string
+          to_email: string
+          cc_emails: string[]
+          subject: string
+          template_version: string
+          payload: Json
+          message_id: string | null
+          idempotency_key: string | null
+          sent_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          supplier_order_id: string
+          user_id: string
+          sent_by_type?: string
+          to_email: string
+          cc_emails?: string[]
+          subject: string
+          template_version?: string
+          payload?: Json
+          message_id?: string | null
+          idempotency_key?: string | null
+          sent_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          supplier_order_id?: string
+          user_id?: string
+          sent_by_type?: string
+          to_email?: string
+          cc_emails?: string[]
+          subject?: string
+          template_version?: string
+          payload?: Json
+          message_id?: string | null
+          idempotency_key?: string | null
+          sent_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_order_dispatch_logs_supplier_order_id_fkey"
+            columns: ["supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_order_dispatch_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -925,6 +1227,7 @@ export type Database = {
           raw_text: string | null
           received_date: string | null
           status: string
+          supplier_order_id: string | null
           supplier_delivery_note_number: string
           supplier_name: string
           updated_at: string | null
@@ -944,6 +1247,7 @@ export type Database = {
           raw_text?: string | null
           received_date?: string | null
           status?: string
+          supplier_order_id?: string | null
           supplier_delivery_note_number: string
           supplier_name: string
           updated_at?: string | null
@@ -963,6 +1267,7 @@ export type Database = {
           raw_text?: string | null
           received_date?: string | null
           status?: string
+          supplier_order_id?: string | null
           supplier_delivery_note_number?: string
           supplier_name?: string
           updated_at?: string | null
@@ -974,6 +1279,13 @@ export type Database = {
             columns: ["matched_project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_supplier_order_id_fkey"
+            columns: ["supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1154,11 +1466,13 @@ export type Database = {
           created_at: string | null
           delivery_note_id: string | null
           id: string
+          idempotency_key: string | null
           notes: string | null
           project_id: string
           receipt_date: string | null
           receipt_type: string
           status: string
+          supplier_order_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -1166,11 +1480,13 @@ export type Database = {
           created_at?: string | null
           delivery_note_id?: string | null
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           project_id: string
           receipt_date?: string | null
           receipt_type: string
           status?: string
+          supplier_order_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -1178,11 +1494,13 @@ export type Database = {
           created_at?: string | null
           delivery_note_id?: string | null
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           project_id?: string
           receipt_date?: string | null
           receipt_type?: string
           status?: string
+          supplier_order_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -1199,6 +1517,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_supplier_order_id_fkey"
+            columns: ["supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_orders"
             referencedColumns: ["id"]
           },
         ]

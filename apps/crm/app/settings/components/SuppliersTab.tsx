@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Loader2, Pencil, Plus, Package, Trash2, X } from 'lucide-react'
+import { Check, Loader2, Pencil, Plus, Package, Trash2, X, MapPin } from 'lucide-react'
 import { CompanySettings, Supplier } from '@/types'
 
 export function SuppliersTab({
@@ -34,8 +34,17 @@ export function SuppliersTab({
               email: '',
               orderEmail: '',
               phone: '',
-              contactPerson: '',
-              address: '',
+              contactPersonInternal: '',
+              contactPersonInternalPhone: '',
+              contactPersonInternalEmail: '',
+              contactPersonExternal: '',
+              contactPersonExternalPhone: '',
+              contactPersonExternalEmail: '',
+              street: '',
+              houseNumber: '',
+              postalCode: '',
+              city: '',
+              country: '',
               notes: '',
             })
           }
@@ -108,35 +117,186 @@ export function SuppliersTab({
                 placeholder="+43 123 456789"
               />
             </div>
+            <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-slate-400 mt-2">Ansprechpartner Innendienst</div>
             <div>
               <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
-                Ansprechpartner
+                Name
               </label>
               <input
                 type="text"
-                value={editingSupplier.contactPerson || ''}
+                value={editingSupplier.contactPersonInternal || ''}
                 onChange={e =>
                   setEditingSupplier(prev =>
-                    prev ? { ...prev, contactPerson: e.target.value } : null
+                    prev ? { ...prev, contactPersonInternal: e.target.value } : null
                   )
                 }
                 className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
-                placeholder="Max Mustermann"
+                placeholder="z.B. Frau Müller"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                Telefon
+              </label>
+              <input
+                type="text"
+                value={editingSupplier.contactPersonInternalPhone || ''}
+                onChange={e =>
+                  setEditingSupplier(prev =>
+                    prev ? { ...prev, contactPersonInternalPhone: e.target.value } : null
+                  )
+                }
+                className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                placeholder="+43 123 456789"
               />
             </div>
             <div className="md:col-span-2">
               <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
-                Adresse
+                E-Mail
               </label>
-              <textarea
-                value={editingSupplier.address || ''}
+              <input
+                type="email"
+                value={editingSupplier.contactPersonInternalEmail || ''}
                 onChange={e =>
-                  setEditingSupplier(prev => (prev ? { ...prev, address: e.target.value } : null))
+                  setEditingSupplier(prev =>
+                    prev ? { ...prev, contactPersonInternalEmail: e.target.value } : null
+                  )
                 }
-                rows={2}
                 className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
-                placeholder="Straße 1, 1234 Ort"
+                placeholder="innen@lieferant.at"
               />
+            </div>
+            <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-slate-400 mt-2">Ansprechpartner Außendienst</div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                Name
+              </label>
+              <input
+                type="text"
+                value={editingSupplier.contactPersonExternal || ''}
+                onChange={e =>
+                  setEditingSupplier(prev =>
+                    prev ? { ...prev, contactPersonExternal: e.target.value } : null
+                  )
+                }
+                className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                placeholder="z.B. Herr Schmidt"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                Telefon
+              </label>
+              <input
+                type="text"
+                value={editingSupplier.contactPersonExternalPhone || ''}
+                onChange={e =>
+                  setEditingSupplier(prev =>
+                    prev ? { ...prev, contactPersonExternalPhone: e.target.value } : null
+                  )
+                }
+                className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                placeholder="+43 123 456789"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                E-Mail
+              </label>
+              <input
+                type="email"
+                value={editingSupplier.contactPersonExternalEmail || ''}
+                onChange={e =>
+                  setEditingSupplier(prev =>
+                    prev ? { ...prev, contactPersonExternalEmail: e.target.value } : null
+                  )
+                }
+                className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                placeholder="aussen@lieferant.at"
+              />
+            </div>
+            <div className="md:col-span-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 mt-4">
+              <MapPin className="h-3 w-3" /> Adresse
+            </div>
+            <div className="col-span-2 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Straße
+                </label>
+                <input
+                  type="text"
+                  value={editingSupplier.street || ''}
+                  onChange={e =>
+                    setEditingSupplier(prev => (prev ? { ...prev, street: e.target.value } : null))
+                  }
+                  className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                  placeholder="Musterstraße"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Hausnr.
+                </label>
+                <input
+                  type="text"
+                  value={editingSupplier.houseNumber || ''}
+                  onChange={e =>
+                    setEditingSupplier(prev =>
+                      prev ? { ...prev, houseNumber: e.target.value } : null
+                    )
+                  }
+                  className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                  placeholder="123"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  PLZ
+                </label>
+                <input
+                  type="text"
+                  value={editingSupplier.postalCode || ''}
+                  onChange={e =>
+                    setEditingSupplier(prev =>
+                      prev ? { ...prev, postalCode: e.target.value } : null
+                    )
+                  }
+                  className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                  placeholder="1010"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Stadt
+                </label>
+                <input
+                  type="text"
+                  value={editingSupplier.city || ''}
+                  onChange={e =>
+                    setEditingSupplier(prev => (prev ? { ...prev, city: e.target.value } : null))
+                  }
+                  className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                  placeholder="Wien"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Land
+                </label>
+                <input
+                  type="text"
+                  value={editingSupplier.country || ''}
+                  onChange={e =>
+                    setEditingSupplier(prev =>
+                      prev ? { ...prev, country: e.target.value } : null
+                    )
+                  }
+                  className="w-full rounded-xl bg-white px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-amber-500"
+                  placeholder="Österreich"
+                />
+              </div>
             </div>
             <div className="md:col-span-2">
               <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -199,8 +359,22 @@ export function SuppliersTab({
                     {supplier.orderEmail || supplier.email}
                   </p>
                 )}
-                {supplier.contactPerson && (
-                  <p className="text-xs text-slate-400">Ansprechpartner: {supplier.contactPerson}</p>
+                {(supplier.contactPersonInternal || supplier.contactPersonExternal) && (
+                  <p className="text-xs text-slate-400">
+                    {[
+                      supplier.contactPersonInternal &&
+                        `Innen: ${supplier.contactPersonInternal}${supplier.contactPersonInternalPhone ? ` · ${supplier.contactPersonInternalPhone}` : ''}${supplier.contactPersonInternalEmail ? ` · ${supplier.contactPersonInternalEmail}` : ''}`,
+                      supplier.contactPersonExternal &&
+                        `Außen: ${supplier.contactPersonExternal}${supplier.contactPersonExternalPhone ? ` · ${supplier.contactPersonExternalPhone}` : ''}${supplier.contactPersonExternalEmail ? ` · ${supplier.contactPersonExternalEmail}` : ''}`,
+                    ]
+                      .filter(Boolean)
+                      .join(' | ')}
+                  </p>
+                )}
+                {(supplier.street || supplier.postalCode || supplier.city || supplier.country) && (
+                  <p className="text-xs text-slate-400">
+                    {[[supplier.street, supplier.houseNumber].filter(Boolean).join(' '), [supplier.postalCode, supplier.city].filter(Boolean).join(' '), supplier.country].filter(Boolean).join(', ')}
+                  </p>
                 )}
               </div>
               <div className="flex gap-2">

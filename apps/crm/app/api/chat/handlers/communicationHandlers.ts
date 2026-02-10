@@ -7,6 +7,81 @@ import {
   formatWhitelistError,
 } from '../serverHandlers'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
+import { buildSupplierOrderTemplate } from '@/lib/orders/supplierOrderTemplate'
+
+interface SupplierOrderAgentRow {
+  id: string
+  project_id: string
+  order_number: string
+  delivery_calendar_week: string | null
+  installation_reference_date: string | null
+  notes: string | null
+  suppliers:
+    | {
+        name: string
+        email: string | null
+        order_email: string | null
+      }
+    | {
+        name: string
+        email: string | null
+        order_email: string | null
+      }[]
+    | null
+  projects:
+    | {
+        order_number: string | null
+        customer_name: string | null
+        installation_date: string | null
+      }
+    | {
+        order_number: string | null
+        customer_name: string | null
+        installation_date: string | null
+      }[]
+    | null
+  supplier_order_items:
+    | Array<{
+        position_number: number
+        description: string
+        quantity: number
+        unit: string
+        model_number: string | null
+        manufacturer: string | null
+        expected_delivery_date: string | null
+      }>
+    | null
+}
+
+function relationToSingle<T>(value: T | T[] | null): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] || null : value
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return 0
+}
+
+async function resolveCompanyNameForSupplierOrder(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+): Promise<string> {
+  const { data: companyId } = await supabase.rpc('get_current_company_id')
+  if (!companyId) return 'Ihr Unternehmen'
+
+  const { data: company } = await supabase
+    .from('company_settings')
+    .select('display_name, company_name')
+    .eq('id', companyId)
+    .maybeSingle()
+
+  return (company?.display_name || company?.company_name || 'Ihr Unternehmen') as string
+}
 
 export const handleArchiveDocument: ServerHandler = async (args, supabase) => {
   const project = await findProject(supabase, args.projectId as string)
@@ -159,6 +234,90 @@ export const handleSendEmail: ServerHandler = async (args, supabase, userId) => 
         text: emailBody,
       },
       projectId: args.projectId as string | undefined,
+    },
+  }
+}
+
+export const handleSendSupplierOrderEmail: ServerHandler = async (args, supabase) => {
+  const supplierOrderId = args.supplierOrderId as string
+  const toEmailOverride = (args.toEmail as string | undefined)?.trim()
+  const idempotencyKey =
+    (args.idempotencyKey as string | undefined)?.trim() ||
+    `ai-${supplierOrderId}-${Date.now()}`
+
+  if (!supplierOrderId) {
+    return { result: '❌ supplierOrderId fehlt.' }
+  }
+
+  const { data: orderData } = await supabase
+    .from('supplier_orders')
+    .select(
+      `\n      id,\n      project_id,\n      order_number,\n      delivery_calendar_week,\n      installation_reference_date,\n      notes,\n      suppliers (name, email, order_email),\n      projects (order_number, customer_name, installation_date),\n      supplier_order_items (\n        position_number,\n        description,\n        quantity,\n        unit,\n        model_number,\n        manufacturer,\n        expected_delivery_date\n      )\n    `,
+    )
+    .eq('id', supplierOrderId)
+    .maybeSingle()
+
+  if (!orderData) {
+    return { result: '❌ Lieferanten-Bestellung nicht gefunden.' }
+  }
+
+  const order = orderData as SupplierOrderAgentRow
+  const supplier = relationToSingle(order.suppliers)
+  const project = relationToSingle(order.projects)
+
+  if (!supplier || !project) {
+    return { result: '❌ Lieferant oder Auftrag fehlt in der Bestellung.' }
+  }
+
+  const recipientEmail = toEmailOverride || supplier.order_email || supplier.email || ''
+  if (!recipientEmail) {
+    return { result: '❌ Für diesen Lieferanten ist keine Bestell-E-Mail hinterlegt.' }
+  }
+
+  const companyName = await resolveCompanyNameForSupplierOrder(supabase)
+  const items = (order.supplier_order_items || []).map((item, index) => ({
+    positionNumber: item.position_number || index + 1,
+    description: item.description,
+    quantity: Math.max(0, toNumber(item.quantity)),
+    unit: item.unit || 'Stk',
+    modelNumber: item.model_number || undefined,
+    manufacturer: item.manufacturer || undefined,
+    expectedDeliveryDate: item.expected_delivery_date || undefined,
+  }))
+
+  if (items.length === 0) {
+    return { result: '❌ Die Bestellung enthält keine Positionen.' }
+  }
+
+  const template = buildSupplierOrderTemplate({
+    orderNumber: order.order_number,
+    projectOrderNumber: project.order_number || order.project_id,
+    projectCustomerName: project.customer_name || 'Unbekannt',
+    supplierName: supplier.name,
+    supplierEmail: recipientEmail,
+    companyName,
+    deliveryCalendarWeek: order.delivery_calendar_week || undefined,
+    installationReferenceDate:
+      order.installation_reference_date || project.installation_date || undefined,
+    notes: order.notes || undefined,
+    items,
+  })
+
+  const bodyPreview = template.text.length > 150 ? `${template.text.slice(0, 150)}...` : template.text
+
+  return {
+    result: `Darf ich an ${recipientEmail} senden?`,
+    pendingEmail: {
+      functionName: 'sendSupplierOrderEmail',
+      to: recipientEmail,
+      subject: template.subject,
+      bodyPreview,
+      api: `/api/supplier-orders/${supplierOrderId}/send`,
+      payload: {
+        toEmail: recipientEmail,
+        idempotencyKey,
+      },
+      projectId: order.project_id,
     },
   }
 }

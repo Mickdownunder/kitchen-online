@@ -154,8 +154,19 @@ export interface Supplier {
   email?: string
   orderEmail?: string
   phone?: string
-  contactPerson?: string
-  address?: string
+  /** Innendienst Ansprechpartner (Name) */
+  contactPersonInternal?: string
+  contactPersonInternalPhone?: string
+  contactPersonInternalEmail?: string
+  /** Außendienst Ansprechpartner (Name) */
+  contactPersonExternal?: string
+  contactPersonExternalPhone?: string
+  contactPersonExternalEmail?: string
+  street?: string
+  houseNumber?: string
+  postalCode?: string
+  city?: string
+  country?: string
   notes?: string
   createdAt: string
   updatedAt: string
@@ -717,6 +728,7 @@ export interface DeliveryNote {
   matchedProjectId?: string
   matchedByUserId?: string
   matchedAt?: string
+  supplierOrderId?: string
 
   // Dokument
   documentUrl?: string
@@ -767,11 +779,13 @@ export interface GoodsReceipt {
   id: string
   projectId: string
   deliveryNoteId?: string
+  supplierOrderId?: string
   userId: string
 
   // Wareneingang-Daten
   receiptDate: string
   receiptType: 'partial' | 'complete'
+  idempotencyKey?: string
 
   // Status
   status: GoodsReceiptStatus
@@ -808,6 +822,101 @@ export interface GoodsReceiptItem {
   // Relations
   projectItem?: InvoiceItem
   deliveryNoteItem?: DeliveryNoteItem
+}
+
+// ============================================
+// LIEFERANTEN-BESTELLUNGEN (Supplier Orders)
+// ============================================
+
+export type SupplierOrderCreatedByType = 'user' | 'ai'
+
+export type SupplierOrderStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'sent'
+  | 'ab_received'
+  | 'delivery_note_received'
+  | 'goods_receipt_open'
+  | 'goods_receipt_booked'
+  | 'ready_for_installation'
+  | 'cancelled'
+
+export interface SupplierOrderDeviation {
+  field: string
+  itemId?: string
+  expected?: string | number | null
+  actual?: string | number | null
+  note?: string
+}
+
+export interface SupplierOrderItem {
+  id: string
+  supplierOrderId: string
+  invoiceItemId?: string
+  articleId?: string
+  positionNumber: number
+  description: string
+  modelNumber?: string
+  manufacturer?: string
+  quantity: number
+  quantityConfirmed?: number
+  unit: string
+  expectedDeliveryDate?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SupplierOrderDispatchLog {
+  id: string
+  supplierOrderId: string
+  userId: string
+  sentByType: SupplierOrderCreatedByType
+  toEmail: string
+  ccEmails: string[]
+  subject: string
+  templateVersion: string
+  payload: Record<string, unknown>
+  messageId?: string
+  idempotencyKey?: string
+  sentAt: string
+  createdAt: string
+}
+
+export interface SupplierOrder {
+  id: string
+  userId: string
+  projectId: string
+  supplierId: string
+  supplierName?: string
+  supplierOrderEmail?: string
+  projectOrderNumber?: string
+  projectCustomerName?: string
+  projectInstallationDate?: string
+  orderNumber: string
+  status: SupplierOrderStatus
+  deliveryCalendarWeek?: string
+  installationReferenceDate?: string
+  createdByType: SupplierOrderCreatedByType
+  approvedByUserId?: string
+  approvedAt?: string
+  sentToEmail?: string
+  sentAt?: string
+  bookedAt?: string
+  idempotencyKey?: string
+  templateVersion: string
+  templateSnapshot?: Record<string, unknown>
+  abNumber?: string
+  abConfirmedDeliveryDate?: string
+  abDeviations: SupplierOrderDeviation[]
+  abReceivedAt?: string
+  supplierDeliveryNoteId?: string
+  goodsReceiptId?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+  items?: SupplierOrderItem[]
+  dispatchLogs?: SupplierOrderDispatchLog[]
 }
 
 // ============================================

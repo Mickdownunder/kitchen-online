@@ -13,8 +13,19 @@ interface SupplierRow {
   email: string | null
   order_email: string | null
   phone: string | null
-  contact_person: string | null
-  address: string | null
+  contact_person?: string | null
+  contact_person_internal?: string | null
+  contact_person_internal_phone?: string | null
+  contact_person_internal_email?: string | null
+  contact_person_external?: string | null
+  contact_person_external_phone?: string | null
+  contact_person_external_email?: string | null
+  address?: string | null
+  street?: string | null
+  house_number?: string | null
+  postal_code?: string | null
+  city?: string | null
+  country?: string | null
   notes: string | null
   created_at: string | null
   updated_at: string | null
@@ -28,8 +39,17 @@ function mapSupplierFromRow(row: SupplierRow): Supplier {
     email: row.email ?? undefined,
     orderEmail: row.order_email ?? undefined,
     phone: row.phone ?? undefined,
-    contactPerson: row.contact_person ?? undefined,
-    address: row.address ?? undefined,
+    contactPersonInternal: row.contact_person_internal ?? undefined,
+    contactPersonInternalPhone: row.contact_person_internal_phone ?? undefined,
+    contactPersonInternalEmail: row.contact_person_internal_email ?? undefined,
+    contactPersonExternal: row.contact_person_external ?? undefined,
+    contactPersonExternalPhone: row.contact_person_external_phone ?? undefined,
+    contactPersonExternalEmail: row.contact_person_external_email ?? undefined,
+    street: row.street ?? undefined,
+    houseNumber: row.house_number ?? undefined,
+    postalCode: row.postal_code ?? undefined,
+    city: row.city ?? undefined,
+    country: row.country ?? undefined,
     notes: row.notes ?? undefined,
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
@@ -65,8 +85,17 @@ export async function saveSupplier(supplier: Partial<Supplier>): Promise<Supplie
     email: supplier.email ?? null,
     order_email: supplier.orderEmail ?? null,
     phone: supplier.phone ?? null,
-    contact_person: supplier.contactPerson ?? null,
-    address: supplier.address ?? null,
+    contact_person_internal: supplier.contactPersonInternal ?? null,
+    contact_person_internal_phone: supplier.contactPersonInternalPhone ?? null,
+    contact_person_internal_email: supplier.contactPersonInternalEmail ?? null,
+    contact_person_external: supplier.contactPersonExternal ?? null,
+    contact_person_external_phone: supplier.contactPersonExternalPhone ?? null,
+    contact_person_external_email: supplier.contactPersonExternalEmail ?? null,
+    street: supplier.street ?? null,
+    house_number: supplier.houseNumber ?? null,
+    postal_code: supplier.postalCode ?? null,
+    city: supplier.city ?? null,
+    country: supplier.country ?? null,
     notes: supplier.notes ?? null,
     updated_at: new Date().toISOString(),
   }

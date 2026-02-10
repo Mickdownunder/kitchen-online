@@ -61,6 +61,7 @@ import {
   handleArchiveDocument,
   handleScheduleAppointment,
   handleSendEmail,
+  handleSendSupplierOrderEmail,
   handleSendReminder,
 } from './handlers/communicationHandlers'
 
@@ -320,6 +321,7 @@ const handlerRegistry: Record<string, ServerHandler> = {
   archiveDocument: handleArchiveDocument,
   scheduleAppointment: handleScheduleAppointment,
   sendEmail: handleSendEmail,
+  sendSupplierOrderEmail: handleSendSupplierOrderEmail,
   executeWorkflow: handleExecuteWorkflow,
   findProjectsByCriteria: handleFindProjectsByCriteria,
 }

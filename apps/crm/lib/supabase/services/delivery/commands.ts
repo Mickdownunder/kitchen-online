@@ -51,6 +51,7 @@ export async function createDeliveryNote(
       matched_project_id: deliveryNote.matchedProjectId || null,
       matched_by_user_id: deliveryNote.matchedByUserId || null,
       matched_at: deliveryNote.matchedAt || null,
+      supplier_order_id: deliveryNote.supplierOrderId || null,
       document_url: deliveryNote.documentUrl || null,
       raw_text: deliveryNote.rawText || null,
       notes: deliveryNote.notes || null,
@@ -109,6 +110,7 @@ export async function updateDeliveryNote(
   if (updates.matchedProjectId !== undefined) updateData.matched_project_id = updates.matchedProjectId
   if (updates.matchedByUserId !== undefined) updateData.matched_by_user_id = updates.matchedByUserId
   if (updates.matchedAt !== undefined) updateData.matched_at = updates.matchedAt
+  if (updates.supplierOrderId !== undefined) updateData.supplier_order_id = updates.supplierOrderId
   if (updates.documentUrl !== undefined) updateData.document_url = updates.documentUrl
   if (updates.rawText !== undefined) updateData.raw_text = updates.rawText
   if (updates.notes !== undefined) updateData.notes = updates.notes
@@ -247,6 +249,44 @@ async function updateProjectDeliveryStatus(projectId: string): Promise<void> {
     .eq('id', projectId)
 }
 
+async function getGoodsReceiptByIdempotencyKey(
+  userId: string,
+  projectId: string,
+  idempotencyKey?: string,
+): Promise<ServiceResult<GoodsReceipt> | null> {
+  const normalizedKey = idempotencyKey?.trim()
+  if (!normalizedKey) {
+    return null
+  }
+
+  const { data: existingRow, error: existingError } = await supabase
+    .from('goods_receipts')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('idempotency_key', normalizedKey)
+    .maybeSingle()
+
+  if (existingError) {
+    return toInternalErrorResult(existingError)
+  }
+
+  if (!existingRow?.id) {
+    return null
+  }
+
+  const receiptsResult = await getGoodsReceipts(projectId)
+  if (!receiptsResult.ok) {
+    return receiptsResult
+  }
+
+  const existingReceipt = receiptsResult.data.find((entry) => entry.id === String(existingRow.id))
+  if (!existingReceipt) {
+    return fail('NOT_FOUND', `Goods receipt ${String(existingRow.id)} not found`)
+  }
+
+  return ok(existingReceipt)
+}
+
 export async function createGoodsReceipt(
   goodsReceipt: CreateGoodsReceiptInput,
 ): Promise<ServiceResult<GoodsReceipt>> {
@@ -255,14 +295,25 @@ export async function createGoodsReceipt(
     return userResult
   }
 
+  const idempotentResult = await getGoodsReceiptByIdempotencyKey(
+    userResult.data,
+    goodsReceipt.projectId,
+    goodsReceipt.idempotencyKey,
+  )
+  if (idempotentResult) {
+    return idempotentResult
+  }
+
   const { data, error } = await supabase
     .from('goods_receipts')
     .insert({
       project_id: goodsReceipt.projectId,
       delivery_note_id: goodsReceipt.deliveryNoteId || null,
+      supplier_order_id: goodsReceipt.supplierOrderId || null,
       user_id: userResult.data,
       receipt_date: goodsReceipt.receiptDate || new Date().toISOString(),
       receipt_type: goodsReceipt.receiptType,
+      idempotency_key: goodsReceipt.idempotencyKey || null,
       status: goodsReceipt.status || 'pending',
       notes: goodsReceipt.notes || null,
     })
@@ -270,6 +321,18 @@ export async function createGoodsReceipt(
     .single()
 
   if (error) {
+    const normalizedKey = goodsReceipt.idempotencyKey?.trim()
+    const errorCode = (error as { code?: string }).code
+    if (normalizedKey && errorCode === '23505') {
+      const retryResult = await getGoodsReceiptByIdempotencyKey(
+        userResult.data,
+        goodsReceipt.projectId,
+        normalizedKey,
+      )
+      if (retryResult) {
+        return retryResult
+      }
+    }
     return toInternalErrorResult(error)
   }
 
@@ -295,6 +358,28 @@ export async function createGoodsReceipt(
   }
 
   await updateProjectDeliveryStatus(goodsReceipt.projectId)
+
+  if (goodsReceipt.supplierOrderId) {
+    const { data: projectState } = await supabase
+      .from('projects')
+      .select('all_items_delivered')
+      .eq('id', goodsReceipt.projectId)
+      .maybeSingle()
+
+    const targetStatus = projectState?.all_items_delivered
+      ? 'ready_for_installation'
+      : 'goods_receipt_booked'
+
+    await supabase
+      .from('supplier_orders')
+      .update({
+        goods_receipt_id: data.id,
+        booked_at: new Date().toISOString(),
+        status: targetStatus,
+      })
+      .eq('id', goodsReceipt.supplierOrderId)
+      .eq('user_id', userResult.data)
+  }
 
   const receiptsResult = await getGoodsReceipts(goodsReceipt.projectId)
   if (!receiptsResult.ok) {

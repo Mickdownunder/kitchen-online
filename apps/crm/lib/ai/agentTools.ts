@@ -432,8 +432,17 @@ export const agentTools: FunctionDeclaration[] = [
         email: { type: Type.STRING, description: 'E-Mail' },
         orderEmail: { type: Type.STRING, description: 'E-Mail für Bestellungen' },
         phone: { type: Type.STRING, description: 'Telefon' },
-        contactPerson: { type: Type.STRING, description: 'Ansprechpartner' },
-        address: { type: Type.STRING, description: 'Adresse' },
+        contactPersonInternal: { type: Type.STRING, description: 'Innendienst Ansprechpartner (Name)' },
+        contactPersonInternalPhone: { type: Type.STRING, description: 'Innendienst Ansprechpartner Telefon' },
+        contactPersonInternalEmail: { type: Type.STRING, description: 'Innendienst Ansprechpartner E-Mail' },
+        contactPersonExternal: { type: Type.STRING, description: 'Außendienst Ansprechpartner (Name)' },
+        contactPersonExternalPhone: { type: Type.STRING, description: 'Außendienst Ansprechpartner Telefon' },
+        contactPersonExternalEmail: { type: Type.STRING, description: 'Außendienst Ansprechpartner E-Mail' },
+        street: { type: Type.STRING, description: 'Straße' },
+        houseNumber: { type: Type.STRING, description: 'Hausnummer' },
+        postalCode: { type: Type.STRING, description: 'PLZ' },
+        city: { type: Type.STRING, description: 'Stadt' },
+        country: { type: Type.STRING, description: 'Land (z.B. Österreich)' },
         notes: { type: Type.STRING, description: 'Notizen' },
       },
       required: ['name'],
@@ -675,6 +684,31 @@ export const agentTools: FunctionDeclaration[] = [
         },
       },
       required: ['to', 'subject', 'body'],
+    },
+  },
+  {
+    name: 'sendSupplierOrderEmail',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Bereitet den Versand einer Lieferanten-Bestellung vor. Der finale Versand erfolgt erst nach Nutzer-Freigabe mit der Frage: Darf ich an <email> senden?.',
+      properties: {
+        supplierOrderId: {
+          type: Type.STRING,
+          description: 'ID der Lieferanten-Bestellung aus supplier_orders',
+        },
+        toEmail: {
+          type: Type.STRING,
+          description:
+            'Optional: Zieladresse überschreiben. Sonst wird order_email/email aus dem Lieferanten genutzt.',
+        },
+        idempotencyKey: {
+          type: Type.STRING,
+          description:
+            'Optionaler Idempotency-Key für retry-sicheren Versand (z.B. ai-order-123).',
+        },
+      },
+      required: ['supplierOrderId'],
     },
   },
 
