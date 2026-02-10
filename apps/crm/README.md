@@ -162,7 +162,7 @@ kitchen-online/
 | `/accounting` | Buchhaltung | Lieferantenrechnungen, Exporte |
 | `/payments` | Zahlungen | Zahlungsübersicht, Raten |
 | `/statistics` | Statistiken | Umsatz, Projekte, Kunden, Lieferungen; PDF/Excel-Export |
-| `/settings` | Einstellungen | Firma, Bank, Mitarbeiter, Benutzer, Rechte, Audit-Log, AGB, Auftrag/Rechnung |
+| `/settings` | Einstellungen | Firma, Bank, Lieferanten, Mitarbeiter, Benutzer, Rechte, Audit-Log, AGB, Auftrag/Rechnung |
 
 ### Zusatzfeatures
 

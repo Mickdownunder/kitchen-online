@@ -43,6 +43,13 @@ export {
   deleteEmployee,
 } from './employees'
 
+export {
+  getSuppliers,
+  getSupplier,
+  saveSupplier,
+  deleteSupplier,
+} from './suppliers'
+
 // ============================================
 // Company ID resolution
 // ============================================

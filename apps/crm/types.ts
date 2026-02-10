@@ -146,6 +146,21 @@ export interface Employee {
   updatedAt: string
 }
 
+// Lieferant / Supplier (Stammdaten für Bestellungen)
+export interface Supplier {
+  id: string
+  companyId: string
+  name: string
+  email?: string
+  orderEmail?: string
+  phone?: string
+  contactPerson?: string
+  address?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
 // Separate Customer Entity - Professional Stammdaten
 export interface Customer {
   id: string
@@ -190,6 +205,7 @@ export interface Customer {
 export interface Article {
   id: string
   userId?: string // Reference to user who created this article
+  supplierId?: string | null // Standard-Lieferant für Bestellungen (optional)
   sku: string // Stock Keeping Unit / Artikelnummer
   manufacturer?: string // e.g., "Schüller", "Nolte", "Miele"
   modelNumber?: string // e.g., "Miele G 7000"

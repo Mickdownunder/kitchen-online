@@ -33,6 +33,8 @@ export {
   handleUpdateComplaintStatus,
   handleCreateArticle,
   handleUpdateArticle,
+  handleCreateSupplier,
+  handleListSuppliers,
   handleCreateCustomer,
   handleUpdateCustomer,
   handleCreateEmployee,

@@ -355,7 +355,7 @@ export const agentTools: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       description:
-        'Erstellt einen neuen Artikel im Artikelstamm/Katalog. WICHTIG: Rufe diese Funktion für JEDEN Artikel aus dem Dokument auf! Wenn ein Dokument 10 Artikel hat, rufe diese Funktion 10x auf - einmal pro Artikel. Extrahiere ALLE verfügbaren Daten (Name, Artikelnummer, Beschreibung, Preis, MwSt) aus dem Dokument.',
+        'Erstellt einen neuen Artikel im Artikelstamm/Katalog. WICHTIG: Rufe diese Funktion für JEDEN Artikel aus dem Dokument auf! Wenn ein Dokument 10 Artikel hat, rufe diese Funktion 10x auf - einmal pro Artikel. Extrahiere ALLE verfügbaren Daten (Name, Artikelnummer, Beschreibung, Preis, MwSt) aus dem Dokument. Wenn ein Lieferant im Stamm existiert, gib dessen ID als supplierId an.',
       properties: {
         name: { type: Type.STRING, description: 'Artikelname (aus Dokument extrahieren)' },
         articleNumber: {
@@ -385,7 +385,12 @@ export const agentTools: FunctionDeclaration[] = [
         },
         supplier: {
           type: Type.STRING,
-          description: 'Lieferant/Hersteller - aus Dokument extrahieren',
+          description: 'Lieferant/Hersteller als Text (aus Dokument extrahieren)',
+        },
+        supplierId: {
+          type: Type.STRING,
+          description:
+            'ID eines Lieferanten aus dem Lieferantenstamm (optional; nutze listSuppliers um vorhandene Lieferanten zu finden)',
         },
       },
       required: ['name', 'sellingPrice'],
@@ -406,9 +411,42 @@ export const agentTools: FunctionDeclaration[] = [
         sellingPrice: { type: Type.NUMBER },
         taxRate: { type: Type.NUMBER },
         supplier: { type: Type.STRING },
+        supplierId: { type: Type.STRING, description: 'ID eines Lieferanten aus dem Lieferantenstamm' },
         isActive: { type: Type.BOOLEAN, description: 'Artikel aktiv/deaktiviert' },
       },
       required: ['articleId'],
+    },
+  },
+
+  // ==========================================
+  // LIEFERANTENSTAMM
+  // ==========================================
+  {
+    name: 'createSupplier',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Erstellt einen neuen Lieferanten in den Stammdaten. Nutze dies, wenn ein Lieferant für Bestellungen oder Artikel angelegt werden soll.',
+      properties: {
+        name: { type: Type.STRING, description: 'Name des Lieferanten (Firma oder Anbieter)' },
+        email: { type: Type.STRING, description: 'E-Mail' },
+        orderEmail: { type: Type.STRING, description: 'E-Mail für Bestellungen' },
+        phone: { type: Type.STRING, description: 'Telefon' },
+        contactPerson: { type: Type.STRING, description: 'Ansprechpartner' },
+        address: { type: Type.STRING, description: 'Adresse' },
+        notes: { type: Type.STRING, description: 'Notizen' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'listSuppliers',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Listet alle Lieferanten der Firma. Nutze dies, um vorhandene Lieferanten zu finden (z.B. vor createArticle oder für Bestellungen).',
+      properties: {},
+      required: [],
     },
   },
 

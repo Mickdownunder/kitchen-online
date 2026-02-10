@@ -81,6 +81,7 @@ export type Database = {
           sku: string
           specifications: Json | null
           stock_quantity: number | null
+          supplier_id: string | null
           tax_rate: Database["public"]["Enums"]["tax_rate"]
           unit: Database["public"]["Enums"]["unit_type"]
           updated_at: string | null
@@ -102,6 +103,7 @@ export type Database = {
           sku: string
           specifications?: Json | null
           stock_quantity?: number | null
+          supplier_id?: string | null
           tax_rate?: Database["public"]["Enums"]["tax_rate"]
           unit?: Database["public"]["Enums"]["unit_type"]
           updated_at?: string | null
@@ -123,6 +125,7 @@ export type Database = {
           sku?: string
           specifications?: Json | null
           stock_quantity?: number | null
+          supplier_id?: string | null
           tax_rate?: Database["public"]["Enums"]["tax_rate"]
           unit?: Database["public"]["Enums"]["unit_type"]
           updated_at?: string | null
@@ -220,6 +223,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "bank_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          email: string | null
+          order_email: string | null
+          phone: string | null
+          contact_person: string | null
+          address: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          name: string
+          email?: string | null
+          order_email?: string | null
+          phone?: string | null
+          contact_person?: string | null
+          address?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          name?: string
+          email?: string | null
+          order_email?: string | null
+          phone?: string | null
+          contact_person?: string | null
+          address?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"

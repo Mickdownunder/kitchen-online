@@ -53,21 +53,25 @@ export const handleCreateArticle: ServerHandler = async (args, supabase, userId)
   const name = args.name as string
   if (!name?.trim()) return { result: '❌ Artikelname fehlt.' }
 
+  const insert: Record<string, unknown> = {
+    user_id: userId,
+    name,
+    sku: (args.articleNumber as string) || `ART-${Date.now().toString().slice(-6)}`,
+    description: (args.description as string) || null,
+    category: (args.category as string) || 'Other',
+    unit: (args.unit as string) || 'Stk',
+    default_purchase_price: (args.purchasePrice as number) || 0,
+    default_sale_price: (args.sellingPrice as number) || 0,
+    tax_rate: (args.taxRate as number) || 20,
+    manufacturer: (args.supplier as string) || null,
+    is_active: true,
+  }
+  const supplierId = args.supplierId as string | undefined
+  if (supplierId) insert.supplier_id = supplierId
+
   const { data: article, error } = await supabase
     .from('articles')
-    .insert({
-      user_id: userId,
-      name,
-      sku: (args.articleNumber as string) || `ART-${Date.now().toString().slice(-6)}`,
-      description: (args.description as string) || null,
-      category: (args.category as string) || 'Other',
-      unit: (args.unit as string) || 'Stk',
-      default_purchase_price: (args.purchasePrice as number) || 0,
-      default_sale_price: (args.sellingPrice as number) || 0,
-      tax_rate: (args.taxRate as number) || 20,
-      manufacturer: (args.supplier as string) || null,
-      is_active: true,
-    })
+    .insert(insert)
     .select('id, sku')
     .single()
 
@@ -85,6 +89,7 @@ export const handleUpdateArticle: ServerHandler = async (args, supabase) => {
   if (args.sellingPrice !== undefined) updates.default_sale_price = args.sellingPrice
   if (args.taxRate !== undefined) updates.tax_rate = args.taxRate
   if (args.supplier) updates.manufacturer = args.supplier
+  if (args.supplierId !== undefined) updates.supplier_id = args.supplierId || null
   if (args.isActive !== undefined) updates.is_active = args.isActive
 
   const { error } = await supabase.from('articles').update(updates).eq('id', args.articleId as string)
@@ -205,6 +210,61 @@ export const handleUpdateEmployee: ServerHandler = async (args, supabase) => {
   const { error } = await supabase.from('employees').update(updates).eq('id', args.employeeId as string)
   if (error) return { result: `❌ Fehler: ${error.message}` }
   return { result: `✅ Mitarbeiter aktualisiert.` }
+}
+
+export const handleCreateSupplier: ServerHandler = async (args, supabase, userId) => {
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (!settings) return { result: '❌ Bitte zuerst Firmenstammdaten anlegen.' }
+
+  const name = (args.name as string)?.trim()
+  if (!name) return { result: '❌ Lieferantenname fehlt.' }
+
+  const { data: supplier, error } = await supabase
+    .from('suppliers')
+    .insert({
+      company_id: settings.id,
+      name,
+      email: (args.email as string) || null,
+      order_email: (args.orderEmail as string) || null,
+      phone: (args.phone as string) || null,
+      contact_person: (args.contactPerson as string) || null,
+      address: (args.address as string) || null,
+      notes: (args.notes as string) || null,
+    })
+    .select('id, name')
+    .single()
+
+  if (error) return { result: `❌ Fehler: ${error.message}` }
+  return { result: `✅ Lieferant "${supplier.name}" angelegt (ID: ${supplier.id}).` }
+}
+
+export const handleListSuppliers: ServerHandler = async (args, supabase, userId) => {
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (!settings) return { result: '❌ Bitte zuerst Firmenstammdaten anlegen. Keine Lieferanten vorhanden.' }
+
+  const { data: rows, error } = await supabase
+    .from('suppliers')
+    .select('id, name, order_email, email')
+    .eq('company_id', settings.id)
+    .order('name', { ascending: true })
+
+  if (error) return { result: `❌ Fehler: ${error.message}` }
+  if (!rows?.length) return { result: 'Keine Lieferanten angelegt. Nutze createSupplier um einen anzulegen.' }
+
+  const list = rows
+    .map((r, i) => `${i + 1}. ${r.name} (ID: ${r.id})${r.order_email || r.email ? ` – ${r.order_email || r.email}` : ''}`)
+    .join('\n')
+  return { result: `Lieferanten:\n${list}` }
 }
 
 export const handleUpdateCompanySettings: ServerHandler = async (args, supabase, userId) => {

@@ -20,6 +20,7 @@ ${opts.appointmentsSummary}
 **Projekte:** createProject, updateProjectDetails, updateCustomerInfo, updateWorkflowStatus, addProjectNote, scheduleAppointment
 **Finanzen:** updateFinancialAmounts, updatePaymentStatus, createPartialPayment, updatePartialPayment, createFinalInvoice, updateInvoiceNumber, configurePaymentSchedule, sendReminder
 **Artikel:** addItemToProject, updateItem, createArticle, updateArticle
+**Lieferantenstamm:** createSupplier, listSuppliers (Lieferanten anlegen und auflisten für Bestellungen/Artikel)
 **Stammdaten:** createCustomer, updateCustomer, createEmployee, updateEmployee, updateCompanySettings
 **Reklamationen:** createComplaint, updateComplaintStatus
 **Dokumente:** archiveDocument, sendEmail

@@ -1,16 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { BankAccount, CompanySettings, Employee } from '@/types'
+import type { BankAccount, CompanySettings, Employee, Supplier } from '@/types'
 import {
   deleteBankAccount,
   deleteEmployee,
+  deleteSupplier,
   getBankAccounts,
   getCompanySettings,
   getEmployees,
+  getSuppliers,
   saveBankAccount,
   saveCompanySettings,
   saveEmployee,
+  saveSupplier,
 } from '@/lib/supabase/services'
 import { logger } from '@/lib/utils/logger'
 
@@ -25,12 +28,17 @@ interface UseCompanySettingsDataResult {
   employees: Employee[]
   editingEmployee: Partial<Employee> | null
   setEditingEmployee: React.Dispatch<React.SetStateAction<Partial<Employee> | null>>
+  suppliers: Supplier[]
+  editingSupplier: Partial<Supplier> | null
+  setEditingSupplier: React.Dispatch<React.SetStateAction<Partial<Supplier> | null>>
   reload: () => Promise<void>
   saveCompany: () => Promise<CompanySettings>
   saveBank: () => Promise<BankAccount | null>
   removeBank: (id: string) => Promise<void>
   saveEmployeeEntry: () => Promise<Employee | null>
   removeEmployee: (id: string) => Promise<void>
+  saveSupplierEntry: () => Promise<Supplier | null>
+  removeSupplier: (id: string) => Promise<void>
 }
 
 export function useCompanySettingsData(): UseCompanySettingsDataResult {
@@ -57,8 +65,10 @@ export function useCompanySettingsData(): UseCompanySettingsDataResult {
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [editingBank, setEditingBank] = useState<Partial<BankAccount> | null>(null)
   const [editingEmployee, setEditingEmployee] = useState<Partial<Employee> | null>(null)
+  const [editingSupplier, setEditingSupplier] = useState<Partial<Supplier> | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -66,12 +76,14 @@ export function useCompanySettingsData(): UseCompanySettingsDataResult {
       const settings = await getCompanySettings()
       if (settings) {
         setCompanySettings(settings)
-        const [banks, emps] = await Promise.all([
+        const [banks, emps, supps] = await Promise.all([
           getBankAccounts(settings.id),
           getEmployees(settings.id),
+          getSuppliers(settings.id),
         ])
         setBankAccounts(banks)
         setEmployees(emps)
+        setSuppliers(supps)
       }
     } catch (error: unknown) {
       // Ignore aborted requests (normal during page navigation)
@@ -150,6 +162,36 @@ export function useCompanySettingsData(): UseCompanySettingsDataResult {
     setEmployees(prev => prev.filter(e => e.id !== id))
   }, [])
 
+  const saveSupplierEntry = useCallback(async () => {
+    if (!editingSupplier || !companySettings.id) return null
+
+    let companyId = companySettings.id
+    if (!companyId) {
+      const saved = await saveCompanySettings({
+        ...companySettings,
+        companyName: companySettings.companyName || 'Mein Unternehmen',
+      })
+      setCompanySettings(saved)
+      companyId = saved.id
+    }
+
+    setSaving(true)
+    try {
+      const saved = await saveSupplier({ ...editingSupplier, companyId })
+      if (editingSupplier.id) setSuppliers(prev => prev.map(s => (s.id === saved.id ? saved : s)))
+      else setSuppliers(prev => [...prev, saved])
+      setEditingSupplier(null)
+      return saved
+    } finally {
+      setSaving(false)
+    }
+  }, [editingSupplier, companySettings])
+
+  const removeSupplier = useCallback(async (id: string) => {
+    await deleteSupplier(id)
+    setSuppliers(prev => prev.filter(s => s.id !== id))
+  }, [])
+
   return {
     loading,
     saving,
@@ -161,11 +203,16 @@ export function useCompanySettingsData(): UseCompanySettingsDataResult {
     employees,
     editingEmployee,
     setEditingEmployee,
+    suppliers,
+    editingSupplier,
+    setEditingSupplier,
     reload: load,
     saveCompany,
     saveBank,
     removeBank,
     saveEmployeeEntry,
     removeEmployee,
+    saveSupplierEntry,
+    removeSupplier,
   }
 }

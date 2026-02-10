@@ -180,5 +180,4 @@ Empfehlung: Thresholds erst anheben, wenn 75 % erreicht sind; bis dahin können 
 ## Referenzen
 
 - Refactor-Plan: `docs/WORLD_CLASS_REFACTOR_PLAN_2026-02-10.md` (Welle 5)
-- Welle-4-Defizite: `docs/WELLE_4_DEFIZITE.md`
 - Jest-Config: `apps/crm/jest.config.mjs` (`collectCoverageFrom`, `coverageThreshold`)

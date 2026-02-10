@@ -10,11 +10,13 @@ import {
   FileSearch,
   Scale,
   ClipboardList,
+  Package,
 } from 'lucide-react'
 import AIAgentButton from '@/components/AIAgentButton'
 import { useAuth } from '@/hooks/useAuth'
 import { CompanyTab } from './components/CompanyTab'
 import { BankTab } from './components/BankTab'
+import { SuppliersTab } from './components/SuppliersTab'
 import { EmployeesTab } from './components/EmployeesTab'
 import { InvoiceTab } from './components/InvoiceTab'
 import { AGBTab } from './components/AGBTab'
@@ -26,7 +28,7 @@ import { useUserManagement } from '@/hooks/useUserManagement'
 import { useToast } from '@/components/providers/ToastProvider'
 import { logger } from '@/lib/utils/logger'
 
-type TabType = 'company' | 'bank' | 'employees' | 'invoice' | 'agb' | 'auftrag' | 'users' | 'audit'
+type TabType = 'company' | 'bank' | 'suppliers' | 'employees' | 'invoice' | 'agb' | 'auftrag' | 'users' | 'audit'
 
 type RoleKey = 'geschaeftsfuehrer' | 'administration' | 'buchhaltung' | 'verkaeufer' | 'monteur'
 
@@ -45,12 +47,17 @@ export default function SettingsPageClient() {
     bankAccounts,
     editingBank,
     setEditingBank,
+    suppliers,
+    editingSupplier,
+    setEditingSupplier,
     employees,
     editingEmployee,
     setEditingEmployee,
     saveCompany,
     saveBank,
     removeBank,
+    saveSupplierEntry,
+    removeSupplier,
     saveEmployeeEntry,
     removeEmployee,
   } = useCompanySettingsData()
@@ -132,9 +139,31 @@ export default function SettingsPageClient() {
     }
   }
 
+  const handleSaveSupplier = async () => {
+    try {
+      await saveSupplierEntry()
+      success('Lieferant erfolgreich gespeichert')
+    } catch (err) {
+      logger.error('Error saving supplier', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      error('Fehler beim Speichern des Lieferanten')
+    }
+  }
+
+  const handleDeleteSupplier = async (id: string) => {
+    if (!confirm('Lieferant wirklich löschen?')) return
+    try {
+      await removeSupplier(id)
+      success('Lieferant erfolgreich gelöscht')
+    } catch (err) {
+      logger.error('Error deleting supplier', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      error('Fehler beim Löschen des Lieferanten')
+    }
+  }
+
   const tabs = [
     { id: 'company' as TabType, label: 'Firmendaten', icon: Building2 },
     { id: 'bank' as TabType, label: 'Bankverbindungen', icon: CreditCard },
+    { id: 'suppliers' as TabType, label: 'Lieferanten', icon: Package },
     { id: 'employees' as TabType, label: 'Mitarbeiter', icon: Users },
     { id: 'invoice' as TabType, label: 'Rechnungseinstellungen', icon: FileText },
     { id: 'agb' as TabType, label: 'AGB', icon: Scale },
@@ -205,6 +234,18 @@ export default function SettingsPageClient() {
             saving={saving}
             onSaveBank={handleSaveBank}
             onDeleteBank={handleDeleteBank}
+          />
+        )}
+
+        {activeTab === 'suppliers' && (
+          <SuppliersTab
+            companySettings={companySettings}
+            suppliers={suppliers}
+            editingSupplier={editingSupplier}
+            setEditingSupplier={setEditingSupplier}
+            saving={saving}
+            onSaveSupplier={handleSaveSupplier}
+            onDeleteSupplier={handleDeleteSupplier}
           />
         )}
 

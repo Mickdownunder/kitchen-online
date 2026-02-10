@@ -1,5 +1,20 @@
 # World-Class Refactor Plan (Stand: 2026-02-10)
 
+## Stand: umgesetzt
+
+Alle Wellen dieses Plans sind umgesetzt:
+
+- **Welle 1:** Projekt-Flow entkoppelt (ProjectList, ProjectBasicsTab, ProjectItemsTab, ProjectDocumentsTab, useProjectDocuments; Zerlegung in Container/Toolbar/Table/Stats, Sections, UI-Module).
+- **Welle 2:** Rechnungen, Payments, Accounting stabilisiert (Query/Mutation-Layer, Headless/Presentational, Hooks, zentrale Money-Utilities).
+- **Welle 3:** Service-Layer domänenscharf (projects, invoices, delivery, supplierInvoices, orders mit queries/commands/mappers/validators).
+- **Welle 4:** Portal + API-Routen gehärtet: Portal-Seiten dünn (Komposition + Hooks, UI/Utils ausgelagert in z. B. dashboard.ui, documents.ui); Chat-API mit Zod-Schema + safeParse; publish-document Route schlank, Use-Case/Mappers in eigene Module; Booking-Webhook mit Retry/Backoff.
+- **Welle 5:** Test-Hardening umgesetzt (Invoice/Payment, Delivery, Project, Permissions; Branch-Coverage > 70 %). Portal auth/reset/invite (Punkt 5) bleibt wie vereinbart nach Welle-4-Merge.
+- **Welle 6:** Platform-Standards wie beschrieben (PR-Checkliste, CI Gates).
+
+Details zu Coverage siehe `docs/COVERAGE_PLAN_75.md`, zu Architektur `docs/ARCHITECTURE.md`.
+
+---
+
 ## Baseline (ist bereits erreicht)
 - Monorepo `lint`: grün
 - Monorepo `build`: grün
