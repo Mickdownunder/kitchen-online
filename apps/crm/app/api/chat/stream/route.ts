@@ -140,6 +140,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Load planning appointments (calendar) for AI context – same as Kalender-UI
+    let appointmentsSummary = ''
+    const { data: planningAppointments } = await supabase
+      .from('planning_appointments')
+      .select('customer_name, date, time, type, notes')
+      .eq('company_id', companyId)
+      .order('date', { ascending: true })
+      .order('time', { ascending: true })
+
+    if (planningAppointments?.length) {
+      const lines = planningAppointments.map(
+        (a: { customer_name: string; date: string; time: string | null; type: string; notes: string | null }) => {
+          const time = a.time ? ` ${a.time}` : ''
+          const notes = a.notes ? ` – ${a.notes.slice(0, 80)}${a.notes.length > 80 ? '…' : ''}` : ''
+          return `${a.date}${time} | ${a.type} | ${a.customer_name}${notes}`
+        }
+      )
+      appointmentsSummary = lines.join('\n')
+    }
+
     const projectSummary = buildProjectSummary(projectList, invoicesForSummary)
 
     // Model selection - use Flash by default
@@ -175,6 +195,7 @@ export async function POST(request: NextRequest) {
               systemInstruction: buildSystemInstruction({
                 projectSummary,
                 variant: 'stream',
+                appointmentsSummary,
               }),
               tools: [{ functionDeclarations: agentTools }],
             },

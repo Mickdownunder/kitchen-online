@@ -59,13 +59,21 @@ export const handleScheduleAppointment: ServerHandler = async (args, supabase, u
   if (!project || appointmentType === 'Planung' || appointmentType === 'Beratung') {
     const customerName = (args.customerName as string) || (project ? project.customer_name : 'Unbekannt')
 
-    const { error } = await supabase.from('appointments').insert({
+    const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
+    if (companyError || !companyId) {
+      return { result: '❌ Keine Firma zugeordnet. Bitte zuerst Firma auswählen.' }
+    }
+
+    const { error } = await supabase.from('planning_appointments').insert({
       user_id: userId,
+      company_id: companyId,
+      customer_id: project?.customer_id ?? null,
       customer_name: customerName,
       date: appointmentDate,
       time: appointmentTime,
       type: 'Consultation',
-      notes: (args.notes as string) || '',
+      notes: (args.notes as string) || null,
+      project_id: project?.id ?? null,
     })
 
     if (error) return { result: `❌ Fehler: ${error.message}` }
