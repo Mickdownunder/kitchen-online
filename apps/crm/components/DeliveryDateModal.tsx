@@ -34,14 +34,17 @@ export default function DeliveryDateModal({
 
     setSaving(true)
     try {
-      const updatedProject = await updateProject(project.id, {
+      const updatedProjectResult = await updateProject(project.id, {
         deliveryDate,
         deliveryTime: deliveryTime || undefined,
         status: ProjectStatus.DELIVERY,
       })
+      if (!updatedProjectResult.ok) {
+        throw new Error(updatedProjectResult.message)
+      }
 
       if (onUpdateProject) {
-        onUpdateProject(updatedProject)
+        onUpdateProject(updatedProjectResult.data)
       }
 
       try {

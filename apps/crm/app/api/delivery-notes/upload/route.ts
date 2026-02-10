@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const { analysis, matching } = await analyzeResponse.json()
 
     // Create delivery note (getCurrentUser is called inside createDeliveryNote)
-    const deliveryNote = await createDeliveryNote({
+    const deliveryNoteResult = await createDeliveryNote({
       supplierName: analysis.supplierName || supplierName || 'Unbekannt',
       supplierDeliveryNoteNumber: analysis.deliveryNoteNumber || `LS-${Date.now()}`,
       deliveryDate: analysis.deliveryDate || deliveryDate || new Date().toISOString().split('T')[0],
@@ -122,8 +122,14 @@ export async function POST(request: NextRequest) {
         ) || [],
     })
 
+    if (!deliveryNoteResult.ok) {
+      return apiErrors.internal(new Error(deliveryNoteResult.message), {
+        component: 'delivery-notes-api',
+      })
+    }
+
     return NextResponse.json({
-      deliveryNote,
+      deliveryNote: deliveryNoteResult.data,
       analysis,
       matching,
     })

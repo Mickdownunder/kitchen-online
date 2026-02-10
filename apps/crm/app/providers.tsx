@@ -191,10 +191,13 @@ function AuthenticatedAppProvider({ children }: { children: ReactNode }) {
 
     if (project) {
       try {
-        const updated = await updateProject(project.id, {
+        const updatedResult = await updateProject(project.id, {
           documents: [doc, ...(project.documents || [])],
         })
-        setProjects(prev => prev.map(p => (p.id === project.id ? updated : p)))
+        if (!updatedResult.ok) {
+          throw new Error(updatedResult.message)
+        }
+        setProjects(prev => prev.map(p => (p.id === project.id ? updatedResult.data : p)))
       } catch (error) {
         logger.error('Error adding document', { component: 'AppProvider' }, error instanceof Error ? error : new Error(String(error)))
       }

@@ -56,10 +56,11 @@ export function schedulePaymentScheduleCheck(opts: {
               const newInvoice = createResult.data
 
               // Markiere als erstellt
-              await updateProject(project.id, {
+              const updateResult = await updateProject(project.id, {
                 secondPaymentCreated: true,
                 notes: `${project.notes || ''}\n${new Date().toLocaleDateString('de-DE')}: Zweite Anzahlung "${newInvoice.invoiceNumber}" (${amounts.second.toFixed(2)}€) automatisch erstellt.`,
               })
+              if (!updateResult.ok) throw new Error(updateResult.message)
 
               const updatedProject: CustomerProject = {
                 ...project,

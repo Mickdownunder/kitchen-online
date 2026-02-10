@@ -1,46 +1,37 @@
-import { supabase } from '../../client'
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import type { CustomerProject } from '@/types'
+import { supabase } from '../../client'
 import { getCurrentUser } from '../auth'
-import { logger } from '@/lib/utils/logger'
 import { mapProjectFromDB } from './mappers'
 import type { ProjectClient } from './types'
+import {
+  ensureAuthenticatedUserId,
+  isNotFoundError,
+  toInternalErrorResult,
+} from './validators'
 
-export async function getProjects(): Promise<CustomerProject[]> {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      logger.warn('getProjects: No user authenticated, returning empty array', {
-        component: 'projects',
-      })
-      return []
-    }
-
-    const { data, error } = await supabase
-      .from('projects')
-      .select(`*, invoice_items (*)`)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      logger.error('getProjects error', { component: 'projects' }, error as Error)
-      throw error
-    }
-
-    return (data || []).map(mapProjectFromDB)
-  } catch (error: unknown) {
-    const err = error as { message?: string; name?: string }
-    if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
-      return []
-    }
-
-    logger.error('getProjects failed', { component: 'projects' }, error as Error)
-    return []
+export async function getProjects(): Promise<ServiceResult<CustomerProject[]>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
   }
+
+  const { data, error } = await supabase
+    .from('projects')
+    .select(`*, invoice_items (*)`)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return toInternalErrorResult(error)
+  }
+
+  return ok((data || []).map(mapProjectFromDB))
 }
 
 export async function getProject(
   id: string,
   client?: ProjectClient,
-): Promise<CustomerProject | null> {
+): Promise<ServiceResult<CustomerProject>> {
   const sb = client ?? supabase
   const { data, error } = await sb
     .from('projects')
@@ -49,8 +40,16 @@ export async function getProject(
     .single()
 
   if (error) {
-    throw error
+    if (isNotFoundError(error)) {
+      return fail('NOT_FOUND', `Project ${id} not found`)
+    }
+
+    return toInternalErrorResult(error)
   }
 
-  return data ? mapProjectFromDB(data) : null
+  if (!data) {
+    return fail('NOT_FOUND', `Project ${id} not found`)
+  }
+
+  return ok(mapProjectFromDB(data))
 }

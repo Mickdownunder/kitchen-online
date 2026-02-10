@@ -104,8 +104,9 @@ export function useProjectForm(
     }
 
     getSupplierInvoices(formData.id)
-      .then(invoices => {
+      .then((invoicesResult) => {
         if (!isActive) return
+        const invoices = invoicesResult.ok ? invoicesResult.data : []
         const total = invoices.reduce((sum, inv) => sum + inv.netAmount, 0)
         setSupplierInvoiceTotal(total)
       })

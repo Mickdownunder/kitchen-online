@@ -133,8 +133,10 @@ export function useProjectDocumentQueries(
       }
 
       try {
-        const customerDeliveryNotes = await getCustomerDeliveryNotes(project.id)
-        allDocuments.push(...mapCustomerDeliveryNotesToDocuments(customerDeliveryNotes, project))
+        const customerDeliveryNotesResult = await getCustomerDeliveryNotes(project.id)
+        if (customerDeliveryNotesResult.ok) {
+          allDocuments.push(...mapCustomerDeliveryNotesToDocuments(customerDeliveryNotesResult.data, project))
+        }
       } catch (error: unknown) {
         if (isAbort(error)) {
           return
@@ -143,8 +145,10 @@ export function useProjectDocumentQueries(
       }
 
       try {
-        const supplierDeliveryNotes = await getDeliveryNotes()
-        allDocuments.push(...mapSupplierDeliveryNotesToDocuments(supplierDeliveryNotes, project))
+        const supplierDeliveryNotesResult = await getDeliveryNotes()
+        if (supplierDeliveryNotesResult.ok) {
+          allDocuments.push(...mapSupplierDeliveryNotesToDocuments(supplierDeliveryNotesResult.data, project))
+        }
       } catch (error: unknown) {
         if (isAbort(error)) {
           return

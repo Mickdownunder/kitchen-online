@@ -29,8 +29,12 @@ function ProjectsPageContent() {
 
   const handleAddProject = async (project: CustomerProject) => {
     try {
-      const newProject = await createProject(project)
-      setProjects(prev => [newProject, ...prev])
+      const newProjectResult = await createProject(project)
+      if (!newProjectResult.ok) {
+        throw new Error(newProjectResult.message)
+      }
+
+      setProjects(prev => [newProjectResult.data, ...prev])
     } catch (error) {
       logger.error('Error creating project', { component: 'ProjectsPageContent' }, error as Error)
       alert('Fehler beim Erstellen des Auftrags')
@@ -44,9 +48,12 @@ function ProjectsPageContent() {
         alert('Fehler: Keine Projekt-ID vorhanden')
         return updatedProject
       }
-      const result = await updateProject(updatedProject.id, updatedProject)
-      setProjects(prev => prev.map(p => (p.id === result.id ? result : p)))
-      return result
+      const updateResult = await updateProject(updatedProject.id, updatedProject)
+      if (!updateResult.ok) {
+        throw new Error(updateResult.message)
+      }
+      setProjects(prev => prev.map(p => (p.id === updateResult.data.id ? updateResult.data : p)))
+      return updateResult.data
     } catch (error: unknown) {
       const errObj = error as Error & { code?: string; details?: string; hint?: string }
       logger.error('Error updating project', {

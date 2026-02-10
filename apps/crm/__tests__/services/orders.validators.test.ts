@@ -1,8 +1,9 @@
 import {
   emptyOrderStats,
+  ensureAuthenticatedUserId,
   getAuthenticatedUserId,
   isNotFoundError,
-  requireAuthenticatedUserId,
+  toInternalErrorResult,
   toOrderStatus,
 } from '@/lib/supabase/services/orders/validators'
 
@@ -20,13 +21,21 @@ describe('orders validators', () => {
     })
   })
 
-  describe('requireAuthenticatedUserId', () => {
+  describe('ensureAuthenticatedUserId', () => {
     it('returns user id for valid object', () => {
-      expect(requireAuthenticatedUserId({ id: 'user-1' })).toBe('user-1')
+      expect(ensureAuthenticatedUserId({ id: 'user-1' })).toEqual({
+        ok: true,
+        data: 'user-1',
+      })
     })
 
-    it('throws for missing user id', () => {
-      expect(() => requireAuthenticatedUserId({})).toThrow('Not authenticated')
+    it('returns unauthorized for missing user id', () => {
+      const result = ensureAuthenticatedUserId({})
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.code).toBe('UNAUTHORIZED')
+        expect(result.message).toBe('Not authenticated')
+      }
     })
   })
 
@@ -60,5 +69,14 @@ describe('orders validators', () => {
       confirmed: 0,
       cancelled: 0,
     })
+  })
+
+  it('maps unknown errors to internal failures', () => {
+    const result = toInternalErrorResult(new Error('DB down'))
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INTERNAL')
+      expect(result.message).toBe('DB down')
+    }
   })
 })

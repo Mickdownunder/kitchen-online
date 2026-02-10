@@ -1,16 +1,17 @@
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import type { AuthenticatedUserLike, PostgrestErrorLike } from './types'
 
-export function requireAuthenticatedUserId(user: unknown): string {
+export function ensureAuthenticatedUserId(user: unknown): ServiceResult<string> {
   if (!user || typeof user !== 'object') {
-    throw new Error('Not authenticated')
+    return fail('UNAUTHORIZED', 'Not authenticated')
   }
 
   const candidate = user as Partial<AuthenticatedUserLike>
   if (typeof candidate.id !== 'string' || candidate.id.length === 0) {
-    throw new Error('Not authenticated')
+    return fail('UNAUTHORIZED', 'Not authenticated')
   }
 
-  return candidate.id
+  return ok(candidate.id)
 }
 
 export function isNotFoundError(error: unknown): boolean {
@@ -28,4 +29,9 @@ export function toNumber(value: number | string | null | undefined): number {
 
 export function getTodayIsoDate(): string {
   return new Date().toISOString().split('T')[0]
+}
+
+export function toInternalErrorResult(error: unknown): ServiceResult<never> {
+  const postgrestError = error as PostgrestErrorLike
+  return fail('INTERNAL', postgrestError.message || 'Unknown error', error)
 }

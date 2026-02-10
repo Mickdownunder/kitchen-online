@@ -1,7 +1,5 @@
 import type { CustomerProject } from '@/types'
-
-const MAX_MESSAGE_LENGTH = 10_000
-const MAX_PROJECTS = 500
+import { ChatRequestSchema } from './schema'
 
 export interface ParsedChatRequest {
   message: string
@@ -25,30 +23,20 @@ export function parseChatRequest(body: unknown): ParseChatRequestResult {
       ? (body as Record<string, unknown>)
       : {}
 
-  const message = typeof parsedBody.message === 'string' ? parsedBody.message : ''
-  const projects = Array.isArray(parsedBody.projects) ? (parsedBody.projects as CustomerProject[]) : []
-
-  if (message.length > MAX_MESSAGE_LENGTH) {
+  const parsed = ChatRequestSchema.safeParse(parsedBody)
+  if (!parsed.success) {
     return {
       ok: false,
       kind: 'validation',
-      message: 'Message exceeds maximum length',
-    }
-  }
-
-  if (projects.length > MAX_PROJECTS) {
-    return {
-      ok: false,
-      kind: 'validation',
-      message: 'Projects exceed maximum allowed count',
+      message: parsed.error.issues[0]?.message || 'Invalid chat request payload',
     }
   }
 
   return {
     ok: true,
     data: {
-      message,
-      projects,
+      message: parsed.data.message,
+      projects: parsed.data.projects as unknown as CustomerProject[],
     },
   }
 }

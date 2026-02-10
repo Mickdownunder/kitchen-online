@@ -1,3 +1,4 @@
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import type {
   CustomerDeliveryNote,
   DeliveryNote,
@@ -21,15 +22,25 @@ import type {
   UpdateCustomerDeliveryNoteInput,
   UpdateDeliveryNoteInput,
 } from './types'
-import { getTodayIsoDate, requireAuthenticatedUserId, toNumber } from './validators'
+import {
+  ensureAuthenticatedUserId,
+  getTodayIsoDate,
+  toInternalErrorResult,
+  toNumber,
+} from './validators'
 
-export async function createDeliveryNote(deliveryNote: CreateDeliveryNoteInput): Promise<DeliveryNote> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+export async function createDeliveryNote(
+  deliveryNote: CreateDeliveryNoteInput,
+): Promise<ServiceResult<DeliveryNote>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
   const { data, error } = await supabase
     .from('delivery_notes')
     .insert({
-      user_id: userId,
+      user_id: userResult.data,
       supplier_name: deliveryNote.supplierName,
       supplier_delivery_note_number: deliveryNote.supplierDeliveryNoteNumber,
       delivery_date: deliveryNote.deliveryDate,
@@ -48,7 +59,7 @@ export async function createDeliveryNote(deliveryNote: CreateDeliveryNoteInput):
     .single()
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   if (deliveryNote.items && deliveryNote.items.length > 0) {
@@ -68,17 +79,23 @@ export async function createDeliveryNote(deliveryNote: CreateDeliveryNoteInput):
       notes: item.notes || null,
     }))
 
-    await supabase.from('delivery_note_items').insert(itemsToInsert)
+    const { error: itemError } = await supabase.from('delivery_note_items').insert(itemsToInsert)
+    if (itemError) {
+      return toInternalErrorResult(itemError)
+    }
   }
 
-  return (await getDeliveryNote(data.id)) as DeliveryNote
+  return getDeliveryNote(data.id)
 }
 
 export async function updateDeliveryNote(
   id: string,
   updates: UpdateDeliveryNoteInput,
-): Promise<DeliveryNote> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+): Promise<ServiceResult<DeliveryNote>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
   const updateData: Record<string, unknown> = {}
   if (updates.supplierName !== undefined) updateData.supplier_name = updates.supplierName
@@ -100,27 +117,30 @@ export async function updateDeliveryNote(
     .from('delivery_notes')
     .update(updateData)
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('user_id', userResult.data)
     .select()
     .single()
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapDeliveryNoteFromDB(data)
+  return ok(mapDeliveryNoteFromDB(data))
 }
 
 export async function matchDeliveryNoteToProject(
   deliveryNoteId: string,
   projectId: string,
   confidence?: number,
-): Promise<DeliveryNote> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+): Promise<ServiceResult<DeliveryNote>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
   return updateDeliveryNote(deliveryNoteId, {
     matchedProjectId: projectId,
-    matchedByUserId: userId,
+    matchedByUserId: userResult.data,
     matchedAt: new Date().toISOString(),
     status: 'matched',
     aiMatched: confidence !== undefined,
@@ -209,15 +229,20 @@ async function updateProjectDeliveryStatus(projectId: string): Promise<void> {
     .eq('id', projectId)
 }
 
-export async function createGoodsReceipt(goodsReceipt: CreateGoodsReceiptInput): Promise<GoodsReceipt> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+export async function createGoodsReceipt(
+  goodsReceipt: CreateGoodsReceiptInput,
+): Promise<ServiceResult<GoodsReceipt>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
   const { data, error } = await supabase
     .from('goods_receipts')
     .insert({
       project_id: goodsReceipt.projectId,
       delivery_note_id: goodsReceipt.deliveryNoteId || null,
-      user_id: userId,
+      user_id: userResult.data,
       receipt_date: goodsReceipt.receiptDate || new Date().toISOString(),
       receipt_type: goodsReceipt.receiptType,
       status: goodsReceipt.status || 'pending',
@@ -227,7 +252,7 @@ export async function createGoodsReceipt(goodsReceipt: CreateGoodsReceiptInput):
     .single()
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   if (goodsReceipt.items && goodsReceipt.items.length > 0) {
@@ -241,7 +266,10 @@ export async function createGoodsReceipt(goodsReceipt: CreateGoodsReceiptInput):
       notes: item.notes || null,
     }))
 
-    await supabase.from('goods_receipt_items').insert(itemsToInsert)
+    const { error: itemInsertError } = await supabase.from('goods_receipt_items').insert(itemsToInsert)
+    if (itemInsertError) {
+      return toInternalErrorResult(itemInsertError)
+    }
 
     for (const item of goodsReceipt.items) {
       await updateInvoiceItemDeliveryStatus(item.projectItemId, item.quantityReceived)
@@ -250,73 +278,83 @@ export async function createGoodsReceipt(goodsReceipt: CreateGoodsReceiptInput):
 
   await updateProjectDeliveryStatus(goodsReceipt.projectId)
 
-  return (await getGoodsReceipts(goodsReceipt.projectId).then((receipts) => receipts.find((receipt) => receipt.id === data.id))) as GoodsReceipt
+  const receiptsResult = await getGoodsReceipts(goodsReceipt.projectId)
+  if (!receiptsResult.ok) {
+    return receiptsResult
+  }
+
+  const createdReceipt = receiptsResult.data.find((receipt) => receipt.id === data.id)
+  if (!createdReceipt) {
+    return fail('NOT_FOUND', `Goods receipt ${data.id} not found`)
+  }
+
+  return ok(createdReceipt)
 }
 
 export async function createCustomerDeliveryNote(
   deliveryNote: CreateCustomerDeliveryNoteInput,
-): Promise<CustomerDeliveryNote> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+): Promise<ServiceResult<CustomerDeliveryNote>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
-  const { getNextDeliveryNoteNumber } = await import('../company')
-  const deliveryNoteNumber =
-    deliveryNote.deliveryNoteNumber || (await getNextDeliveryNoteNumber())
+  let deliveryNoteNumber = deliveryNote.deliveryNoteNumber
+  if (!deliveryNoteNumber) {
+    const { getNextDeliveryNoteNumber } = await import('../company')
+    deliveryNoteNumber = await getNextDeliveryNoteNumber()
+  }
 
-  try {
-    const { data, error } = await supabase
-      .from('customer_delivery_notes')
-      .insert({
-        user_id: userId,
-        project_id: deliveryNote.projectId,
-        delivery_note_number: deliveryNoteNumber,
-        delivery_date: deliveryNote.deliveryDate,
-        delivery_address: deliveryNote.deliveryAddress || null,
-        items: deliveryNote.items || null,
-        status: deliveryNote.status || 'draft',
-        customer_signature: deliveryNote.customerSignature || null,
-        customer_signature_date: deliveryNote.customerSignatureDate || null,
-        signed_by: deliveryNote.signedBy || null,
-        notes: deliveryNote.notes || null,
-      })
-      .select()
-      .single()
+  const { data, error } = await supabase
+    .from('customer_delivery_notes')
+    .insert({
+      user_id: userResult.data,
+      project_id: deliveryNote.projectId,
+      delivery_note_number: deliveryNoteNumber,
+      delivery_date: deliveryNote.deliveryDate,
+      delivery_address: deliveryNote.deliveryAddress || null,
+      items: deliveryNote.items || null,
+      status: deliveryNote.status || 'draft',
+      customer_signature: deliveryNote.customerSignature || null,
+      customer_signature_date: deliveryNote.customerSignatureDate || null,
+      signed_by: deliveryNote.signedBy || null,
+      notes: deliveryNote.notes || null,
+    })
+    .select()
+    .single()
 
-    if (error) {
-      const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      logger.error('createCustomerDeliveryNote error', {
-        component: 'delivery',
-        message: errObj.message,
-        code: errObj.code,
-        details: errObj.details,
-        hint: errObj.hint,
-      })
+  if (error) {
+    const errObj = error as Error & { code?: string; details?: string; hint?: string }
+    logger.error('createCustomerDeliveryNote error', {
+      component: 'delivery',
+      message: errObj.message,
+      code: errObj.code,
+      details: errObj.details,
+      hint: errObj.hint,
+    })
 
-      if (errObj.code === '42P01' || errObj.message?.includes('does not exist')) {
-        throw new Error(
-          'Die Tabelle customer_delivery_notes existiert noch nicht. Bitte führen Sie das SQL-Script in Supabase aus.',
-        )
-      }
-
-      throw error
+    if (errObj.code === '42P01' || errObj.message?.includes('does not exist')) {
+      return fail(
+        'INTERNAL',
+        'Die Tabelle customer_delivery_notes existiert noch nicht. Bitte führen Sie das SQL-Script in Supabase aus.',
+        error,
+      )
     }
 
-    return mapCustomerDeliveryNoteFromDB(data)
-  } catch (error: unknown) {
-    const err = error as { message?: string; stack?: string }
-    logger.error('createCustomerDeliveryNote failed', {
-      component: 'delivery',
-      message: err?.message,
-      stack: err?.stack,
-    })
-    throw error
+    return toInternalErrorResult(error)
   }
+
+  return ok(mapCustomerDeliveryNoteFromDB(data))
 }
 
 export async function updateCustomerDeliveryNote(
   id: string,
   updates: UpdateCustomerDeliveryNoteInput,
-): Promise<CustomerDeliveryNote> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+): Promise<ServiceResult<CustomerDeliveryNote>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
   const updateData: Record<string, unknown> = {}
 
@@ -338,22 +376,22 @@ export async function updateCustomerDeliveryNote(
     .from('customer_delivery_notes')
     .update(updateData)
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('user_id', userResult.data)
     .select()
     .single()
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapCustomerDeliveryNoteFromDB(data)
+  return ok(mapCustomerDeliveryNoteFromDB(data))
 }
 
 export async function addCustomerSignature(
   deliveryNoteId: string,
   signature: string,
   signedBy: string,
-): Promise<CustomerDeliveryNote> {
+): Promise<ServiceResult<CustomerDeliveryNote>> {
   return updateCustomerDeliveryNote(deliveryNoteId, {
     customerSignature: signature,
     customerSignatureDate: getTodayIsoDate(),
@@ -362,12 +400,18 @@ export async function addCustomerSignature(
   })
 }
 
-export async function deleteDeliveryNote(id: string): Promise<void> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+export async function deleteDeliveryNote(id: string): Promise<ServiceResult<void>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
-  const deliveryNote = await getDeliveryNote(id)
-  if (!deliveryNote) {
-    throw new Error('Lieferschein nicht gefunden')
+  const deliveryNoteResult = await getDeliveryNote(id)
+  if (!deliveryNoteResult.ok) {
+    if (deliveryNoteResult.code === 'NOT_FOUND') {
+      return deliveryNoteResult
+    }
+    return deliveryNoteResult
   }
 
   const { error: itemsError } = await supabase
@@ -376,37 +420,48 @@ export async function deleteDeliveryNote(id: string): Promise<void> {
     .eq('delivery_note_id', id)
 
   if (itemsError) {
-    logger.warn('Fehler beim Löschen der Items (möglicherweise CASCADE)', { component: 'delivery' }, itemsError as Error)
+    logger.warn(
+      'Fehler beim Löschen der Items (möglicherweise CASCADE)',
+      { component: 'delivery' },
+      itemsError as Error,
+    )
   }
 
   const { error } = await supabase
     .from('delivery_notes')
     .delete()
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('user_id', userResult.data)
 
   if (error) {
     logger.error('Fehler beim Löschen des Lieferscheins', { component: 'delivery' }, error as Error)
-    throw error
+    return toInternalErrorResult(error)
   }
+
+  return ok(undefined)
 }
 
-export async function deleteCustomerDeliveryNote(id: string): Promise<void> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+export async function deleteCustomerDeliveryNote(id: string): Promise<ServiceResult<void>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
-  const deliveryNote = await getCustomerDeliveryNote(id)
-  if (!deliveryNote) {
-    throw new Error('Kunden-Lieferschein nicht gefunden')
+  const deliveryNoteResult = await getCustomerDeliveryNote(id)
+  if (!deliveryNoteResult.ok) {
+    return deliveryNoteResult
   }
 
   const { error } = await supabase
     .from('customer_delivery_notes')
     .delete()
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('user_id', userResult.data)
 
   if (error) {
     logger.error('Fehler beim Löschen des Kunden-Lieferscheins', { component: 'delivery' }, error as Error)
-    throw error
+    return toInternalErrorResult(error)
   }
+
+  return ok(undefined)
 }

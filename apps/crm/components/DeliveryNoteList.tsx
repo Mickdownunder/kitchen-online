@@ -31,9 +31,25 @@ export default function DeliveryNoteList() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [notes, projs] = await Promise.all([getDeliveryNotes(), getProjects()])
-      setDeliveryNotes(notes)
-      setProjects(projs)
+      const [notesResult, projectsResult] = await Promise.all([getDeliveryNotes(), getProjects()])
+      setDeliveryNotes(notesResult.ok ? notesResult.data : [])
+      setProjects(projectsResult.ok ? projectsResult.data : [])
+
+      if (!notesResult.ok) {
+        logger.error(
+          'Error loading delivery notes',
+          { component: 'DeliveryNoteList', code: notesResult.code },
+          new Error(notesResult.message),
+        )
+      }
+
+      if (!projectsResult.ok) {
+        logger.error(
+          'Error loading projects',
+          { component: 'DeliveryNoteList', code: projectsResult.code },
+          new Error(projectsResult.message),
+        )
+      }
     } catch (error) {
       logger.error('Error loading delivery notes', { component: 'DeliveryNoteList' }, error as Error)
     } finally {

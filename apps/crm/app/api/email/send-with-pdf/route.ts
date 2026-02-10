@@ -88,10 +88,11 @@ export async function POST(request: NextRequest) {
     let project = null
     if (projectId) {
       try {
-        project = await getProject(projectId, supabase)
-        if (!project) {
+        const projectResult = await getProject(projectId, supabase)
+        if (!projectResult.ok) {
           return apiErrors.notFound()
         }
+        project = projectResult.data
       } catch (error: unknown) {
         logger.error(
           'Fehler beim Laden des Projekts',

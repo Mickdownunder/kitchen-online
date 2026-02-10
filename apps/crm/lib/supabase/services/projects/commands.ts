@@ -1,8 +1,5 @@
-import { supabase } from '../../client'
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import type { CustomerProject, InvoiceItem, ProjectDocument } from '@/types'
-import { getCurrentUser } from '../auth'
-import { getNextOrderNumber } from '../company'
-import { createInvoice, getInvoices } from '../invoices'
 import { audit } from '@/lib/utils/auditLogger'
 import { logger } from '@/lib/utils/logger'
 import {
@@ -11,6 +8,10 @@ import {
   roundTo2Decimals,
 } from '@/lib/utils/priceCalculations'
 import { calculatePaymentAmounts } from '@/lib/utils/paymentSchedule'
+import { supabase } from '../../client'
+import { getCurrentUser } from '../auth'
+import { getNextOrderNumber } from '../company'
+import { createInvoice, getInvoices } from '../invoices'
 import { getProject } from './queries'
 import type {
   BuildProjectInsertInput,
@@ -24,10 +25,12 @@ import type {
 } from './types'
 import { UUID_RE } from './types'
 import {
+  ensureAuthenticatedUserId,
   generateAccessCode,
   logServiceError,
   logSupabaseError,
   resolveUnit,
+  toInternalErrorResult,
   validateItems,
 } from './validators'
 
@@ -190,8 +193,11 @@ async function maybeCreateFirstPayment(
   }
 }
 
-async function insertItems(projectId: string, items: InvoiceItem[]): Promise<void> {
-  validateItems(items)
+async function insertItems(projectId: string, items: InvoiceItem[]): Promise<ServiceResult<void>> {
+  const validationResult = validateItems(items)
+  if (!validationResult.ok) {
+    return validationResult
+  }
 
   const rows = items.map((item, idx) =>
     buildItemRow({
@@ -204,7 +210,7 @@ async function insertItems(projectId: string, items: InvoiceItem[]): Promise<voi
   const { error } = await supabase.from('invoice_items').insert(rows)
 
   if (!error) {
-    return
+    return ok(undefined)
   }
 
   logger.error('Error inserting items', { component: 'projects' }, error as Error)
@@ -218,8 +224,10 @@ async function insertItems(projectId: string, items: InvoiceItem[]): Promise<voi
     })
   }
 
-  throw new Error(
+  return fail(
+    'INTERNAL',
     `Fehler beim Erstellen der Artikel: ${error.message}. Projekt wurde nicht erstellt.`,
+    error,
   )
 }
 
@@ -283,8 +291,11 @@ function buildProjectUpdate(project: UpdateProjectInput): Record<string, unknown
   return data
 }
 
-async function upsertItems(projectId: string, items: InvoiceItem[]): Promise<void> {
-  validateItems(items)
+async function upsertItems(projectId: string, items: InvoiceItem[]): Promise<ServiceResult<void>> {
+  const validationResult = validateItems(items)
+  if (!validationResult.ok) {
+    return validationResult
+  }
 
   const { data: existingItems, error: fetchError } = await supabase
     .from('invoice_items')
@@ -293,7 +304,7 @@ async function upsertItems(projectId: string, items: InvoiceItem[]): Promise<voi
 
   if (fetchError) {
     logger.error('Error fetching existing items', { component: 'projects' }, fetchError as Error)
-    throw fetchError
+    return toInternalErrorResult(fetchError)
   }
 
   const existingIds = new Set((existingItems ?? []).map((item) => item.id))
@@ -304,41 +315,34 @@ async function upsertItems(projectId: string, items: InvoiceItem[]): Promise<voi
     const item = items[idx]
     const row = buildItemRow({ item, projectId, position: idx + 1 }) as ItemUpdate & ItemInsert
 
-    try {
-      if (item.id && UUID_RE.test(item.id) && existingIds.has(item.id)) {
-        const { error: updateError } = await supabase
-          .from('invoice_items')
-          .update(row as ItemUpdate)
-          .eq('id', item.id)
+    if (item.id && UUID_RE.test(item.id) && existingIds.has(item.id)) {
+      const { error: updateError } = await supabase
+        .from('invoice_items')
+        .update(row as ItemUpdate)
+        .eq('id', item.id)
 
-        if (updateError) {
-          logger.error(`Error updating item ${item.id}`, { component: 'projects' }, updateError as Error)
-          throw new Error(
-            `Fehler beim Aktualisieren des Artikels "${item.description || item.id}": ${updateError.message}`,
-          )
-        }
-
-        incomingIds.add(item.id)
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('invoice_items')
-          .insert(row)
-          .select('id')
-          .single()
-
-        if (insertError) {
-          logger.error('Error inserting item', { component: 'projects' }, insertError as Error)
-          throw new Error(
-            `Fehler beim Einfügen des Artikels "${item.description || 'Neu'}": ${insertError.message}`,
-          )
-        }
-
-        if (inserted) {
-          insertedIds.push(inserted.id)
-          incomingIds.add(inserted.id)
-        }
+      if (updateError) {
+        logger.error(`Error updating item ${item.id}`, { component: 'projects' }, updateError as Error)
+        return fail(
+          'INTERNAL',
+          `Fehler beim Aktualisieren des Artikels "${item.description || item.id}": ${updateError.message}`,
+          updateError,
+        )
       }
-    } catch (itemError) {
+
+      incomingIds.add(item.id)
+      continue
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('invoice_items')
+      .insert(row)
+      .select('id')
+      .single()
+
+    if (insertError) {
+      logger.error('Error inserting item', { component: 'projects' }, insertError as Error)
+
       if (insertedIds.length > 0) {
         logger.warn(`Rolling back ${insertedIds.length} inserted items due to error`, {
           component: 'projects',
@@ -354,7 +358,16 @@ async function upsertItems(projectId: string, items: InvoiceItem[]): Promise<voi
         }
       }
 
-      throw itemError
+      return fail(
+        'INTERNAL',
+        `Fehler beim Einfügen des Artikels "${item.description || 'Neu'}": ${insertError.message}`,
+        insertError,
+      )
+    }
+
+    if (inserted) {
+      insertedIds.push(inserted.id)
+      incomingIds.add(inserted.id)
     }
   }
 
@@ -366,14 +379,15 @@ async function upsertItems(projectId: string, items: InvoiceItem[]): Promise<voi
       logger.error('Error deleting removed items', { component: 'projects' }, deleteError as Error)
     }
   }
+
+  return ok(undefined)
 }
 
-export async function createProject(project: CreateProjectInput): Promise<CustomerProject> {
+export async function createProject(project: CreateProjectInput): Promise<ServiceResult<CustomerProject>> {
   try {
-    const user = await getCurrentUser()
-    const userId = user?.id
-    if (!userId) {
-      throw new Error('Not authenticated')
+    const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+    if (!userResult.ok) {
+      return userResult
     }
 
     const documents = project.documents || []
@@ -393,7 +407,7 @@ export async function createProject(project: CreateProjectInput): Promise<Custom
       .from('projects')
       .insert(
         buildProjectInsert({
-          userId,
+          userId: userResult.data,
           project,
           accessCode,
           orderNumber,
@@ -405,40 +419,45 @@ export async function createProject(project: CreateProjectInput): Promise<Custom
 
     if (error) {
       logSupabaseError('createProject', error)
-      throw error
+      return toInternalErrorResult(error)
     }
 
     const projectId = data.id
-
     await maybeCreateFirstPayment(project, projectId, orderNumber, data.order_number)
 
     if (project.items?.length) {
-      await insertItems(projectId, project.items)
+      const itemResult = await insertItems(projectId, project.items)
+      if (!itemResult.ok) {
+        return itemResult
+      }
     }
 
-    const createdProject = (await getProject(projectId)) as CustomerProject
+    const createdProjectResult = await getProject(projectId)
+    if (!createdProjectResult.ok) {
+      return createdProjectResult
+    }
 
     audit.projectCreated(projectId, {
-      customerName: createdProject.customerName,
-      orderNumber: createdProject.orderNumber,
-      totalAmount: createdProject.totalAmount,
+      customerName: createdProjectResult.data.customerName,
+      orderNumber: createdProjectResult.data.orderNumber,
+      totalAmount: createdProjectResult.data.totalAmount,
     })
 
-    return createdProject
+    return createdProjectResult
   } catch (error: unknown) {
     logServiceError('createProject', error)
-    throw error
+    return fail('INTERNAL', error instanceof Error ? error.message : 'Unknown error', error)
   }
 }
 
 export async function updateProject(
   id: string,
   project: UpdateProjectInput,
-): Promise<CustomerProject> {
+): Promise<ServiceResult<CustomerProject>> {
   try {
-    const user = await getCurrentUser()
-    if (!user?.id) {
-      throw new Error('Not authenticated')
+    const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+    if (!userResult.ok) {
+      return userResult
     }
 
     const updateData = buildProjectUpdate(project)
@@ -447,23 +466,28 @@ export async function updateProject(
       logger.warn('updateProject: No fields to update, returning existing project', {
         component: 'projects',
       })
-      return (await getProject(id)) as CustomerProject
+      return getProject(id)
     }
 
     if (Object.keys(updateData).length > 0) {
       const { error } = await supabase.from('projects').update(updateData).eq('id', id).select().single()
-
       if (error) {
         logSupabaseError('updateProject', error)
-        throw error
+        return toInternalErrorResult(error)
       }
     }
 
     if (project.items !== undefined) {
-      await upsertItems(id, project.items)
+      const upsertResult = await upsertItems(id, project.items)
+      if (!upsertResult.ok) {
+        return upsertResult
+      }
     }
 
-    const updatedProject = (await getProject(id)) as CustomerProject
+    const updatedProjectResult = await getProject(id)
+    if (!updatedProjectResult.ok) {
+      return updatedProjectResult
+    }
 
     const changedFields: Record<string, unknown> = {}
     if (project.customerName !== undefined) changedFields.customerName = project.customerName
@@ -476,34 +500,31 @@ export async function updateProject(
       audit.projectUpdated(id, {}, changedFields)
     }
 
-    return updatedProject
-  } catch (error) {
+    return updatedProjectResult
+  } catch (error: unknown) {
     logger.error('updateProject failed', { component: 'projects' }, error as Error)
-    throw error
+    return fail('INTERNAL', error instanceof Error ? error.message : 'Unknown error', error)
   }
 }
 
-export async function deleteProject(id: string): Promise<void> {
+export async function deleteProject(id: string): Promise<ServiceResult<void>> {
   let projectData: Record<string, unknown> = {}
 
-  try {
-    const project = await getProject(id)
-    if (project) {
-      projectData = {
-        customerName: project.customerName,
-        orderNumber: project.orderNumber,
-        totalAmount: project.totalAmount,
-        status: project.status,
-      }
+  const projectResult = await getProject(id)
+  if (projectResult.ok) {
+    projectData = {
+      customerName: projectResult.data.customerName,
+      orderNumber: projectResult.data.orderNumber,
+      totalAmount: projectResult.data.totalAmount,
+      status: projectResult.data.status,
     }
-  } catch {
-    // keep delete behavior even if read failed
   }
 
   const { error } = await supabase.from('projects').delete().eq('id', id)
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   audit.projectDeleted(id, projectData)
+  return ok(undefined)
 }

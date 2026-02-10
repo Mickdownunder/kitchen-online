@@ -1,15 +1,21 @@
 import {
+  ensureAuthenticatedUserId,
   getTodayIsoDate,
   isNotFoundError,
-  requireAuthenticatedUserId,
+  toInternalErrorResult,
   toNumber,
 } from '@/lib/supabase/services/delivery/validators'
 
 describe('delivery validators', () => {
-  it('requires authenticated user id', () => {
-    expect(requireAuthenticatedUserId({ id: 'user-1' })).toBe('user-1')
-    expect(() => requireAuthenticatedUserId(null)).toThrow('Not authenticated')
-    expect(() => requireAuthenticatedUserId({ id: '' })).toThrow('Not authenticated')
+  it('returns service result for authenticated user id', () => {
+    expect(ensureAuthenticatedUserId({ id: 'user-1' })).toEqual({ ok: true, data: 'user-1' })
+
+    const missingUser = ensureAuthenticatedUserId(null)
+    expect(missingUser.ok).toBe(false)
+    if (!missingUser.ok) {
+      expect(missingUser.code).toBe('UNAUTHORIZED')
+      expect(missingUser.message).toBe('Not authenticated')
+    }
   })
 
   it('detects not found errors', () => {
@@ -30,5 +36,15 @@ describe('delivery validators', () => {
     expect(getTodayIsoDate()).toBe('2026-02-10')
 
     jest.useRealTimers()
+  })
+
+  it('maps errors to internal service failures', () => {
+    const result = toInternalErrorResult(new Error('DB error'))
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INTERNAL')
+      expect(result.message).toBe('DB error')
+    }
   })
 })

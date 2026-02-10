@@ -77,7 +77,10 @@ export default function DeliveryNoteDetail({
 
     try {
       setLoading(true)
-      await matchDeliveryNoteToProject(deliveryNote.id, selectedProjectId)
+      const matchResult = await matchDeliveryNoteToProject(deliveryNote.id, selectedProjectId)
+      if (!matchResult.ok) {
+        throw new Error(matchResult.message)
+      }
       onUpdate()
       onBack()
     } catch (error) {
@@ -107,7 +110,7 @@ export default function DeliveryNoteDetail({
           createdAt: new Date().toISOString(),
         }))
 
-      await createGoodsReceipt({
+      const receiptResult = await createGoodsReceipt({
         projectId: deliveryNote.matchedProjectId,
         deliveryNoteId: deliveryNote.id,
         userId: deliveryNote.userId,
@@ -117,6 +120,9 @@ export default function DeliveryNoteDetail({
         status: 'booked',
         items: goodsReceiptItems,
       })
+      if (!receiptResult.ok) {
+        throw new Error(receiptResult.message)
+      }
 
       alert('Wareneingang erfolgreich gebucht!')
       onUpdate()

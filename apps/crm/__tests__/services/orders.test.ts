@@ -22,6 +22,10 @@ import {
   createOrder,
   updateOrder,
   deleteOrder,
+  sendOrder,
+  confirmOrder,
+  cancelOrder,
+  upsertOrderForProject,
   getOrderStats,
 } from '@/lib/supabase/services/orders'
 
@@ -33,12 +37,15 @@ beforeEach(() => {
 })
 
 describe('getOrders', () => {
-  it('returns empty array when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
     const result = await getOrders()
 
-    expect(result).toEqual([])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns mapped orders when user authenticated', async () => {
@@ -60,27 +67,34 @@ describe('getOrders', () => {
 
     const result = await getOrders()
 
-    expect(result).toHaveLength(1)
-    expect(result[0].orderNumber).toBe('K-2026-0001')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0].orderNumber).toBe('K-2026-0001')
+    }
   })
 
   it('filters by projectId when provided', async () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
     mockQueryResult({ data: [], error: null })
 
-    await getOrders('proj-1')
+    const result = await getOrders('proj-1')
 
+    expect(result.ok).toBe(true)
     expect(mockGetCurrentUser).toHaveBeenCalled()
   })
 })
 
 describe('getOrder', () => {
-  it('returns null when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
     const result = await getOrder('order-1')
 
-    expect(result).toBeNull()
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns order when found', async () => {
@@ -100,15 +114,21 @@ describe('getOrder', () => {
 
     const result = await getOrder('order-1')
 
-    expect(result).not.toBeNull()
-    expect(result?.orderNumber).toBe('K-2026-0001')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.orderNumber).toBe('K-2026-0001')
+    }
   })
 })
 
 describe('getOrderByNumber', () => {
-  it('returns null when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
-    expect(await getOrderByNumber('K-2026-0001')).toBeNull()
+    const result = await getOrderByNumber('K-2026-0001')
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns order when found', async () => {
@@ -127,15 +147,21 @@ describe('getOrderByNumber', () => {
     })
 
     const result = await getOrderByNumber('K-2026-0001')
-    expect(result).not.toBeNull()
-    expect(result?.orderNumber).toBe('K-2026-0001')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.orderNumber).toBe('K-2026-0001')
+    }
   })
 })
 
 describe('getOrderByProject', () => {
-  it('returns null when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
-    expect(await getOrderByProject('proj-1')).toBeNull()
+    const result = await getOrderByProject('proj-1')
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns order when found', async () => {
@@ -154,8 +180,10 @@ describe('getOrderByProject', () => {
     })
 
     const result = await getOrderByProject('proj-1')
-    expect(result).not.toBeNull()
-    expect(result?.projectId).toBe('proj-1')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.projectId).toBe('proj-1')
+    }
   })
 })
 
@@ -170,11 +198,13 @@ const ORDER_ROW = {
 }
 
 describe('createOrder', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
-    await expect(
-      createOrder({ projectId: 'proj-1', orderNumber: 'K-2026-0001' })
-    ).rejects.toThrow('Not authenticated')
+    const result = await createOrder({ projectId: 'proj-1', orderNumber: 'K-2026-0001' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('creates order', async () => {
@@ -183,16 +213,21 @@ describe('createOrder', () => {
 
     const result = await createOrder({ projectId: 'proj-1', orderNumber: 'K-2026-0001' })
 
-    expect(result.id).toBe('order-new')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('order-new')
+    }
   })
 })
 
 describe('updateOrder', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
-    await expect(
-      updateOrder('order-1', { status: 'sent' })
-    ).rejects.toThrow('Not authenticated')
+    const result = await updateOrder('order-1', { status: 'sent' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('updates order', async () => {
@@ -201,7 +236,10 @@ describe('updateOrder', () => {
 
     const result = await updateOrder('order-1', { status: 'sent' })
 
-    expect(result.status).toBe('sent')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.status).toBe('sent')
+    }
   })
 })
 
@@ -210,7 +248,123 @@ describe('deleteOrder', () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
     mockQueryResult({ data: null, error: null })
 
-    await expect(deleteOrder('order-1')).resolves.toBeUndefined()
+    await expect(deleteOrder('order-1')).resolves.toEqual({ ok: true, data: undefined })
+  })
+
+  it('returns INTERNAL on delete error', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: { message: 'constraint' } })
+
+    const result = await deleteOrder('order-1')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('INTERNAL')
+  })
+})
+
+describe('sendOrder', () => {
+  it('updates order status to sent', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: { ...ORDER_ROW, status: 'sent' }, error: null })
+
+    const result = await sendOrder('order-1')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.status).toBe('sent')
+  })
+
+  it('returns UNAUTHORIZED when no user', async () => {
+    mockGetCurrentUser.mockResolvedValue(null)
+    const result = await sendOrder('order-1')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('UNAUTHORIZED')
+  })
+})
+
+describe('confirmOrder', () => {
+  it('updates order status to confirmed', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: { ...ORDER_ROW, status: 'confirmed' }, error: null })
+
+    const result = await confirmOrder('order-1')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.status).toBe('confirmed')
+  })
+})
+
+describe('cancelOrder', () => {
+  it('updates order status to cancelled', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: { ...ORDER_ROW, status: 'cancelled' }, error: null })
+
+    const result = await cancelOrder('order-1')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.status).toBe('cancelled')
+  })
+})
+
+describe('upsertOrderForProject', () => {
+  it('updates existing order when order exists for project', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'order-1',
+        user_id: 'user-1',
+        project_id: 'proj-1',
+        order_number: 'K-2026-0001',
+        status: 'active',
+        created_at: '2026-01-15T00:00:00Z',
+        updated_at: '2026-01-15T00:00:00Z',
+      },
+      error: null,
+    })
+    mockQueryResult({
+      data: {
+        id: 'order-1',
+        user_id: 'user-1',
+        project_id: 'proj-1',
+        order_number: 'K-2026-0002',
+        status: 'active',
+        created_at: '2026-01-15T00:00:00Z',
+        updated_at: '2026-01-15T00:00:00Z',
+      },
+      error: null,
+    })
+
+    const result = await upsertOrderForProject('proj-1', 'K-2026-0002', {})
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('order-1')
+      expect(result.data.orderNumber).toBe('K-2026-0002')
+    }
+  })
+
+  it('creates order when no order exists for project', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+    mockQueryResult({
+      data: {
+        id: 'order-new',
+        user_id: 'user-1',
+        project_id: 'proj-1',
+        order_number: 'K-2026-0001',
+        status: 'draft',
+        created_at: '2026-01-15T00:00:00Z',
+        updated_at: '2026-01-15T00:00:00Z',
+      },
+      error: null,
+    })
+
+    const result = await upsertOrderForProject('proj-1', 'K-2026-0001', {})
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('order-new')
+      expect(result.data.projectId).toBe('proj-1')
+    }
   })
 })
 
@@ -235,8 +389,11 @@ describe('getOrdersWithProject', () => {
 
     const result = await getOrdersWithProject()
 
-    expect(result).toHaveLength(1)
-    expect(result[0].orderNumber).toBe('K-2026-0001')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0].orderNumber).toBe('K-2026-0001')
+    }
   })
 })
 
@@ -247,7 +404,10 @@ describe('getOrderStats', () => {
 
     const result = await getOrderStats()
 
-    expect(result).toBeDefined()
-    expect(typeof result.total).toBe('number')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data).toBeDefined()
+      expect(typeof result.data.total).toBe('number')
+    }
   })
 })

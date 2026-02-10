@@ -49,10 +49,11 @@ export async function POST(request: NextRequest) {
       return apiErrors.validation()
     }
 
-    const project = await getProject(projectId)
-    if (!project) {
+    const projectResult = await getProject(projectId)
+    if (!projectResult.ok) {
       return apiErrors.notFound()
     }
+    const project = projectResult.data
 
     const invoiceResult = await getInvoice(invoiceId)
     if (!invoiceResult.ok) {

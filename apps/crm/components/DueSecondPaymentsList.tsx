@@ -48,10 +48,11 @@ export function DueSecondPaymentsList({ projects, onProjectUpdate }: DueSecondPa
       const newInvoice = createResult.data
 
       // Markiere als erstellt
-      await updateProject(project.id, {
+      const updateResult = await updateProject(project.id, {
         secondPaymentCreated: true,
         notes: `${project.notes || ''}\n${new Date().toLocaleDateString('de-DE')}: Zweite Anzahlung "${newInvoice.invoiceNumber}" (${amounts.second.toFixed(2)}€) erstellt.`,
       })
+      if (!updateResult.ok) throw new Error(updateResult.message)
 
       if (onProjectUpdate) onProjectUpdate()
       alert(`Zweite Anzahlung "${newInvoice.invoiceNumber}" erfolgreich erstellt!`)

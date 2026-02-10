@@ -86,10 +86,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Lade Projekt FRISCH aus der Datenbank
-    const project = await getProject(projectId)
-    if (!project) {
+    const projectResult = await getProject(projectId)
+    if (!projectResult.ok) {
       return apiErrors.notFound()
     }
+    const project = projectResult.data
 
     // Lade Rechnung aus der neuen invoices-Tabelle
     const invoiceResult = await getInvoice(invoiceId)

@@ -167,7 +167,11 @@ describe('createComplaint', () => {
   it('throws when project not found', async () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
     mockGetCurrentCompanyId.mockResolvedValue('comp-1')
-    mockGetProject.mockResolvedValue(null)
+    mockGetProject.mockResolvedValue({
+      ok: false,
+      code: 'NOT_FOUND',
+      message: 'Project proj-1 not found',
+    })
 
     await expect(
       createComplaint({
@@ -182,7 +186,10 @@ describe('createComplaint', () => {
   it('returns created complaint on success', async () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
     mockGetCurrentCompanyId.mockResolvedValue('comp-1')
-    mockGetProject.mockResolvedValue({ id: 'proj-1', name: 'Projekt' } as never)
+    mockGetProject.mockResolvedValue({
+      ok: true,
+      data: { id: 'proj-1', customerName: 'Projekt' } as never,
+    })
     mockQueryResult({
       data: {
         id: 'c-new',

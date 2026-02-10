@@ -35,16 +35,19 @@ export default function MeasurementDateModal({
     setSaving(true)
     try {
       // Update project
-      const updatedProject = await updateProject(project.id, {
+      const updatedProjectResult = await updateProject(project.id, {
         measurementDate,
         measurementTime: measurementTime || undefined,
         isMeasured: true,
         status: ProjectStatus.MEASURING,
       })
+      if (!updatedProjectResult.ok) {
+        throw new Error(updatedProjectResult.message)
+      }
 
       // Update parent component state
       if (onUpdateProject) {
-        onUpdateProject(updatedProject)
+        onUpdateProject(updatedProjectResult.data)
       }
 
       // Create calendar appointment

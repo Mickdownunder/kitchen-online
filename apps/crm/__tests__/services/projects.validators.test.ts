@@ -1,7 +1,10 @@
 import type { InvoiceItem } from '@/types'
 import {
+  ensureAuthenticatedUserId,
   generateAccessCode,
+  isNotFoundError,
   resolveUnit,
+  toInternalErrorResult,
   validateItems,
 } from '@/lib/supabase/services/projects/validators'
 
@@ -36,14 +39,51 @@ describe('projects validators', () => {
   })
 
   it('validates invoice items and rejects invalid quantity', () => {
-    expect(() => validateItems([makeItem({ quantity: 0 })])).toThrow('Ungültige Menge')
+    const result = validateItems([makeItem({ quantity: 0 })])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('VALIDATION')
+      expect(result.message).toContain('Ungültige Menge')
+    }
   })
 
   it('validates invoice items and rejects negative prices', () => {
-    expect(() => validateItems([makeItem({ pricePerUnit: -1 })])).toThrow('Ungültiger Preis')
+    const result = validateItems([makeItem({ pricePerUnit: -1 })])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('VALIDATION')
+      expect(result.message).toContain('Ungültiger Preis')
+    }
   })
 
   it('accepts valid items', () => {
-    expect(() => validateItems([makeItem()])).not.toThrow()
+    const result = validateItems([makeItem()])
+    expect(result).toEqual({ ok: true, data: undefined })
+  })
+
+  it('returns unauthorized when no user id is present', () => {
+    const result = ensureAuthenticatedUserId(null)
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+      expect(result.message).toBe('Not authenticated')
+    }
+  })
+
+  it('detects PostgREST not found errors', () => {
+    expect(isNotFoundError({ code: 'PGRST116' })).toBe(true)
+    expect(isNotFoundError({ code: 'PGRST999' })).toBe(false)
+  })
+
+  it('maps unknown errors to internal service failures', () => {
+    const error = new Error('boom')
+    const result = toInternalErrorResult(error)
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INTERNAL')
+      expect(result.message).toBe('boom')
+    }
   })
 })

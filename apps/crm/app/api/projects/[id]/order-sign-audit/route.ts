@@ -34,8 +34,8 @@ export async function GET(
     }
 
     // Prüfen ob User Zugriff auf Projekt hat
-    const project = await getProject(projectId, supabase)
-    if (!project) {
+    const projectResult = await getProject(projectId, supabase)
+    if (!projectResult.ok) {
       return apiErrors.notFound({ component: 'api/projects/order-sign-audit', projectId })
     }
 

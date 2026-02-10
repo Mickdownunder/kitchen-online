@@ -37,6 +37,7 @@ import {
   getInvoiceStats,
   getRemainingCancellableAmount,
   createCreditNote,
+  canCancelInvoice,
   getInvoice,
   getInvoices,
   getInvoiceByNumber,
@@ -374,6 +375,71 @@ describe('deleteInvoice', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.code).toBe('INTERNAL')
+  })
+})
+
+// ─── canCancelInvoice (state machine) ───────────────────────────────────
+
+describe('canCancelInvoice', () => {
+  it('returns canCancel: false for credit type', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({
+      data: { ...INVOICE_ROW, type: 'credit', amount: -500 },
+      error: null,
+    })
+
+    const result = await canCancelInvoice('cn-1')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.canCancel).toBe(false)
+      expect(result.data.reason).toContain('Stornorechnungen')
+    }
+  })
+
+  it('returns canCancel: false when remaining amount is 0', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: { ...INVOICE_ROW, amount: 1200 }, error: null })
+    mockQueryResult({
+      data: [{ ...INVOICE_ROW, id: 'cn-1', type: 'credit', amount: -1200 }],
+      error: null,
+    })
+
+    const result = await canCancelInvoice('inv-1')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.canCancel).toBe(false)
+      expect(result.data.reason).toContain('vollständig storniert')
+    }
+  })
+
+  it('returns canCancel: true with remainingAmount when cancellable', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: { ...INVOICE_ROW, amount: 1200, type: 'partial' }, error: null })
+    mockQueryResult({ data: { ...INVOICE_ROW, amount: 1200 }, error: null })
+    mockQueryResult({ data: [], error: null })
+
+    const result = await canCancelInvoice('inv-1')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.canCancel).toBe(true)
+      expect(result.data.remainingAmount).toBe(1200)
+    }
+  })
+
+  it('returns canCancel: false when invoice not found', async () => {
+    setAuthenticatedUser()
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+
+    const result = await canCancelInvoice('nonexistent')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.canCancel).toBe(false)
+      expect(result.data.reason).toContain('nicht gefunden')
+    }
   })
 })
 

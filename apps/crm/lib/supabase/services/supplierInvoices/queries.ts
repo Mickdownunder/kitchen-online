@@ -1,3 +1,4 @@
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import type { SupplierInvoice } from '@/types'
 import { supabase } from '../../client'
 import {
@@ -13,9 +14,11 @@ import type {
   SupplierInvoiceRow,
   SupplierInvoiceStats,
 } from './types'
-import { isNotFoundError, getTodayIsoDate } from './validators'
+import { getTodayIsoDate, isNotFoundError, toInternalErrorResult } from './validators'
 
-export async function getSupplierInvoices(projectId?: string): Promise<SupplierInvoice[]> {
+export async function getSupplierInvoices(
+  projectId?: string,
+): Promise<ServiceResult<SupplierInvoice[]>> {
   let query = supabase
     .from('supplier_invoices')
     .select('*')
@@ -28,31 +31,31 @@ export async function getSupplierInvoices(projectId?: string): Promise<SupplierI
   const { data, error } = await query
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   const rows = (data || []) as SupplierInvoiceRow[]
-  return rows.map(mapSupplierInvoiceFromRow)
+  return ok(rows.map(mapSupplierInvoiceFromRow))
 }
 
-export async function getSupplierInvoice(id: string): Promise<SupplierInvoice | null> {
+export async function getSupplierInvoice(id: string): Promise<ServiceResult<SupplierInvoice>> {
   const { data, error } = await supabase.from('supplier_invoices').select('*').eq('id', id).single()
 
   if (error) {
     if (isNotFoundError(error)) {
-      return null
+      return fail('NOT_FOUND', `Supplier invoice ${id} not found`)
     }
 
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapSupplierInvoiceFromRow(data as SupplierInvoiceRow)
+  return ok(mapSupplierInvoiceFromRow(data as SupplierInvoiceRow))
 }
 
 export async function getSupplierInvoicesByDateRange(
   startDate: string,
   endDate: string,
-): Promise<SupplierInvoice[]> {
+): Promise<ServiceResult<SupplierInvoice[]>> {
   const { data, error } = await supabase
     .from('supplier_invoices')
     .select('*')
@@ -61,14 +64,14 @@ export async function getSupplierInvoicesByDateRange(
     .order('invoice_date', { ascending: true })
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   const rows = (data || []) as SupplierInvoiceRow[]
-  return rows.map(mapSupplierInvoiceFromRow)
+  return ok(rows.map(mapSupplierInvoiceFromRow))
 }
 
-export async function getOpenSupplierInvoices(): Promise<SupplierInvoice[]> {
+export async function getOpenSupplierInvoices(): Promise<ServiceResult<SupplierInvoice[]>> {
   const { data, error } = await supabase
     .from('supplier_invoices')
     .select('*')
@@ -76,14 +79,14 @@ export async function getOpenSupplierInvoices(): Promise<SupplierInvoice[]> {
     .order('due_date', { ascending: true, nullsFirst: false })
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   const rows = (data || []) as SupplierInvoiceRow[]
-  return rows.map(mapSupplierInvoiceFromRow)
+  return ok(rows.map(mapSupplierInvoiceFromRow))
 }
 
-export async function getOverdueSupplierInvoices(): Promise<SupplierInvoice[]> {
+export async function getOverdueSupplierInvoices(): Promise<ServiceResult<SupplierInvoice[]>> {
   const today = getTodayIsoDate()
 
   const { data, error } = await supabase
@@ -94,39 +97,49 @@ export async function getOverdueSupplierInvoices(): Promise<SupplierInvoice[]> {
     .order('due_date', { ascending: true })
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   const rows = (data || []) as SupplierInvoiceRow[]
-  return rows.map(mapSupplierInvoiceFromRow)
+  return ok(rows.map(mapSupplierInvoiceFromRow))
 }
 
-export async function getSupplierInvoiceCustomCategories(): Promise<SupplierInvoiceCustomCategory[]> {
+export async function getSupplierInvoiceCustomCategories(): Promise<
+  ServiceResult<SupplierInvoiceCustomCategory[]>
+> {
   const { data, error } = await supabase
     .from('supplier_invoice_custom_categories')
     .select('id, user_id, name, created_at')
     .order('name')
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
   const rows = (data || []) as SupplierInvoiceCustomCategoryRow[]
-  return rows.map(mapCustomCategoryFromRow)
+  return ok(rows.map(mapCustomCategoryFromRow))
 }
 
 export async function getSupplierInvoiceStats(
   startDate: string,
   endDate: string,
-): Promise<SupplierInvoiceStats> {
-  const invoices = await getSupplierInvoicesByDateRange(startDate, endDate)
-  return buildSupplierInvoiceStats(invoices)
+): Promise<ServiceResult<SupplierInvoiceStats>> {
+  const invoicesResult = await getSupplierInvoicesByDateRange(startDate, endDate)
+  if (!invoicesResult.ok) {
+    return invoicesResult
+  }
+
+  return ok(buildSupplierInvoiceStats(invoicesResult.data))
 }
 
 export async function getInputTaxForUVA(
   startDate: string,
   endDate: string,
-): Promise<InputTaxBucket[]> {
-  const invoices = await getSupplierInvoicesByDateRange(startDate, endDate)
-  return buildInputTaxBuckets(invoices)
+): Promise<ServiceResult<InputTaxBucket[]>> {
+  const invoicesResult = await getSupplierInvoicesByDateRange(startDate, endDate)
+  if (!invoicesResult.ok) {
+    return invoicesResult
+  }
+
+  return ok(buildInputTaxBuckets(invoicesResult.data))
 }

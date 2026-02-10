@@ -113,9 +113,15 @@ export function useInvoiceViewData(invoiceProp: ListInvoice): UseInvoiceViewData
       }
 
       try {
-        const fullProject = await getProject(projectId)
-        if (isActive && fullProject) {
-          setProjectData(fullProject)
+        const fullProjectResult = await getProject(projectId)
+        if (isActive && fullProjectResult.ok) {
+          setProjectData(fullProjectResult.data)
+        } else if (isActive && !fullProjectResult.ok && fullProjectResult.code !== 'NOT_FOUND') {
+          logger.error(
+            'Error loading project details',
+            { component: 'InvoiceView', code: fullProjectResult.code },
+            new Error(fullProjectResult.message),
+          )
         }
       } catch (error) {
         logger.error('Error loading project details', { component: 'InvoiceView' }, error as Error)

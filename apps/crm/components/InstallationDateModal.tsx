@@ -35,16 +35,19 @@ export default function InstallationDateModal({
     setSaving(true)
     try {
       // Update project
-      const updatedProject = await updateProject(project.id, {
+      const updatedProjectResult = await updateProject(project.id, {
         installationDate,
         installationTime: installationTime || undefined,
         isInstallationAssigned: true,
         status: ProjectStatus.INSTALLATION,
       })
+      if (!updatedProjectResult.ok) {
+        throw new Error(updatedProjectResult.message)
+      }
 
       // Update parent component state
       if (onUpdateProject) {
-        onUpdateProject(updatedProject)
+        onUpdateProject(updatedProjectResult.data)
       }
 
       // Create calendar appointment

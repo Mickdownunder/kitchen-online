@@ -41,7 +41,8 @@ export function scheduleDeliveryDateBackgroundCheck(opts: {
         updatedProjects.forEach(async (project, idx) => {
           if (project.isDelivered !== opts.projects[idx].isDelivered) {
             try {
-              await updateProject(project.id, { deliveryDate: project.deliveryDate })
+              const updateResult = await updateProject(project.id, { deliveryDate: project.deliveryDate })
+              if (!updateResult.ok) throw new Error(updateResult.message)
             } catch {
               logger.debug('Could not update delivery date', {
                 component: 'deliveryDateBackground',

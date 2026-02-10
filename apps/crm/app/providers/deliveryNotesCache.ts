@@ -26,13 +26,29 @@ export async function refreshDeliveryNotesWithCache(opts: {
     opts.isRefreshingRef.current = true
     opts.setIsLoading(true)
 
-    const [supplier, customer] = await Promise.all([
+    const [supplierResult, customerResult] = await Promise.all([
       getDeliveryNotes(),
       fetchAllCustomerDeliveryNotes(),
     ])
-    opts.setSupplierDeliveryNotes(supplier || [])
-    opts.setCustomerDeliveryNotes(customer || [])
+    opts.setSupplierDeliveryNotes(supplierResult.ok ? supplierResult.data : [])
+    opts.setCustomerDeliveryNotes(customerResult.ok ? customerResult.data : [])
     opts.setLastRefresh(Date.now())
+
+    if (!supplierResult.ok) {
+      logger.error(
+        'Error loading supplier delivery notes',
+        { component: 'deliveryNotesCache', code: supplierResult.code },
+        new Error(supplierResult.message),
+      )
+    }
+
+    if (!customerResult.ok) {
+      logger.error(
+        'Error loading customer delivery notes',
+        { component: 'deliveryNotesCache', code: customerResult.code },
+        new Error(customerResult.message),
+      )
+    }
   } catch (error: unknown) {
     // Ignore aborted requests (normal during page navigation)
     const errMessage = error instanceof Error ? error.message : ''

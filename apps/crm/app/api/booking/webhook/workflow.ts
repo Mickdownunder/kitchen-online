@@ -4,6 +4,9 @@ import { sendEmail } from '@/lib/supabase/services/email'
 import { logger } from '@/lib/utils/logger'
 import { generateAccessCode, splitName, type ExtractedBookingData } from './helpers'
 
+const MAX_WORKFLOW_RETRIES = 3
+const RETRY_BASE_DELAY_MS = 300
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -15,6 +18,14 @@ interface CompanySettingsRow {
   user_id: string
   order_prefix: string | null
   next_order_number: number | null
+}
+
+interface CompanyBaseContext {
+  companyId: string
+  companyName: string | null
+  defaultUserId: string
+  orderPrefix: string
+  nextOrderNumber: number
 }
 
 interface CompanyContext {
@@ -41,6 +52,15 @@ interface ProjectContext {
   appointmentDate: Date
   appointmentDateString: string
   appointmentTimeString: string
+}
+
+interface ExistingProjectContext {
+  projectId: string
+  customerId: string | null
+  orderNumber: string
+  accessCode: string | null
+  measurementDate: string | null
+  measurementTime: string | null
 }
 
 export interface ProcessBookingResult {
@@ -84,24 +104,112 @@ function getPortalUrl(): string {
   return 'https://portal.kuechenonline.com'
 }
 
-async function reserveWebhookEvent(eventId: string, payload: unknown): Promise<boolean> {
-  const { error } = await supabaseAdmin.from('processed_webhooks').insert({
-    event_id: eventId,
-    payload,
-  })
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
 
-  if (!error) {
-    return true
-  }
-
-  if (error.code === '23505') {
+function isTransientError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
     return false
   }
 
-  throw new Error(`Webhook konnte nicht reserviert werden: ${error.message}`)
+  const typedError = error as { message?: string; code?: string; status?: number }
+
+  if (typeof typedError.status === 'number' && [408, 425, 429, 500, 502, 503, 504].includes(typedError.status)) {
+    return true
+  }
+
+  const code = typedError.code || ''
+  if (['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED'].includes(code)) {
+    return true
+  }
+
+  const message = (typedError.message || '').toLowerCase()
+  const transientPatterns = [
+    'timeout',
+    'timed out',
+    'network',
+    'fetch failed',
+    'temporary',
+    'temporarily unavailable',
+    'connection',
+    'rate limit',
+    'too many requests',
+    '503',
+    '502',
+    '504',
+  ]
+
+  return transientPatterns.some((pattern) => message.includes(pattern))
 }
 
-async function loadCompanyContext(): Promise<CompanyContext> {
+async function executeWithRetry<T>(
+  label: string,
+  operation: () => Promise<T>,
+  maxAttempts = MAX_WORKFLOW_RETRIES,
+): Promise<T> {
+  let attempt = 0
+
+  while (attempt < maxAttempts) {
+    try {
+      return await operation()
+    } catch (error) {
+      attempt += 1
+      const canRetry = isTransientError(error) && attempt < maxAttempts
+
+      if (!canRetry) {
+        throw error
+      }
+
+      const delayMs = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1)
+      logger.warn('Retrying webhook operation after transient failure', {
+        component: 'booking-webhook',
+        label,
+        attempt,
+        maxAttempts,
+        delayMs,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+
+      await sleep(delayMs)
+    }
+  }
+
+  throw new Error(`Retry budget exhausted for ${label}`)
+}
+
+async function reserveWebhookEvent(eventId: string, payload: unknown): Promise<boolean> {
+  return executeWithRetry('reserve-webhook-event', async () => {
+    const { error } = await supabaseAdmin.from('processed_webhooks').insert({
+      event_id: eventId,
+      payload,
+    })
+
+    if (!error) {
+      return true
+    }
+
+    if (error.code === '23505') {
+      return false
+    }
+
+    throw new Error(`Webhook konnte nicht reserviert werden: ${error.message}`)
+  })
+}
+
+async function releaseWebhookEvent(eventId: string): Promise<void> {
+  const { error } = await supabaseAdmin.from('processed_webhooks').delete().eq('event_id', eventId)
+
+  if (error) {
+    logger.warn('Failed to release webhook reservation', {
+      component: 'booking-webhook',
+      eventId,
+      error: error.message,
+    })
+  }
+}
+
+async function loadCompanyBaseContext(): Promise<CompanyBaseContext> {
   const { data: companySettings, error: companyError } = await supabaseAdmin
     .from('company_settings')
     .select('id, company_name, user_id, order_prefix, next_order_number')
@@ -112,27 +220,75 @@ async function loadCompanyContext(): Promise<CompanyContext> {
     throw new Error('Keine Company Settings gefunden')
   }
 
-  const orderPrefix = companySettings.order_prefix || 'K-'
-  const nextOrderNum = companySettings.next_order_number ?? 1
-  const orderNumber = `${orderPrefix}${new Date().getFullYear()}-${String(nextOrderNum).padStart(4, '0')}`
+  return {
+    companyId: companySettings.id,
+    companyName: companySettings.company_name,
+    defaultUserId: companySettings.user_id,
+    orderPrefix: companySettings.order_prefix || 'K-',
+    nextOrderNumber: companySettings.next_order_number ?? 1,
+  }
+}
+
+async function reserveOrderNumber(company: CompanyBaseContext): Promise<CompanyContext> {
+  const orderNumber = `${company.orderPrefix}${new Date().getFullYear()}-${String(company.nextOrderNumber).padStart(4, '0')}`
 
   const { error: updateError } = await supabaseAdmin
     .from('company_settings')
     .update({
-      next_order_number: nextOrderNum + 1,
+      next_order_number: company.nextOrderNumber + 1,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', companySettings.id)
+    .eq('id', company.companyId)
 
   if (updateError) {
     throw new Error(`Auftragsnummer konnte nicht reserviert werden: ${updateError.message}`)
   }
 
   return {
-    companyId: companySettings.id,
-    companyName: companySettings.company_name,
-    defaultUserId: companySettings.user_id,
+    companyId: company.companyId,
+    companyName: company.companyName,
+    defaultUserId: company.defaultUserId,
     orderNumber,
+  }
+}
+
+async function findExistingProjectForEvent(eventId: string): Promise<ExistingProjectContext | null> {
+  const { data, error } = await supabaseAdmin
+    .from('projects')
+    .select('id, customer_id, order_number, access_code, measurement_date, measurement_time, notes')
+    .ilike('notes', `%Cal.com Event ID: ${eventId}%`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<{
+      id: string
+      customer_id: string | null
+      order_number: string | null
+      access_code: string | null
+      measurement_date: string | null
+      measurement_time: string | null
+      notes: string | null
+    }>()
+
+  if (error) {
+    logger.warn('Failed to query existing project by event id', {
+      component: 'booking-webhook',
+      eventId,
+      error: error.message,
+    })
+    return null
+  }
+
+  if (!data || !data.order_number) {
+    return null
+  }
+
+  return {
+    projectId: data.id,
+    customerId: data.customer_id,
+    orderNumber: data.order_number,
+    accessCode: data.access_code,
+    measurementDate: data.measurement_date,
+    measurementTime: data.measurement_time,
   }
 }
 
@@ -234,8 +390,26 @@ async function findOrCreateCustomer(data: ExtractedBookingData): Promise<Custome
   }
 }
 
+function buildProjectContextFromExisting(
+  data: ExtractedBookingData,
+  existingProject: ExistingProjectContext,
+): ProjectContext {
+  const fallbackAppointmentDate = parseAppointmentDate(data.appointment.startTime)
+  const appointmentDateString =
+    existingProject.measurementDate || fallbackAppointmentDate.toISOString().split('T')[0]
+  const appointmentTimeString = existingProject.measurementTime || formatTime(fallbackAppointmentDate)
+
+  return {
+    projectId: existingProject.projectId,
+    appointmentDate: fallbackAppointmentDate,
+    appointmentDateString,
+    appointmentTimeString,
+  }
+}
+
 async function createProject(
   data: ExtractedBookingData,
+  eventId: string,
   company: CompanyContext,
   customer: CustomerContext,
   salesperson: SalespersonContext,
@@ -260,7 +434,7 @@ async function createProject(
       salesperson_name: salesperson.salespersonName,
       measurement_date: appointmentDateString,
       measurement_time: appointmentTimeString,
-      notes: `Automatisch erstellt via Cal.com Buchung.\nMeeting: ${
+      notes: `Automatisch erstellt via Cal.com Buchung.\nCal.com Event ID: ${eventId}\nMeeting: ${
         data.meetingUrl || 'Kein Link'
       }\nTermin: ${data.appointment.title || 'Beratung'}`,
     })
@@ -279,13 +453,48 @@ async function createProject(
   }
 }
 
+async function ensureProjectAccessCode(projectId: string, accessCode: string | null): Promise<string> {
+  if (accessCode) {
+    return accessCode
+  }
+
+  const generatedAccessCode = generateAccessCode()
+  const { error } = await supabaseAdmin
+    .from('projects')
+    .update({ access_code: generatedAccessCode, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+
+  if (error) {
+    logger.warn('Failed to persist generated access code on existing project', {
+      component: 'booking-webhook',
+      projectId,
+      error: error.message,
+    })
+  }
+
+  return generatedAccessCode
+}
+
 async function createPlanningAppointment(
   data: ExtractedBookingData,
-  company: CompanyContext,
+  company: CompanyBaseContext,
   customer: CustomerContext,
   salesperson: SalespersonContext,
   project: ProjectContext,
 ): Promise<void> {
+  const { data: existingAppointment } = await supabaseAdmin
+    .from('planning_appointments')
+    .select('id')
+    .eq('project_id', project.projectId)
+    .eq('type', 'Planung')
+    .eq('date', project.appointmentDateString)
+    .eq('time', project.appointmentTimeString)
+    .maybeSingle<{ id: string }>()
+
+  if (existingAppointment) {
+    return
+  }
+
   const { error } = await supabaseAdmin.from('planning_appointments').insert({
     user_id: salesperson.salespersonId || company.defaultUserId,
     company_id: company.companyId,
@@ -311,7 +520,7 @@ async function sendBookingConfirmation(
   data: ExtractedBookingData,
   customer: CustomerContext,
   project: ProjectContext,
-  company: CompanyContext,
+  company: Pick<CompanyBaseContext, 'companyName'>,
   accessCode: string,
 ): Promise<boolean> {
   const emailData = bookingConfirmationTemplate({
@@ -327,14 +536,17 @@ async function sendBookingConfirmation(
   })
 
   try {
-    await sendEmail({
-      to: emailData.to,
-      subject: emailData.subject,
-      html: emailData.html,
-      text: emailData.text,
-      from: process.env.BOOKING_EMAIL_FROM || 'office@kuechenonline.com',
-      fromName: company.companyName || 'KüchenOnline',
+    await executeWithRetry('send-booking-confirmation-email', async () => {
+      await sendEmail({
+        to: emailData.to,
+        subject: emailData.subject,
+        html: emailData.html,
+        text: emailData.text,
+        from: process.env.BOOKING_EMAIL_FROM || 'office@kuechenonline.com',
+        fromName: company.companyName || 'KüchenOnline',
+      })
     })
+
     return true
   } catch (error) {
     logger.warn(
@@ -349,6 +561,45 @@ async function sendBookingConfirmation(
   }
 }
 
+async function executeBookingWorkflow(eventId: string, data: ExtractedBookingData): Promise<ProcessBookingResult> {
+  const companyBase = await loadCompanyBaseContext()
+  const salesperson = await resolveSalesperson(data.sellerEmail)
+  const customer = await findOrCreateCustomer(data)
+
+  const existingProject = await findExistingProjectForEvent(eventId)
+
+  if (existingProject) {
+    const accessCode = await ensureProjectAccessCode(existingProject.projectId, existingProject.accessCode)
+    const project = buildProjectContextFromExisting(data, existingProject)
+
+    await createPlanningAppointment(data, companyBase, customer, salesperson, project)
+    const emailSent = await sendBookingConfirmation(data, customer, project, companyBase, accessCode)
+
+    return {
+      customerId: existingProject.customerId || customer.customerId,
+      projectId: existingProject.projectId,
+      orderNumber: existingProject.orderNumber,
+      accessCode,
+      emailSent,
+    }
+  }
+
+  const company = await reserveOrderNumber(companyBase)
+  const accessCode = generateAccessCode()
+  const project = await createProject(data, eventId, company, customer, salesperson, accessCode)
+
+  await createPlanningAppointment(data, companyBase, customer, salesperson, project)
+  const emailSent = await sendBookingConfirmation(data, customer, project, companyBase, accessCode)
+
+  return {
+    customerId: customer.customerId,
+    projectId: project.projectId,
+    orderNumber: company.orderNumber,
+    accessCode,
+    emailSent,
+  }
+}
+
 export async function processBookingWebhook(
   eventId: string,
   payload: unknown,
@@ -359,23 +610,17 @@ export async function processBookingWebhook(
     return { status: 'duplicate' }
   }
 
-  const company = await loadCompanyContext()
-  const salesperson = await resolveSalesperson(data.sellerEmail)
-  const customer = await findOrCreateCustomer(data)
+  try {
+    const result = await executeWithRetry('process-booking-workflow', () =>
+      executeBookingWorkflow(eventId, data),
+    )
 
-  const accessCode = generateAccessCode()
-  const project = await createProject(data, company, customer, salesperson, accessCode)
-  await createPlanningAppointment(data, company, customer, salesperson, project)
-  const emailSent = await sendBookingConfirmation(data, customer, project, company, accessCode)
-
-  return {
-    status: 'processed',
-    result: {
-      customerId: customer.customerId,
-      projectId: project.projectId,
-      orderNumber: company.orderNumber,
-      accessCode,
-      emailSent,
-    },
+    return {
+      status: 'processed',
+      result,
+    }
+  } catch (error) {
+    await releaseWebhookEvent(eventId)
+    throw error
   }
 }

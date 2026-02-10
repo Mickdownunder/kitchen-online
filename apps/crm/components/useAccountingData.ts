@@ -83,13 +83,30 @@ export function useAccountingData(projects: CustomerProject[]) {
       const startDate = dateRange.startDate.toISOString().split('T')[0]
       const endDate = dateRange.endDate.toISOString().split('T')[0]
 
-      const [invoices, inputTax] = await Promise.all([
+      const [invoicesResult, inputTaxResult] = await Promise.all([
         getSupplierInvoicesByDateRange(startDate, endDate),
         getInputTaxForUVA(startDate, endDate),
       ])
 
-      setSupplierInvoices(invoices)
-      setInputTaxData(inputTax)
+      if (!invoicesResult.ok || !inputTaxResult.ok) {
+        const errorMessage = !invoicesResult.ok
+          ? invoicesResult.message
+          : !inputTaxResult.ok
+            ? inputTaxResult.message
+            : 'Unknown error'
+        logger.error(
+          'Fehler beim Laden der Eingangsrechnungen',
+          {
+            component: 'AccountingView',
+            supplierInvoicesCode: invoicesResult.ok ? undefined : invoicesResult.code,
+            inputTaxCode: inputTaxResult.ok ? undefined : inputTaxResult.code,
+          },
+          new Error(errorMessage),
+        )
+      }
+
+      setSupplierInvoices(invoicesResult.ok ? invoicesResult.data : [])
+      setInputTaxData(inputTaxResult.ok ? inputTaxResult.data : [])
     } catch (error) {
       logger.error(
         'Fehler beim Laden der Eingangsrechnungen',

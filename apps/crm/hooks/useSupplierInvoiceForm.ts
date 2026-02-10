@@ -157,9 +157,15 @@ export function useSupplierInvoiceForm({
       }
 
       if (editingInvoice) {
-        await updateSupplierInvoice(editingInvoice.id, roundedData)
+        const updateResult = await updateSupplierInvoice(editingInvoice.id, roundedData)
+        if (!updateResult.ok) {
+          throw new Error(updateResult.message)
+        }
       } else {
-        await createSupplierInvoice(roundedData)
+        const createResult = await createSupplierInvoice(roundedData)
+        if (!createResult.ok) {
+          throw new Error(createResult.message)
+        }
       }
 
       await onSaved()

@@ -24,9 +24,16 @@ export async function refreshProjectsWithCache(opts: {
   try {
     opts.isRefreshingRef.current = true
     if (!silent) opts.setIsLoading(true)
-    const data = await getProjects()
-    opts.setProjects(data || [])
+    const dataResult = await getProjects()
+    opts.setProjects(dataResult.ok ? dataResult.data : [])
     opts.setLastRefresh(Date.now())
+    if (!dataResult.ok) {
+      logger.error(
+        'Error loading projects from Supabase',
+        { component: 'projectsCache', code: dataResult.code },
+        new Error(dataResult.message),
+      )
+    }
   } catch (error) {
     logger.error('Error loading projects from Supabase', { component: 'projectsCache' }, error instanceof Error ? error : new Error(String(error)))
     opts.setProjects([])

@@ -1,3 +1,4 @@
+import { ok, type ServiceResult } from '@/lib/types/service'
 import type { PaymentMethod, SupplierInvoice } from '@/types'
 import { supabase } from '../../client'
 import {
@@ -14,34 +15,42 @@ import type {
   SupplierInvoiceRow,
   UpdateSupplierInvoiceInput,
 } from './types'
-import { getTodayIsoDate, requireAuthenticatedUserId, requireNonEmptyCategoryName } from './validators'
+import {
+  ensureAuthenticatedUserId,
+  ensureNonEmptyCategoryName,
+  getTodayIsoDate,
+  toInternalErrorResult,
+} from './validators'
 
 export async function createSupplierInvoice(
   input: CreateSupplierInvoiceInput,
-): Promise<SupplierInvoice> {
+): Promise<ServiceResult<SupplierInvoice>> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const userId = requireAuthenticatedUserId(user)
+  const userResult = ensureAuthenticatedUserId(user)
+  if (!userResult.ok) {
+    return userResult
+  }
 
   const { data, error } = await supabase
     .from('supplier_invoices')
-    .insert(mapCreateInputToInsert(userId, input))
+    .insert(mapCreateInputToInsert(userResult.data, input))
     .select()
     .single()
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapSupplierInvoiceFromRow(data as SupplierInvoiceRow)
+  return ok(mapSupplierInvoiceFromRow(data as SupplierInvoiceRow))
 }
 
 export async function updateSupplierInvoice(
   id: string,
   input: UpdateSupplierInvoiceInput,
-): Promise<SupplierInvoice> {
+): Promise<ServiceResult<SupplierInvoice>> {
   const { data, error } = await supabase
     .from('supplier_invoices')
     .update(mapUpdateInputToRow(input))
@@ -50,17 +59,17 @@ export async function updateSupplierInvoice(
     .single()
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapSupplierInvoiceFromRow(data as SupplierInvoiceRow)
+  return ok(mapSupplierInvoiceFromRow(data as SupplierInvoiceRow))
 }
 
 export async function markSupplierInvoicePaid(
   id: string,
   paidDate?: string,
   paymentMethod?: PaymentMethod,
-): Promise<SupplierInvoice> {
+): Promise<ServiceResult<SupplierInvoice>> {
   return updateSupplierInvoice(id, {
     isPaid: true,
     paidDate: paidDate || getTodayIsoDate(),
@@ -68,7 +77,9 @@ export async function markSupplierInvoicePaid(
   })
 }
 
-export async function markSupplierInvoiceUnpaid(id: string): Promise<SupplierInvoice> {
+export async function markSupplierInvoiceUnpaid(
+  id: string,
+): Promise<ServiceResult<SupplierInvoice>> {
   return updateSupplierInvoice(id, {
     isPaid: false,
     paidDate: undefined,
@@ -76,41 +87,54 @@ export async function markSupplierInvoiceUnpaid(id: string): Promise<SupplierInv
   })
 }
 
-export async function deleteSupplierInvoice(id: string): Promise<void> {
+export async function deleteSupplierInvoice(id: string): Promise<ServiceResult<void>> {
   const { error } = await supabase.from('supplier_invoices').delete().eq('id', id)
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
+
+  return ok(undefined)
 }
 
 export async function addSupplierInvoiceCustomCategory(
   name: string,
-): Promise<SupplierInvoiceCustomCategory> {
+): Promise<ServiceResult<SupplierInvoiceCustomCategory>> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const userId = requireAuthenticatedUserId(user)
-  const trimmedName = requireNonEmptyCategoryName(name)
+  const userResult = ensureAuthenticatedUserId(user)
+  if (!userResult.ok) {
+    return userResult
+  }
+
+  const categoryNameResult = ensureNonEmptyCategoryName(name)
+  if (!categoryNameResult.ok) {
+    return categoryNameResult
+  }
 
   const { data, error } = await supabase
     .from('supplier_invoice_custom_categories')
-    .insert(mapCustomCategoryToInsert(userId, trimmedName))
+    .insert(mapCustomCategoryToInsert(userResult.data, categoryNameResult.data))
     .select('id, user_id, name, created_at')
     .single()
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapCustomCategoryFromRow(data as SupplierInvoiceCustomCategoryRow)
+  return ok(mapCustomCategoryFromRow(data as SupplierInvoiceCustomCategoryRow))
 }
 
-export async function deleteSupplierInvoiceCustomCategory(id: string): Promise<void> {
+export async function deleteSupplierInvoiceCustomCategory(
+  id: string,
+): Promise<ServiceResult<void>> {
   const { error } = await supabase.from('supplier_invoice_custom_categories').delete().eq('id', id)
 
   if (error) {
-    throw error
+    return toInternalErrorResult(error)
   }
+
+  return ok(undefined)
 }

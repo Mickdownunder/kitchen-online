@@ -78,7 +78,10 @@ export async function POST(request: NextRequest) {
     const parsedRequest = parseChatRequest(body)
     if (!parsedRequest.ok) {
       apiLogger.error(new Error(parsedRequest.message), 400)
-      return apiErrors.validation()
+      return apiErrors.validation({
+        component: 'api/chat',
+        validationMessage: parsedRequest.message,
+      })
     }
 
     logger.info('Chat API request received', {

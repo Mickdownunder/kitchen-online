@@ -116,11 +116,11 @@ export default function BankReconciliationView() {
     setAssignModal(tx)
     setLoadingAssignList(true)
     try {
-      const [supplier, outgoing] = await Promise.all([
+      const [supplierResult, outgoing] = await Promise.all([
         getOpenSupplierInvoices(),
         getInvoicesWithProject().then(result => result.ok ? result.data.filter(inv => !inv.isPaid) : []),
       ])
-      setOpenSupplierInvoices(supplier)
+      setOpenSupplierInvoices(supplierResult.ok ? supplierResult.data : [])
       setOpenOutgoingInvoices(outgoing)
     } finally {
       setLoadingAssignList(false)

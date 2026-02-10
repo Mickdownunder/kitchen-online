@@ -1,6 +1,7 @@
 import type { InvoiceItem } from '@/types'
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import { logger } from '@/lib/utils/logger'
-import type { ServiceErrorLike } from './types'
+import type { AuthenticatedUserLike, ServiceErrorLike } from './types'
 
 const UNIT_MAP: Record<string, InvoiceItem['unit']> = {
   Stk: 'Stk',
@@ -42,20 +43,51 @@ export function generateAccessCode(length = 12): string {
   return result
 }
 
-export function validateItems(items: InvoiceItem[]): void {
+export function ensureAuthenticatedUserId(user: unknown): ServiceResult<string> {
+  if (!user || typeof user !== 'object') {
+    return fail('UNAUTHORIZED', 'Not authenticated')
+  }
+
+  const candidate = user as Partial<AuthenticatedUserLike>
+  if (typeof candidate.id !== 'string' || candidate.id.length === 0) {
+    return fail('UNAUTHORIZED', 'Not authenticated')
+  }
+
+  return ok(candidate.id)
+}
+
+export function isNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const postgrestError = error as ServiceErrorLike
+  return postgrestError.code === 'PGRST116'
+}
+
+export function toInternalErrorResult(error: unknown): ServiceResult<never> {
+  const postgrestError = error as ServiceErrorLike
+  return fail('INTERNAL', postgrestError.message || 'Unknown error', error)
+}
+
+export function validateItems(items: InvoiceItem[]): ServiceResult<void> {
   for (const item of items) {
     if (item.quantity !== undefined && item.quantity <= 0) {
-      throw new Error(
+      return fail(
+        'VALIDATION',
         `Ungültige Menge für Artikel "${item.description || 'Unbekannt'}": ${item.quantity}. Menge muss größer als 0 sein.`,
       )
     }
 
     if (item.pricePerUnit !== undefined && item.pricePerUnit < 0) {
-      throw new Error(
+      return fail(
+        'VALIDATION',
         `Ungültiger Preis für Artikel "${item.description || 'Unbekannt'}": ${item.pricePerUnit}. Preis darf nicht negativ sein.`,
       )
     }
   }
+
+  return ok(undefined)
 }
 
 export function logSupabaseError(fn: string, error: unknown): void {

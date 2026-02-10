@@ -1,3 +1,4 @@
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import type { CustomerDeliveryNote, DeliveryNote, GoodsReceipt } from '@/types'
 import { logger } from '@/lib/utils/logger'
 import { supabase } from '../../client'
@@ -7,12 +8,16 @@ import {
   mapDeliveryNoteFromDB,
   mapGoodsReceiptFromDB,
 } from './mappers'
-import { isNotFoundError } from './validators'
+import {
+  ensureAuthenticatedUserId,
+  isNotFoundError,
+  toInternalErrorResult,
+} from './validators'
 
-export async function getDeliveryNotes(): Promise<DeliveryNote[]> {
-  const user = await getCurrentUser()
-  if (!user) {
-    return []
+export async function getDeliveryNotes(): Promise<ServiceResult<DeliveryNote[]>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
   }
 
   const { data, error } = await supabase
@@ -23,21 +28,21 @@ export async function getDeliveryNotes(): Promise<DeliveryNote[]> {
       delivery_note_items (*)
     `,
     )
-    .eq('user_id', user.id)
+    .eq('user_id', userResult.data)
     .order('received_date', { ascending: false })
 
   if (error) {
     logger.error('Error fetching delivery notes', { component: 'delivery' }, error as Error)
-    return []
+    return toInternalErrorResult(error)
   }
 
-  return (data || []).map(mapDeliveryNoteFromDB)
+  return ok((data || []).map(mapDeliveryNoteFromDB))
 }
 
-export async function getDeliveryNote(id: string): Promise<DeliveryNote | null> {
-  const user = await getCurrentUser()
-  if (!user) {
-    return null
+export async function getDeliveryNote(id: string): Promise<ServiceResult<DeliveryNote>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
   }
 
   const { data, error } = await supabase
@@ -49,24 +54,24 @@ export async function getDeliveryNote(id: string): Promise<DeliveryNote | null> 
     `,
     )
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userResult.data)
     .single()
 
   if (error) {
     if (isNotFoundError(error)) {
-      return null
+      return fail('NOT_FOUND', `Delivery note ${id} not found`)
     }
 
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapDeliveryNoteFromDB(data)
+  return ok(mapDeliveryNoteFromDB(data))
 }
 
-export async function getGoodsReceipts(projectId?: string): Promise<GoodsReceipt[]> {
-  const user = await getCurrentUser()
-  if (!user) {
-    return []
+export async function getGoodsReceipts(projectId?: string): Promise<ServiceResult<GoodsReceipt[]>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
   }
 
   let query = supabase
@@ -77,7 +82,7 @@ export async function getGoodsReceipts(projectId?: string): Promise<GoodsReceipt
       goods_receipt_items (*)
     `,
     )
-    .eq('user_id', user.id)
+    .eq('user_id', userResult.data)
 
   if (projectId) {
     query = query.eq('project_id', projectId)
@@ -87,91 +92,78 @@ export async function getGoodsReceipts(projectId?: string): Promise<GoodsReceipt
 
   if (error) {
     logger.error('Error fetching goods receipts', { component: 'delivery' }, error as Error)
-    return []
+    return toInternalErrorResult(error)
   }
 
-  return (data || []).map(mapGoodsReceiptFromDB)
+  return ok((data || []).map(mapGoodsReceiptFromDB))
 }
 
-export async function getCustomerDeliveryNotes(projectId?: string): Promise<CustomerDeliveryNote[]> {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      logger.warn('getCustomerDeliveryNotes: No user authenticated', { component: 'delivery' })
-      return []
-    }
+export async function getCustomerDeliveryNotes(
+  projectId?: string,
+): Promise<ServiceResult<CustomerDeliveryNote[]>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
-    let query = supabase
-      .from('customer_delivery_notes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+  let query = supabase
+    .from('customer_delivery_notes')
+    .select('*')
+    .eq('user_id', userResult.data)
+    .order('created_at', { ascending: false })
 
-    if (projectId) {
-      query = query.eq('project_id', projectId)
-    }
+  if (projectId) {
+    query = query.eq('project_id', projectId)
+  }
 
-    const { data, error } = await query
+  const { data, error } = await query
 
-    if (error) {
-      const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      logger.error('getCustomerDeliveryNotes error', {
-        component: 'delivery',
-        message: errObj.message,
-        code: errObj.code,
-        details: errObj.details,
-        hint: errObj.hint,
-      })
-
-      if (errObj.code === '42P01' || errObj.message?.includes('does not exist')) {
-        logger.warn('customer_delivery_notes table does not exist yet. Please run the SQL script.', {
-          component: 'delivery',
-        })
-        return []
-      }
-
-      return []
-    }
-
-    return (data || []).map(mapCustomerDeliveryNoteFromDB)
-  } catch (error: unknown) {
-    const err = error as { message?: string; name?: string; stack?: string }
-    if (err?.message?.includes('aborted') || err?.name === 'AbortError') {
-      return []
-    }
-
-    logger.error('getCustomerDeliveryNotes failed', {
+  if (error) {
+    const errObj = error as Error & { code?: string; details?: string; hint?: string }
+    logger.error('getCustomerDeliveryNotes error', {
       component: 'delivery',
-      message: err?.message,
-      stack: err?.stack,
+      message: errObj.message,
+      code: errObj.code,
+      details: errObj.details,
+      hint: errObj.hint,
     })
 
-    return []
+    if (errObj.code === '42P01' || errObj.message?.includes('does not exist')) {
+      return fail(
+        'INTERNAL',
+        'Die Tabelle customer_delivery_notes existiert noch nicht. Bitte führen Sie das SQL-Script in Supabase aus.',
+        error,
+      )
+    }
+
+    return toInternalErrorResult(error)
   }
+
+  return ok((data || []).map(mapCustomerDeliveryNoteFromDB))
 }
 
-export async function getCustomerDeliveryNote(id: string): Promise<CustomerDeliveryNote | null> {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return null
-    }
-
-    const { data, error } = await supabase
-      .from('customer_delivery_notes')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (error) {
-      logger.error('getCustomerDeliveryNote error', { component: 'delivery' }, error as Error)
-      return null
-    }
-
-    return mapCustomerDeliveryNoteFromDB(data)
-  } catch (error) {
-    logger.error('getCustomerDeliveryNote failed', { component: 'delivery' }, error as Error)
-    return null
+export async function getCustomerDeliveryNote(
+  id: string,
+): Promise<ServiceResult<CustomerDeliveryNote>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
   }
+
+  const { data, error } = await supabase
+    .from('customer_delivery_notes')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userResult.data)
+    .single()
+
+  if (error) {
+    if (isNotFoundError(error)) {
+      return fail('NOT_FOUND', `Customer delivery note ${id} not found`)
+    }
+
+    return toInternalErrorResult(error)
+  }
+
+  return ok(mapCustomerDeliveryNoteFromDB(data))
 }

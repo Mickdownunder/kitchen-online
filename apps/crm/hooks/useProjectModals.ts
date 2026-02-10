@@ -118,11 +118,25 @@ export function useProjectModals(): ProjectModalsState & ProjectModalsActions {
 
   const openDeliveryNoteModal = useCallback(async (project: CustomerProject) => {
     try {
-      const notes = await getCustomerDeliveryNotes(project.id)
+      const notesResult = await getCustomerDeliveryNotes(project.id)
+      if (!notesResult.ok) {
+        logger.error(
+          'Error loading delivery notes',
+          { component: 'useProjectModals', code: notesResult.code },
+          new Error(notesResult.message),
+        )
+        setDeliveryNoteModal({
+          isOpen: true,
+          project,
+          existingNote: null,
+        })
+        return
+      }
+
       setDeliveryNoteModal({
         isOpen: true,
         project,
-        existingNote: notes[0] || null,
+        existingNote: notesResult.data[0] || null,
       })
     } catch (error: unknown) {
       // Ignore aborted requests (normal during page navigation)

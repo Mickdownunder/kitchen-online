@@ -1,4 +1,5 @@
 import type { OrderStatus } from '@/types'
+import { fail, ok, type ServiceResult } from '@/lib/types/service'
 import type { AuthenticatedUserLike, OrderStats, PostgrestErrorLike } from './types'
 
 const NOT_AUTHENTICATED_MESSAGE = 'Not authenticated'
@@ -14,15 +15,6 @@ export function getAuthenticatedUserId(user: unknown): string | null {
   }
 
   return candidate.id
-}
-
-export function requireAuthenticatedUserId(user: unknown): string {
-  const userId = getAuthenticatedUserId(user)
-  if (!userId) {
-    throw new Error(NOT_AUTHENTICATED_MESSAGE)
-  }
-
-  return userId
 }
 
 export function isNotFoundError(error: unknown): boolean {
@@ -46,4 +38,18 @@ export function emptyOrderStats(): OrderStats {
     confirmed: 0,
     cancelled: 0,
   }
+}
+
+export function ensureAuthenticatedUserId(user: unknown): ServiceResult<string> {
+  const userId = getAuthenticatedUserId(user)
+  if (!userId) {
+    return fail('UNAUTHORIZED', NOT_AUTHENTICATED_MESSAGE)
+  }
+
+  return ok(userId)
+}
+
+export function toInternalErrorResult(error: unknown): ServiceResult<never> {
+  const postgrestError = error as PostgrestErrorLike & { message?: string }
+  return fail('INTERNAL', postgrestError.message || 'Unknown error', error)
 }

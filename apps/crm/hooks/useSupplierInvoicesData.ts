@@ -74,10 +74,10 @@ export function useSupplierInvoicesData(
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('bank')
 
   const loadCustomCategories = useCallback(async () => {
-    try {
-      const data = await getSupplierInvoiceCustomCategories()
-      setCustomCategories(data.map((category) => ({ id: category.id, name: category.name })))
-    } catch {
+    const dataResult = await getSupplierInvoiceCustomCategories()
+    if (dataResult.ok) {
+      setCustomCategories(dataResult.data.map((category) => ({ id: category.id, name: category.name })))
+    } else {
       setCustomCategories([])
     }
   }, [])
@@ -85,12 +85,17 @@ export function useSupplierInvoicesData(
   const loadInvoices = useCallback(async () => {
     setLoading(true)
     try {
-      const [data] = await Promise.all([getSupplierInvoices(), loadCustomCategories()])
+      const [dataResult] = await Promise.all([getSupplierInvoices(), loadCustomCategories()])
+      const data = dataResult.ok ? dataResult.data : []
       setInvoices(data)
 
       if (onStatsChangeRef.current) {
         const totalTax = data.reduce((sum, invoice) => sum + invoice.taxAmount, 0)
         onStatsChangeRef.current({ totalTax, count: data.length })
+      }
+
+      if (!dataResult.ok) {
+        throw new Error(dataResult.message)
       }
     } catch (error) {
       logger.error(
@@ -162,18 +167,27 @@ export function useSupplierInvoicesData(
   }, [filteredInvoices])
 
   const addCustomCategory = useCallback(async (name: string) => {
-    const category = await addSupplierInvoiceCustomCategory(name)
+    const categoryResult = await addSupplierInvoiceCustomCategory(name)
+    if (!categoryResult.ok) {
+      throw new Error(categoryResult.message)
+    }
     await loadCustomCategories()
-    return category
+    return categoryResult.data
   }, [loadCustomCategories])
 
   const removeInvoice = useCallback(async (invoiceId: string) => {
-    await deleteSupplierInvoice(invoiceId)
+    const result = await deleteSupplierInvoice(invoiceId)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
     await loadInvoices()
   }, [loadInvoices])
 
   const markUnpaid = useCallback(async (invoiceId: string) => {
-    await markSupplierInvoiceUnpaid(invoiceId)
+    const result = await markSupplierInvoiceUnpaid(invoiceId)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
     await loadInvoices()
   }, [loadInvoices])
 
@@ -182,7 +196,10 @@ export function useSupplierInvoicesData(
       return
     }
 
-    await markSupplierInvoicePaid(payingInvoice.id, paidDate, paymentMethod)
+    const result = await markSupplierInvoicePaid(payingInvoice.id, paidDate, paymentMethod)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
     await loadInvoices()
     setPayingInvoice(null)
   }, [loadInvoices, paidDate, payingInvoice, paymentMethod])

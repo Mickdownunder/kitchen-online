@@ -36,4 +36,16 @@ describe('parseChatRequest', () => {
       expect(result.kind).toBe('validation')
     }
   })
+
+  it('returns validation error when project ids are invalid', () => {
+    const result = parseChatRequest({
+      message: 'ok',
+      projects: [{ id: '' }],
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.kind).toBe('validation')
+    }
+  })
 })

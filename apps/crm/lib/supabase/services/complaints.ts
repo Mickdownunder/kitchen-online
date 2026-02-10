@@ -77,8 +77,8 @@ export async function createComplaint(
     }
 
     // Validate that project exists and is not deleted
-    const project = await getProject(complaint.projectId)
-    if (!project) {
+    const projectResult = await getProject(complaint.projectId)
+    if (!projectResult.ok) {
       throw new Error(`Projekt mit ID ${complaint.projectId} nicht gefunden oder gelöscht`)
     }
 

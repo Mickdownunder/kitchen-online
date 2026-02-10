@@ -73,15 +73,18 @@ export default function CustomerDeliveryNoteModal({
       }))
 
       if (existingDeliveryNote) {
-        await updateCustomerDeliveryNote(existingDeliveryNote.id, {
+        const updateResult = await updateCustomerDeliveryNote(existingDeliveryNote.id, {
           deliveryNoteNumber,
           deliveryDate,
           deliveryAddress: deliveryAddress || undefined,
           items,
           status: 'draft', // Bleibt draft bis Lieferdatum erreicht ist
         })
+        if (!updateResult.ok) {
+          throw new Error(updateResult.message)
+        }
       } else {
-        await createCustomerDeliveryNote({
+        const createResult = await createCustomerDeliveryNote({
           projectId: project.id,
           deliveryNoteNumber: '', // Leer = wird fortlaufend generiert (getNextDeliveryNoteNumber)
           deliveryDate,
@@ -89,6 +92,9 @@ export default function CustomerDeliveryNoteModal({
           items,
           status: 'draft', // Bleibt draft bis Lieferdatum erreicht ist
         })
+        if (!createResult.ok) {
+          throw new Error(createResult.message)
+        }
       }
 
       if (onSuccess) onSuccess()

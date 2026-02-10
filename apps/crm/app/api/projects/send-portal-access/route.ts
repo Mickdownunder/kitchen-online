@@ -56,10 +56,11 @@ export async function POST(request: NextRequest) {
       return apiErrors.badRequest()
     }
 
-    const project = await getProject(projectId, supabase)
-    if (!project) {
+    const projectResult = await getProject(projectId, supabase)
+    if (!projectResult.ok) {
       return apiErrors.notFound()
     }
+    const project = projectResult.data
 
     const customerEmail = project.email
     if (!customerEmail?.trim()) {

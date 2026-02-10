@@ -1,3 +1,4 @@
+import { ok, type ServiceResult } from '@/lib/types/service'
 import type { Order } from '@/types'
 import { logger } from '@/lib/utils/logger'
 import { supabase } from '../../client'
@@ -5,7 +6,7 @@ import { getCurrentUser } from '../auth'
 import { mapOrderFromRow } from './mappers'
 import { getOrderByProject } from './queries'
 import type { CreateOrderParams, OrderInsert, OrderRow, OrderUpdate, UpdateOrderInput } from './types'
-import { requireAuthenticatedUserId } from './validators'
+import { ensureAuthenticatedUserId, toInternalErrorResult } from './validators'
 
 function getTodayIsoDate(): string {
   return new Date().toISOString().split('T')[0]
@@ -38,80 +39,94 @@ function mapUpdateInputToRow(updates: UpdateOrderInput): OrderUpdate {
   return updateData
 }
 
-export async function createOrder(params: CreateOrderParams): Promise<Order> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+export async function createOrder(params: CreateOrderParams): Promise<ServiceResult<Order>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
   const { data, error } = await supabase
     .from('orders')
-    .insert(mapCreateParamsToInsert(userId, params))
+    .insert(mapCreateParamsToInsert(userResult.data, params))
     .select()
     .single()
 
   if (error) {
     logger.error('Error creating order', { component: 'orders' }, error as Error)
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapOrderFromRow(data as OrderRow)
+  return ok(mapOrderFromRow(data as OrderRow))
 }
 
-export async function updateOrder(id: string, updates: UpdateOrderInput): Promise<Order> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+export async function updateOrder(
+  id: string,
+  updates: UpdateOrderInput,
+): Promise<ServiceResult<Order>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
   const { data, error } = await supabase
     .from('orders')
     .update(mapUpdateInputToRow(updates))
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('user_id', userResult.data)
     .select()
     .single()
 
   if (error) {
     logger.error('Error updating order', { component: 'orders' }, error as Error)
-    throw error
+    return toInternalErrorResult(error)
   }
 
-  return mapOrderFromRow(data as OrderRow)
+  return ok(mapOrderFromRow(data as OrderRow))
 }
 
-export async function sendOrder(id: string): Promise<Order> {
+export async function sendOrder(id: string): Promise<ServiceResult<Order>> {
   return updateOrder(id, {
     status: 'sent',
     sentAt: new Date().toISOString(),
   })
 }
 
-export async function confirmOrder(id: string): Promise<Order> {
+export async function confirmOrder(id: string): Promise<ServiceResult<Order>> {
   return updateOrder(id, {
     status: 'confirmed',
     confirmedAt: new Date().toISOString(),
   })
 }
 
-export async function cancelOrder(id: string): Promise<Order> {
+export async function cancelOrder(id: string): Promise<ServiceResult<Order>> {
   return updateOrder(id, { status: 'cancelled' })
 }
 
-export async function deleteOrder(id: string): Promise<void> {
-  const userId = requireAuthenticatedUserId(await getCurrentUser())
+export async function deleteOrder(id: string): Promise<ServiceResult<void>> {
+  const userResult = ensureAuthenticatedUserId(await getCurrentUser())
+  if (!userResult.ok) {
+    return userResult
+  }
 
-  const { error } = await supabase.from('orders').delete().eq('id', id).eq('user_id', userId)
+  const { error } = await supabase.from('orders').delete().eq('id', id).eq('user_id', userResult.data)
 
   if (error) {
     logger.error('Error deleting order', { component: 'orders' }, error as Error)
-    throw error
+    return toInternalErrorResult(error)
   }
+
+  return ok(undefined)
 }
 
 export async function upsertOrderForProject(
   projectId: string,
   orderNumber: string,
   params: Partial<CreateOrderParams>,
-): Promise<Order> {
-  const existingOrder = await getOrderByProject(projectId)
+): Promise<ServiceResult<Order>> {
+  const existingOrderResult = await getOrderByProject(projectId)
 
-  if (existingOrder) {
-    return updateOrder(existingOrder.id, {
+  if (existingOrderResult.ok) {
+    return updateOrder(existingOrderResult.data.id, {
       orderNumber,
       ...params,
     })

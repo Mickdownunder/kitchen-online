@@ -49,12 +49,15 @@ beforeEach(() => {
 })
 
 describe('getDeliveryNotes', () => {
-  it('returns empty array when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
     const result = await getDeliveryNotes()
 
-    expect(result).toEqual([])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns mapped delivery notes when user authenticated', async () => {
@@ -66,27 +69,37 @@ describe('getDeliveryNotes', () => {
 
     const result = await getDeliveryNotes()
 
-    expect(result).toHaveLength(1)
-    expect(result[0].supplierName).toBe('Lieferant GmbH')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0].supplierName).toBe('Lieferant GmbH')
+    }
   })
 
-  it('returns empty array when query errors', async () => {
+  it('returns internal error when query fails', async () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
     mockQueryResult({ data: null, error: { message: 'DB error' } })
 
     const result = await getDeliveryNotes()
 
-    expect(result).toEqual([])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INTERNAL')
+      expect(result.message).toBe('DB error')
+    }
   })
 })
 
 describe('getDeliveryNote', () => {
-  it('returns null when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
     const result = await getDeliveryNote('dn-1')
 
-    expect(result).toBeNull()
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns delivery note when found', async () => {
@@ -95,31 +108,38 @@ describe('getDeliveryNote', () => {
 
     const result = await getDeliveryNote('dn-1')
 
-    expect(result).not.toBeNull()
-    expect(result?.supplierName).toBe('Lieferant GmbH')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.supplierName).toBe('Lieferant GmbH')
+    }
   })
 
-  it('returns null when PGRST116 (not found)', async () => {
+  it('returns not found when note does not exist', async () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
     mockQueryResult({ data: null, error: { code: 'PGRST116' } })
 
     const result = await getDeliveryNote('nonexistent')
 
-    expect(result).toBeNull()
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('NOT_FOUND')
+    }
   })
 })
 
 describe('createDeliveryNote', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
-    await expect(
-      createDeliveryNote({
-        supplierName: 'X',
-        supplierDeliveryNoteNumber: 'LS-1',
-        deliveryDate: '2026-01-01',
-      })
-    ).rejects.toThrow('Not authenticated')
+    const result = await createDeliveryNote({
+      supplierName: 'X',
+      supplierDeliveryNoteNumber: 'LS-1',
+      deliveryDate: '2026-01-01',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('creates delivery note without items', async () => {
@@ -136,18 +156,66 @@ describe('createDeliveryNote', () => {
       deliveryDate: '2026-01-15',
     })
 
-    expect(result.id).toBe('dn-new')
-    expect(result.supplierName).toBe('Lieferant GmbH')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('dn-new')
+      expect(result.data.supplierName).toBe('Lieferant GmbH')
+    }
+  })
+
+  it('creates delivery note with items', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: { ...baseDeliveryNote, id: 'dn-new' },
+      error: null,
+    })
+    mockQueryResult({ data: null, error: null })
+    mockQueryResult({ data: { ...baseDeliveryNote, id: 'dn-new', delivery_note_items: [{ description: 'Artikel 1', quantity_received: 2 }] }, error: null })
+
+    const result = await createDeliveryNote({
+      supplierName: 'Lieferant GmbH',
+      supplierDeliveryNoteNumber: 'LS-001',
+      deliveryDate: '2026-01-15',
+      items: [
+        { description: 'Artikel 1', quantityOrdered: 2, quantityReceived: 2 },
+      ],
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('dn-new')
+    }
+  })
+
+  it('returns INTERNAL when delivery_note_items insert fails', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: { ...baseDeliveryNote, id: 'dn-new' },
+      error: null,
+    })
+    mockQueryResult({ data: null, error: { message: 'item insert failed' } })
+
+    const result = await createDeliveryNote({
+      supplierName: 'X',
+      supplierDeliveryNoteNumber: 'LS-1',
+      deliveryDate: '2026-01-15',
+      items: [{ description: 'Item', quantityOrdered: 1, quantityReceived: 1 }],
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('INTERNAL')
   })
 })
 
 describe('updateDeliveryNote', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
-    await expect(
-      updateDeliveryNote('dn-1', { supplierName: 'Updated' })
-    ).rejects.toThrow('Not authenticated')
+    const result = await updateDeliveryNote('dn-1', { supplierName: 'Updated' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('updates delivery note', async () => {
@@ -159,7 +227,25 @@ describe('updateDeliveryNote', () => {
 
     const result = await updateDeliveryNote('dn-1', { supplierName: 'Updated GmbH' })
 
-    expect(result.supplierName).toBe('Updated GmbH')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.supplierName).toBe('Updated GmbH')
+    }
+  })
+
+  it('updates delivery note status (received -> matched)', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: { ...baseDeliveryNote, status: 'matched' },
+      error: null,
+    })
+
+    const result = await updateDeliveryNote('dn-1', { status: 'matched' })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.status).toBe('matched')
+    }
   })
 })
 
@@ -177,18 +263,24 @@ describe('matchDeliveryNoteToProject', () => {
 
     const result = await matchDeliveryNoteToProject('dn-1', 'proj-1')
 
-    expect(result.matchedProjectId).toBe('proj-1')
-    expect(result.status).toBe('matched')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.matchedProjectId).toBe('proj-1')
+      expect(result.data.status).toBe('matched')
+    }
   })
 })
 
 describe('getGoodsReceipts', () => {
-  it('returns empty array when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
     const result = await getGoodsReceipts()
 
-    expect(result).toEqual([])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns goods receipts when user authenticated', async () => {
@@ -212,22 +304,28 @@ describe('getGoodsReceipts', () => {
 
     const result = await getGoodsReceipts()
 
-    expect(result).toHaveLength(1)
-    expect(result[0].id).toBe('gr-1')
-    expect(result[0].receiptType).toBe('delivery')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0].id).toBe('gr-1')
+      expect(result.data[0].receiptType).toBe('delivery')
+    }
   })
 })
 
 describe('createGoodsReceipt', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
-    await expect(
-      createGoodsReceipt({
-        projectId: 'proj-1',
-        receiptType: 'delivery',
-      })
-    ).rejects.toThrow('Not authenticated')
+    const result = await createGoodsReceipt({
+      projectId: 'proj-1',
+      receiptType: 'delivery',
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('creates goods receipt without items', async () => {
@@ -271,17 +369,111 @@ describe('createGoodsReceipt', () => {
       receiptType: 'delivery',
     })
 
-    expect(result.id).toBe('gr-new')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('gr-new')
+    }
+  })
+
+  it('creates goods receipt with items', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'gr-new',
+        project_id: 'proj-1',
+        delivery_note_id: null,
+        user_id: 'user-1',
+        receipt_date: '2026-01-15',
+        receipt_type: 'delivery',
+        status: 'pending',
+        notes: null,
+        created_at: '2026-01-15',
+        updated_at: '2026-01-15',
+        goods_receipt_items: [],
+      },
+      error: null,
+    })
+    mockQueryResult({ data: null, error: null })
+    mockQueryResult({
+      data: { id: 'item-1', quantity: 2, quantity_delivered: 0 },
+      error: null,
+    })
+    mockQueryResult({ data: null, error: null })
+    mockQueryResult({
+      data: [{ id: 'item-1', quantity: 2, quantity_delivered: 1, delivery_status: 'partially_delivered' }],
+      error: null,
+    })
+    mockQueryResult({ data: null, error: null })
+    mockQueryResult({
+      data: [
+        {
+          id: 'gr-new',
+          project_id: 'proj-1',
+          delivery_note_id: null,
+          user_id: 'user-1',
+          receipt_date: '2026-01-15',
+          receipt_type: 'delivery',
+          status: 'received',
+          notes: null,
+          goods_receipt_items: [{ project_item_id: 'item-1', quantity_received: 1 }],
+        },
+      ],
+      error: null,
+    })
+
+    const result = await createGoodsReceipt({
+      projectId: 'proj-1',
+      receiptType: 'delivery',
+      items: [{ projectItemId: 'item-1', quantityReceived: 1, quantityExpected: 1 }],
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('gr-new')
+    }
+  })
+
+  it('returns INTERNAL when goods_receipt_items insert fails', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'gr-new',
+        project_id: 'proj-1',
+        delivery_note_id: null,
+        user_id: 'user-1',
+        receipt_date: '2026-01-15',
+        receipt_type: 'delivery',
+        status: 'pending',
+        notes: null,
+        created_at: '2026-01-15',
+        updated_at: '2026-01-15',
+        goods_receipt_items: [],
+      },
+      error: null,
+    })
+    mockQueryResult({ data: null, error: { message: 'item insert failed' } })
+
+    const result = await createGoodsReceipt({
+      projectId: 'proj-1',
+      receiptType: 'delivery',
+      items: [{ projectItemId: 'item-1', quantityReceived: 1, quantityExpected: 1 }],
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('INTERNAL')
   })
 })
 
 describe('getCustomerDeliveryNotes', () => {
-  it('returns empty array when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
     const result = await getCustomerDeliveryNotes()
 
-    expect(result).toEqual([])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns customer delivery notes', async () => {
@@ -302,18 +494,24 @@ describe('getCustomerDeliveryNotes', () => {
 
     const result = await getCustomerDeliveryNotes()
 
-    expect(result).toHaveLength(1)
-    expect(result[0].deliveryNoteNumber).toBe('LS-2026-0001')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0].deliveryNoteNumber).toBe('LS-2026-0001')
+    }
   })
 })
 
 describe('getCustomerDeliveryNote', () => {
-  it('returns null when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
     const result = await getCustomerDeliveryNote('cdn-1')
 
-    expect(result).toBeNull()
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
   })
 
   it('returns customer delivery note when found', async () => {
@@ -332,41 +530,189 @@ describe('getCustomerDeliveryNote', () => {
 
     const result = await getCustomerDeliveryNote('cdn-1')
 
-    expect(result).not.toBeNull()
-    expect(result?.deliveryNoteNumber).toBe('LS-2026-0001')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.deliveryNoteNumber).toBe('LS-2026-0001')
+    }
   })
 })
 
 describe('createCustomerDeliveryNote', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
-    await expect(
-      createCustomerDeliveryNote({
-        projectId: 'proj-1',
-        deliveryDate: '2026-01-15',
-      })
-    ).rejects.toThrow('Not authenticated')
+    const result = await createCustomerDeliveryNote({
+      projectId: 'proj-1',
+      deliveryDate: '2026-01-15',
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
+  })
+
+  it('creates customer delivery note when user authenticated', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'cdn-new',
+        project_id: 'proj-1',
+        user_id: 'user-1',
+        delivery_note_number: 'LS-2026-0001',
+        delivery_date: '2026-01-15',
+        status: 'draft',
+      },
+      error: null,
+    })
+
+    const result = await createCustomerDeliveryNote({
+      projectId: 'proj-1',
+      deliveryNoteNumber: 'LS-2026-0001',
+      deliveryDate: '2026-01-15',
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.id).toBe('cdn-new')
+      expect(result.data.deliveryNoteNumber).toBe('LS-2026-0001')
+    }
+  })
+
+  it('returns INTERNAL on insert error', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: { message: 'constraint' } })
+
+    const result = await createCustomerDeliveryNote({
+      projectId: 'proj-1',
+      deliveryNoteNumber: 'LS-1',
+      deliveryDate: '2026-01-15',
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('INTERNAL')
+  })
+
+  it('returns INTERNAL with table hint when error code is 42P01', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: null,
+      error: { code: '42P01', message: 'relation "customer_delivery_notes" does not exist' },
+    })
+
+    const result = await createCustomerDeliveryNote({
+      projectId: 'proj-1',
+      deliveryNoteNumber: 'LS-1',
+      deliveryDate: '2026-01-15',
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INTERNAL')
+      expect(result.message).toContain('existiert noch nicht')
+      expect(result.message).toContain('customer_delivery_notes')
+    }
+  })
+
+  it('returns INTERNAL with table hint when error message includes "does not exist"', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: null,
+      error: { message: 'table customer_delivery_notes does not exist' },
+    })
+
+    const result = await createCustomerDeliveryNote({
+      projectId: 'proj-1',
+      deliveryNoteNumber: 'LS-1',
+      deliveryDate: '2026-01-15',
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INTERNAL')
+      expect(result.message).toContain('existiert noch nicht')
+    }
   })
 })
 
 describe('updateCustomerDeliveryNote', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
-    await expect(
-      updateCustomerDeliveryNote('cdn-1', { status: 'signed' })
-    ).rejects.toThrow('Not authenticated')
+    const result = await updateCustomerDeliveryNote('cdn-1', { status: 'signed' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
+  })
+
+  it('updates customer delivery note', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'cdn-1',
+        project_id: 'proj-1',
+        user_id: 'user-1',
+        delivery_note_number: 'LS-2026-0001',
+        delivery_date: '2026-01-15',
+        status: 'signed',
+      },
+      error: null,
+    })
+
+    const result = await updateCustomerDeliveryNote('cdn-1', { status: 'signed' })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.status).toBe('signed')
+  })
+
+  it('returns INTERNAL on update error', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: { message: 'error' } })
+
+    const result = await updateCustomerDeliveryNote('cdn-1', { status: 'signed' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('INTERNAL')
   })
 })
 
 describe('addCustomerSignature', () => {
-  it('throws when no user', async () => {
+  it('returns unauthorized when no user', async () => {
     mockGetCurrentUser.mockResolvedValue(null)
 
-    await expect(
-      addCustomerSignature('cdn-1', 'sig-base64', 'Max Mustermann')
-    ).rejects.toThrow('Not authenticated')
+    const result = await addCustomerSignature('cdn-1', 'sig-base64', 'Max Mustermann')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
+  })
+
+  it('adds signature and returns updated note', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'cdn-1',
+        project_id: 'proj-1',
+        user_id: 'user-1',
+        delivery_note_number: 'LS-2026-0001',
+        delivery_date: '2026-01-15',
+        status: 'signed',
+        customer_signature: 'sig-base64',
+        signed_by: 'Max Mustermann',
+      },
+      error: null,
+    })
+
+    const result = await addCustomerSignature('cdn-1', 'sig-base64', 'Max Mustermann')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.status).toBe('signed')
+      expect(result.data.signedBy).toBe('Max Mustermann')
+    }
   })
 })
 
@@ -377,7 +723,17 @@ describe('deleteDeliveryNote', () => {
     mockQueryResult({ data: null, error: null })
     mockQueryResult({ data: null, error: null })
 
-    await expect(deleteDeliveryNote('dn-1')).resolves.toBeUndefined()
+    await expect(deleteDeliveryNote('dn-1')).resolves.toEqual({ ok: true, data: undefined })
+  })
+
+  it('returns NOT_FOUND when note does not exist', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+
+    const result = await deleteDeliveryNote('nonexistent')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('NOT_FOUND')
   })
 })
 
@@ -397,6 +753,40 @@ describe('deleteCustomerDeliveryNote', () => {
     })
     mockQueryResult({ data: null, error: null })
 
-    await expect(deleteCustomerDeliveryNote('cdn-1')).resolves.toBeUndefined()
+    await expect(deleteCustomerDeliveryNote('cdn-1')).resolves.toEqual({
+      ok: true,
+      data: undefined,
+    })
+  })
+
+  it('returns NOT_FOUND when note does not exist', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+
+    const result = await deleteCustomerDeliveryNote('nonexistent')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('NOT_FOUND')
+  })
+
+  it('returns INTERNAL when delete fails', async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({
+      data: {
+        id: 'cdn-1',
+        project_id: 'proj-1',
+        user_id: 'user-1',
+        delivery_note_number: 'LS-2026-0001',
+        delivery_date: '2026-01-15',
+        status: 'completed',
+      },
+      error: null,
+    })
+    mockQueryResult({ data: null, error: { message: 'FK constraint' } })
+
+    const result = await deleteCustomerDeliveryNote('cdn-1')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('INTERNAL')
   })
 })

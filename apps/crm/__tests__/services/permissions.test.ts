@@ -39,6 +39,109 @@ describe('getEffectivePermissions', () => {
     expect(result.edit_projects).toBe(false)
   })
 
+  it('returns permissions from RPC when RPC succeeds with data', async () => {
+    mockRpcResult({
+      data: [
+        { permission_code: 'menu_dashboard', allowed: true },
+        { permission_code: 'edit_projects', allowed: true },
+        { permission_code: 'create_invoices', allowed: false },
+      ],
+      error: null,
+    })
+
+    const result = await getEffectivePermissions()
+
+    expect(result.menu_dashboard).toBe(true)
+    expect(result.edit_projects).toBe(true)
+    expect(result.create_invoices).toBe(false)
+    expect(result.manage_users).toBe(false)
+  })
+
+  it('falls back to role when RPC returns empty array', async () => {
+    mockRpcResult({ data: [], error: null })
+
+    const result = await getEffectivePermissions('verkaeufer' as CompanyMemberRole)
+
+    expect(result.menu_dashboard).toBe(true)
+    expect(result.edit_projects).toBe(true)
+    expect(result.create_invoices).toBe(false)
+  })
+
+  it('falls back to role when RPC returns null', async () => {
+    mockRpcResult({ data: null, error: null })
+
+    const result = await getEffectivePermissions('geschaeftsfuehrer' as CompanyMemberRole)
+
+    expect(result.manage_users).toBe(true)
+  })
+
+  it('ignores unknown permission_code from RPC', async () => {
+    mockRpcResult({
+      data: [
+        { permission_code: 'menu_dashboard', allowed: true },
+        { permission_code: 'unknown_code', allowed: true },
+      ],
+      error: null,
+    })
+
+    const result = await getEffectivePermissions()
+
+    expect(result.menu_dashboard).toBe(true)
+  })
+
+  it('falls back to role when RPC fails with code P0001', async () => {
+    mockRpcResult({ data: null, error: { code: 'P0001', message: 'custom exception' } })
+
+    const result = await getEffectivePermissions('verkaeufer' as CompanyMemberRole)
+
+    expect(result.menu_dashboard).toBe(true)
+    expect(result.edit_projects).toBe(true)
+    expect(result.create_invoices).toBe(false)
+  })
+
+  it('returns deny-all for undefined role when RPC fails (fail-closed)', async () => {
+    mockRpcResult({ data: null, error: new Error('RPC failed') })
+
+    const result = await getEffectivePermissions(undefined as unknown as CompanyMemberRole)
+
+    expect(result.menu_dashboard).toBe(false)
+    expect(result.manage_users).toBe(false)
+    expect(result.create_invoices).toBe(false)
+    expect(result.edit_projects).toBe(false)
+  })
+
+  it('returns deny-all for unknown role string when RPC fails (fail-closed)', async () => {
+    mockRpcResult({ data: null, error: new Error('RPC failed') })
+
+    const result = await getEffectivePermissions('customer' as CompanyMemberRole)
+
+    expect(result.menu_dashboard).toBe(false)
+    expect(result.manage_users).toBe(false)
+    expect(result.edit_projects).toBe(false)
+  })
+
+  it('verkaeufer cannot create_invoices or manage_users when RPC fails', async () => {
+    mockRpcResult({ data: null, error: new Error('RPC failed') })
+
+    const result = await getEffectivePermissions('verkaeufer' as CompanyMemberRole)
+
+    expect(result.edit_projects).toBe(true)
+    expect(result.create_invoices).toBe(false)
+    expect(result.manage_users).toBe(false)
+    expect(result.menu_invoices).toBe(false)
+  })
+
+  it('monteur cannot manage_users or create_invoices when RPC fails', async () => {
+    mockRpcResult({ data: null, error: new Error('RPC failed') })
+
+    const result = await getEffectivePermissions('monteur' as CompanyMemberRole)
+
+    expect(result.edit_projects).toBe(true)
+    expect(result.menu_deliveries).toBe(true)
+    expect(result.manage_users).toBe(false)
+    expect(result.create_invoices).toBe(false)
+  })
+
   it('returns permissions for verkaeufer role when RPC fails', async () => {
     mockRpcResult({ data: null, error: new Error('RPC failed') })
 
@@ -84,6 +187,37 @@ describe('getCurrentCompanyId', () => {
     const result = await getCurrentCompanyId()
 
     expect(result).toBe('comp-123')
+  })
+
+  it('returns company id from company_members when RPC fails (fallback)', async () => {
+    mockRpcResult({ data: null, error: new Error('RPC failed') })
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: { company_id: 'comp-fallback' }, error: null })
+
+    const result = await getCurrentCompanyId()
+
+    expect(result).toBe('comp-fallback')
+  })
+
+  it('returns company id from second company_members query when first returns no row', async () => {
+    mockRpcResult({ data: null, error: new Error('RPC failed') })
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: null })
+    mockQueryResult({ data: { company_id: 'comp-second' }, error: null })
+
+    const result = await getCurrentCompanyId()
+
+    expect(result).toBe('comp-second')
+  })
+
+  it('returns null when company_members returns PGRST116', async () => {
+    mockRpcResult({ data: null, error: new Error('RPC failed') })
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
+    mockQueryResult({ data: null, error: { code: 'PGRST116' } })
+
+    const result = await getCurrentCompanyId()
+
+    expect(result).toBeNull()
   })
 })
 
