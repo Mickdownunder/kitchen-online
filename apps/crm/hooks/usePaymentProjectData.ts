@@ -44,51 +44,23 @@ export function usePaymentProjectData({
     }
   }, [])
 
+  // Rechnungen laden sobald ein Projekt ausgewählt ist (ohne setTimeout = Request startet sofort)
   useEffect(() => {
-    let isActive = true
-
     if (selectedProject?.id) {
-      const timer = window.setTimeout(() => {
-        if (isActive) {
-          void loadProjectInvoices(selectedProject.id)
-        }
-      }, 0)
-
-      return () => {
-        isActive = false
-        window.clearTimeout(timer)
-      }
-    }
-
-    const timer = window.setTimeout(() => {
-      if (isActive) {
-        setInvoices([])
-      }
-    }, 0)
-
-    return () => {
-      isActive = false
-      window.clearTimeout(timer)
+      void loadProjectInvoices(selectedProject.id)
+    } else {
+      setInvoices([])
     }
   }, [loadProjectInvoices, selectedProject?.id])
 
+  // Projekt aus URL auswählen sobald projects geladen sind (ohne setTimeout = eine Runde schneller)
   useEffect(() => {
-    if (!projectIdParam || projects.length === 0) {
-      return
-    }
+    if (!projectIdParam || projects.length === 0) return
 
-    const project = projects.find((projectItem) => projectItem.id === projectIdParam)
-    if (!project || project.id === selectedProject?.id) {
-      return
-    }
+    const project = projects.find((p) => p.id === projectIdParam)
+    if (!project || project.id === selectedProject?.id) return
 
-    const timer = window.setTimeout(() => {
-      setSelectedProject(project)
-    }, 0)
-
-    return () => {
-      window.clearTimeout(timer)
-    }
+    setSelectedProject(project)
   }, [projectIdParam, projects, selectedProject?.id])
 
   const calculations = useMemo<ProjectCalculations>(() => {
