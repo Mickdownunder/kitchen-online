@@ -20,10 +20,11 @@ function ProjectsPageContent() {
   // This prevents redundant fetches on every navigation
 
   // Determine initial filter from URL
-  const getInitialFilter = (): 'all' | 'measurement' | 'order' | 'installation' => {
+  const getInitialFilter = (): 'all' | 'measurement' | 'order' | 'installation' | 'material_risk' => {
     if (filterParam === 'needs_measurement') return 'measurement'
     if (filterParam === 'needs_order') return 'order'
     if (filterParam === 'needs_installation') return 'installation'
+    if (filterParam === 'material_risk') return 'material_risk'
     return 'all'
   }
 

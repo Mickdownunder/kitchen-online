@@ -1,4 +1,9 @@
-import { GoogleGenAI, createPartFromFunctionResponse, type GenerateContentResponse } from '@google/genai'
+import {
+  GoogleGenAI,
+  createPartFromFunctionResponse,
+  type GenerateContentResponse,
+  type PartListUnion,
+} from '@google/genai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { agentTools } from '@/lib/ai/agentTools'
 import { buildSystemInstruction } from '@/lib/ai/systemInstruction'
@@ -32,7 +37,7 @@ interface FunctionCallInfo {
 function normalizeHistory(
   chatHistory: ChatHistoryEntry[],
 ): Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> {
-  const mapped = chatHistory.map((message) => {
+  const mapped: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = chatHistory.map((message) => {
     const role = message.role === 'user' ? 'user' : 'model'
     return {
       role,
@@ -182,7 +187,9 @@ export function createChatStreamResponse(input: CreateChatStreamResponseInput): 
             send,
             allUpdatedProjectIds,
           )
-          const nextStream = await chat.sendMessageStream({ message: nextMessageParts })
+          const nextStream = await chat.sendMessageStream({
+            message: nextMessageParts as unknown as PartListUnion,
+          })
           pendingFunctionCalls = await streamAndCollect(nextStream, send)
         }
 

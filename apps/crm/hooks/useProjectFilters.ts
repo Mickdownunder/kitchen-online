@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { CustomerProject } from '@/types'
+import { getProjectMaterialSnapshot } from '@/lib/utils/materialTracking'
 
-export type ProjectListFilterType = 'all' | 'measurement' | 'order' | 'installation'
+export type ProjectListFilterType = 'all' | 'measurement' | 'order' | 'installation' | 'material_risk'
 
 interface UseProjectFiltersOptions {
   projects: CustomerProject[]
@@ -27,6 +28,13 @@ export function useProjectFilters(opts: UseProjectFiltersOptions): UseProjectFil
       if (opts.filterType === 'measurement') return !p.isMeasured
       if (opts.filterType === 'order') return p.isMeasured && !p.isOrdered
       if (opts.filterType === 'installation') return p.isOrdered && !p.installationDate
+      if (opts.filterType === 'material_risk') {
+        const snapshot = getProjectMaterialSnapshot(p)
+        if (!snapshot) return false
+        const inWindow = snapshot.daysUntilInstallation >= 0 && snapshot.daysUntilInstallation <= 14
+        const isRisk = snapshot.riskLevel === 'critical' || snapshot.riskLevel === 'warning'
+        return inWindow && isRisk
+      }
 
       const projectDate = p.orderDate || p.measurementDate || p.offerDate || p.createdAt
       if (projectDate) {

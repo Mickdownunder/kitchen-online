@@ -45,7 +45,7 @@ interface ProjectListProps {
   onAddProject: (_project: CustomerProject) => void
   onUpdateProject: (_project: CustomerProject) => void
   onDeleteProject: (_id: string) => void
-  initialFilter?: 'all' | 'measurement' | 'order' | 'installation'
+  initialFilter?: 'all' | 'measurement' | 'order' | 'installation' | 'material_risk'
   initialOpenProjectId?: string | null
 }
 

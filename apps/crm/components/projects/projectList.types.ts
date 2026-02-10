@@ -1,7 +1,7 @@
 import { CustomerProject } from '@/types'
 
 export type ProjectListTab = 'leads' | 'orders'
-export type ProjectListFilterType = 'all' | 'measurement' | 'order' | 'installation'
+export type ProjectListFilterType = 'all' | 'measurement' | 'order' | 'installation' | 'material_risk'
 export type ProjectSortField = 'customerName' | 'orderNumber' | 'date' | 'totalAmount'
 
 export interface ProjectListStatsData {

@@ -154,7 +154,7 @@ async function updateInvoiceItemDeliveryStatus(
 ): Promise<void> {
   const { data: item } = await supabase
     .from('invoice_items')
-    .select('quantity, quantity_delivered')
+    .select('quantity, quantity_ordered, quantity_delivered, delivery_status')
     .eq('id', itemId)
     .single()
 
@@ -163,32 +163,43 @@ async function updateInvoiceItemDeliveryStatus(
   }
 
   const deliveryItem = item as InvoiceItemDeliveryRow
-  const newQuantityDelivered = toNumber(deliveryItem.quantity_delivered) + quantityReceived
+  const receivedQuantity = Math.max(0, toNumber(quantityReceived))
+  const newQuantityDelivered = toNumber(deliveryItem.quantity_delivered) + receivedQuantity
   const totalQuantity = toNumber(deliveryItem.quantity)
+  const newQuantityOrdered = Math.max(toNumber(deliveryItem.quantity_ordered), newQuantityDelivered)
 
   let deliveryStatus: string
-  if (newQuantityDelivered >= totalQuantity) {
+  if (newQuantityDelivered >= totalQuantity && totalQuantity > 0) {
     deliveryStatus = 'delivered'
+  } else if (deliveryItem.delivery_status === 'missing') {
+    deliveryStatus = 'missing'
   } else if (newQuantityDelivered > 0) {
     deliveryStatus = 'partially_delivered'
-  } else {
+  } else if (newQuantityOrdered > 0) {
     deliveryStatus = 'ordered'
+  } else {
+    deliveryStatus = 'not_ordered'
+  }
+
+  const updates: Record<string, unknown> = {
+    quantity_ordered: newQuantityOrdered,
+    quantity_delivered: newQuantityDelivered,
+    delivery_status: deliveryStatus,
+  }
+  if (receivedQuantity > 0) {
+    updates.actual_delivery_date = getTodayIsoDate()
   }
 
   await supabase
     .from('invoice_items')
-    .update({
-      quantity_delivered: newQuantityDelivered,
-      delivery_status: deliveryStatus,
-      actual_delivery_date: getTodayIsoDate(),
-    })
+    .update(updates)
     .eq('id', itemId)
 }
 
 async function updateProjectDeliveryStatus(projectId: string): Promise<void> {
   const { data: items } = await supabase
     .from('invoice_items')
-    .select('delivery_status, quantity, quantity_delivered')
+    .select('delivery_status, quantity, quantity_ordered, quantity_delivered')
     .eq('project_id', projectId)
 
   if (!items || items.length === 0) {
@@ -206,7 +217,14 @@ async function updateProjectDeliveryStatus(projectId: string): Promise<void> {
       (toNumber(item.quantity_delivered) > 0 && toNumber(item.quantity_delivered) < toNumber(item.quantity)),
   )
 
-  const allOrdered = typedItems.every((item) => item.delivery_status !== 'not_ordered')
+  const allOrdered = typedItems.every((item) => {
+    const orderedQuantity = Math.max(toNumber(item.quantity_ordered), toNumber(item.quantity_delivered))
+    const totalQuantity = toNumber(item.quantity)
+    if (totalQuantity > 0 && orderedQuantity >= totalQuantity) {
+      return true
+    }
+    return item.delivery_status !== 'not_ordered'
+  })
 
   let deliveryStatus: string
   if (allDelivered) {

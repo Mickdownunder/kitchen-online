@@ -7,6 +7,7 @@ import {
   calculateItemTotalsFromNet,
   roundTo2Decimals,
 } from '@/lib/utils/priceCalculations'
+import { applyItemMaterialUpdate } from '@/lib/utils/materialTracking'
 import { calculatePaymentAmounts } from '@/lib/utils/paymentSchedule'
 import { supabase } from '../../client'
 import { getCurrentUser } from '../auth'
@@ -46,6 +47,7 @@ function buildItemRow(context: ItemBuildContext): ItemInsert {
   let taxAmount: number
   let grossTotal: number
   let grossPricePerUnit: number
+  const materialState = applyItemMaterialUpdate(item, {})
 
   if (hasGrossPrice) {
     const totals = calculateItemTotalsFromGross(quantity, item.grossPricePerUnit as number, taxRate)
@@ -81,6 +83,11 @@ function buildItemRow(context: ItemBuildContext): ItemInsert {
     net_total: roundTo2Decimals(netTotal),
     tax_amount: roundTo2Decimals(taxAmount),
     gross_total: roundTo2Decimals(grossTotal),
+    delivery_status: materialState.deliveryStatus,
+    expected_delivery_date: materialState.expectedDeliveryDate || null,
+    actual_delivery_date: materialState.actualDeliveryDate || null,
+    quantity_ordered: materialState.quantityOrdered,
+    quantity_delivered: materialState.quantityDelivered,
     show_in_portal: item.showInPortal || false,
     serial_number: item.serialNumber || null,
     installation_date: item.installationDate || null,

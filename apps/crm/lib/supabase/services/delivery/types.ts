@@ -43,11 +43,14 @@ export type DbRecord = Record<string, unknown>
 
 export interface InvoiceItemDeliveryRow {
   quantity: number | string | null
+  quantity_ordered: number | string | null
   quantity_delivered: number | string | null
+  delivery_status: string | null
 }
 
 export interface ProjectDeliveryItemRow {
   delivery_status: string | null
   quantity: number | string | null
+  quantity_ordered: number | string | null
   quantity_delivered: number | string | null
 }

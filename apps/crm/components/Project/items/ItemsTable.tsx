@@ -12,6 +12,42 @@ import {
 import { Article, CustomerProject, InvoiceItem } from '@/types'
 import { usePriceInput } from '@/hooks/usePriceInput'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
+import {
+  applyItemMaterialUpdate,
+  DELIVERY_STATUS_LABELS,
+  getItemMaterialSnapshot,
+} from '@/lib/utils/materialTracking'
+
+const DELIVERY_STATUS_CLASSES: Record<NonNullable<InvoiceItem['deliveryStatus']>, string> = {
+  not_ordered: 'border-slate-200 bg-slate-100 text-slate-700',
+  ordered: 'border-blue-200 bg-blue-50 text-blue-700',
+  partially_delivered: 'border-amber-200 bg-amber-50 text-amber-700',
+  delivered: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  missing: 'border-red-200 bg-red-50 text-red-700',
+}
+
+function formatMaterialDate(date?: string): string | null {
+  if (!date) {
+    return null
+  }
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+  return parsed.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+}
+
+function parseQuantityInput(value: string): number {
+  if (!value.trim()) {
+    return 0
+  }
+  const normalized = value.replace(',', '.')
+  const parsed = Number.parseFloat(normalized)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 0
+  }
+  return parsed
+}
 
 interface ItemRowEditorProps {
   item: InvoiceItem
@@ -137,6 +173,16 @@ export function ItemRowEditor({
 
   const roundedTotalNet = roundTo2Decimals(totalNet)
   const roundedTotalGross = roundTo2Decimals(totalGross)
+  const material = getItemMaterialSnapshot(item)
+
+  const updateMaterial = (
+    patch: Pick<
+      Partial<InvoiceItem>,
+      'deliveryStatus' | 'quantityOrdered' | 'quantityDelivered' | 'expectedDeliveryDate' | 'actualDeliveryDate'
+    >,
+  ) => {
+    updateItem(item.id, applyItemMaterialUpdate(item, patch))
+  }
 
   return (
     <tr
@@ -208,6 +254,98 @@ export function ItemRowEditor({
           </select>
         ) : (
           <span className="text-xs font-medium text-slate-600">{item.unit || 'Stk'}</span>
+        )}
+      </td>
+
+      <td className="min-w-[240px] px-4 py-3 align-top">
+        {isEditing ? (
+          <div className="space-y-2">
+            <select
+              value={material.status}
+              onChange={(event) =>
+                updateMaterial({
+                  deliveryStatus: event.target.value as NonNullable<InvoiceItem['deliveryStatus']>,
+                })
+              }
+              className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              {Object.entries(DELIVERY_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Bestellt
+                </span>
+                <input
+                  type="text"
+                  value={material.orderedQuantity > 0 ? formatNumber(material.orderedQuantity, true) : ''}
+                  onChange={(event) => {
+                    const nextQuantityOrdered = parseQuantityInput(event.target.value)
+                    updateMaterial({
+                      quantityOrdered: nextQuantityOrdered,
+                      deliveryStatus: nextQuantityOrdered > 0 ? material.status : 'not_ordered',
+                    })
+                  }}
+                  placeholder="0,00"
+                  className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                  inputMode="decimal"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  ETA
+                </span>
+                <input
+                  type="date"
+                  value={material.expectedDeliveryDate || ''}
+                  onChange={(event) =>
+                    updateMaterial({
+                      expectedDeliveryDate: event.target.value || undefined,
+                    })
+                  }
+                  className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+            </div>
+
+            <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold text-slate-600">
+              Wareneingang: {formatNumber(material.deliveredQuantity, true) || '0,00'} /{' '}
+              {formatNumber(material.quantity, true) || '0,00'}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <span
+              className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wider ${DELIVERY_STATUS_CLASSES[material.status]}`}
+            >
+              {DELIVERY_STATUS_LABELS[material.status]}
+            </span>
+            <div className="text-xs font-semibold text-slate-600">
+              Bestellt: {formatNumber(material.orderedQuantity, true) || '0,00'} /{' '}
+              {formatNumber(material.quantity, true) || '0,00'}
+            </div>
+            <div className="text-xs font-semibold text-slate-500">
+              Wareneingang: {formatNumber(material.deliveredQuantity, true) || '0,00'} /{' '}
+              {formatNumber(material.quantity, true) || '0,00'}
+            </div>
+            {(material.expectedDeliveryDate || material.actualDeliveryDate) && (
+              <div className="text-[10px] font-medium text-slate-500">
+                {material.expectedDeliveryDate && (
+                  <span>ETA {formatMaterialDate(material.expectedDeliveryDate)}</span>
+                )}
+                {material.actualDeliveryDate && (
+                  <span className={material.expectedDeliveryDate ? 'ml-2' : ''}>
+                    WE {formatMaterialDate(material.actualDeliveryDate)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </td>
 
@@ -544,6 +682,9 @@ export function ItemsTable({
                 <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">Beschreibung</th>
                 <th className="w-24 px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">Menge</th>
                 <th className="w-20 px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">Einheit</th>
+                <th className="w-60 px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                  Materialstatus
+                </th>
                 <th className="w-32 px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
                   Preis ({priceMode === 'netto' ? 'Netto' : 'Brutto'})
                 </th>
@@ -566,9 +707,9 @@ export function ItemsTable({
                 <tr>
                   <td
                     colSpan={(() => {
-                      if (canViewPurchasePrices && canViewMargins) return 11
-                      if (canViewPurchasePrices || canViewMargins) return 10
-                      return 9
+                      if (canViewPurchasePrices && canViewMargins) return 13
+                      if (canViewPurchasePrices || canViewMargins) return 12
+                      return 11
                     })()}
                     className="px-4 py-12 text-center text-slate-400"
                   >

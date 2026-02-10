@@ -1,5 +1,6 @@
 import React from 'react'
 import {
+  AlertTriangle,
   Briefcase,
   Calendar,
   FileText,
@@ -187,6 +188,12 @@ export function ProjectListToolbar({
               className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${state.filterType === 'installation' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
             >
               <Truck className="h-3.5 w-3.5" /> Zu Terminieren
+            </button>
+            <button
+              onClick={() => onFilterTypeChange('material_risk')}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${state.filterType === 'material_risk' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" /> Materialrisiko
             </button>
           </div>
         )}
