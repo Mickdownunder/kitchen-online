@@ -1,30 +1,83 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { WifiOff } from 'lucide-react'
+import { getInitialOnlineState, probeOnlineStatus } from './offlineIndicator.utils'
 
 /**
  * Offline indicator component
  * Shows when the app is offline
  */
 export function OfflineIndicator() {
-  const [isOnline, setIsOnline] = useState(
-    () => (typeof navigator === 'undefined' ? true : navigator.onLine)
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === 'undefined' ? true : getInitialOnlineState(navigator),
   )
+  const isMountedRef = useRef(true)
+
+  const syncOnlineState = useCallback(async () => {
+    const reachable = await probeOnlineStatus()
+    if (isMountedRef.current) {
+      setIsOnline(reachable)
+    }
+  }, [])
 
   useEffect(() => {
-    // Listen for online/offline events
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const initialSyncTimer = window.setTimeout(() => {
+      void syncOnlineState()
+    }, 0)
+
+    const handleOnline = () => {
+      void syncOnlineState()
+    }
+
+    const handleOffline = () => {
+      setIsOnline(false)
+      void syncOnlineState()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void syncOnlineState()
+      }
+    }
+
+    const handleFocus = () => {
+      void syncOnlineState()
+    }
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
+      window.clearTimeout(initialSyncTimer)
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [syncOnlineState])
+
+  useEffect(() => {
+    if (isOnline) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void syncOnlineState()
+    }, 15000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [isOnline, syncOnlineState])
 
   if (isOnline) return null
 

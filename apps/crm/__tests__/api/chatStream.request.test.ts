@@ -54,4 +54,18 @@ describe('parseChatStreamRequest', () => {
       expect(result.kind).toBe('validation')
     }
   })
+
+  it('returns validation error for invalid project ids', () => {
+    const result = parseChatStreamRequest(
+      JSON.stringify({
+        message: 'ok',
+        projects: [{ id: '' }],
+      }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.kind).toBe('validation')
+    }
+  })
 })

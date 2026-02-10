@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import { logger } from '@/lib/utils/logger'
 import type { PublishRequest } from './schema'
-import { sanitizeFileName } from './helpers'
+import { normalizeDocumentNameForDedup, sanitizeFileName } from './helpers'
 import type { AuthorizationContext, RenderedDocument } from './types'
 
 export async function persistDocument(
@@ -10,28 +10,38 @@ export async function persistDocument(
   rendered: RenderedDocument,
   context: AuthorizationContext,
 ): Promise<NextResponse> {
-  const baseFileName = rendered.fileName.replace('.pdf', '')
+  const expectedName = normalizeDocumentNameForDedup(rendered.fileName)
 
-  const { data: existingDocs } = await context.serviceClient
+  const { data: existingDocs, error: existingDocsError } = await context.serviceClient
     .from('documents')
     .select('id, name')
     .eq('project_id', request.projectId)
     .eq('type', rendered.portalType)
-    .ilike('name', `${baseFileName}%`)
 
-  if (existingDocs && existingDocs.length > 0) {
+  if (existingDocsError) {
+    return apiErrors.internal(new Error(existingDocsError.message), {
+      component: 'api/portal/publish-document',
+      projectId: request.projectId,
+    })
+  }
+
+  const existingMatch = (existingDocs || []).find(
+    (doc) => normalizeDocumentNameForDedup(doc.name) === expectedName,
+  )
+
+  if (existingMatch) {
     logger.info('Document already exists - returning existing record', {
       component: 'api/portal/publish-document',
       projectId: request.projectId,
-      existingDocumentId: existingDocs[0].id,
-      existingDocumentName: existingDocs[0].name,
+      existingDocumentId: existingMatch.id,
+      existingDocumentName: existingMatch.name,
     })
 
     return NextResponse.json({
       success: true,
-      documentId: existingDocs[0].id,
+      documentId: existingMatch.id,
       type: rendered.portalType,
-      name: existingDocs[0].name,
+      name: existingMatch.name,
       alreadyExists: true,
     })
   }

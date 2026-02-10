@@ -30,6 +30,14 @@ export interface ParsedWebhookRequest {
   triggerEvent?: string
 }
 
+export function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
+export function buildEventIdNotesPattern(eventId: string): string {
+  return `%Cal.com Event ID: ${escapeIlikePattern(normalizeString(eventId))}%`
+}
+
 export function verifyCalcomSignature(
   payload: string,
   signature: string | null,

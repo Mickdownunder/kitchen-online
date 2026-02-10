@@ -2,7 +2,12 @@ import { createClient } from '@supabase/supabase-js'
 import { bookingConfirmationTemplate } from '@/lib/email-templates/booking-confirmation'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { logger } from '@/lib/utils/logger'
-import { generateAccessCode, splitName, type ExtractedBookingData } from './helpers'
+import {
+  buildEventIdNotesPattern,
+  generateAccessCode,
+  splitName,
+  type ExtractedBookingData,
+} from './helpers'
 
 const MAX_WORKFLOW_RETRIES = 3
 const RETRY_BASE_DELAY_MS = 300
@@ -253,10 +258,11 @@ async function reserveOrderNumber(company: CompanyBaseContext): Promise<CompanyC
 }
 
 async function findExistingProjectForEvent(eventId: string): Promise<ExistingProjectContext | null> {
+  const notesPattern = buildEventIdNotesPattern(eventId)
   const { data, error } = await supabaseAdmin
     .from('projects')
     .select('id, customer_id, order_number, access_code, measurement_date, measurement_time, notes')
-    .ilike('notes', `%Cal.com Event ID: ${eventId}%`)
+    .ilike('notes', notesPattern)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle<{

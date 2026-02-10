@@ -1,8 +1,6 @@
 import type { CustomerProject } from '@/types'
+import { ChatRequestSchema } from '../schema'
 import type { ChatHistoryEntry, ParseChatStreamRequestResult } from './types'
-
-const MAX_MESSAGE_LENGTH = 10_000
-const MAX_PROJECTS = 500
 
 function asObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -53,32 +51,27 @@ export function parseChatStreamRequest(bodyText: string): ParseChatStreamRequest
     }
   }
 
-  const message = typeof body.message === 'string' ? body.message : ''
-  const projects = Array.isArray(body.projects) ? (body.projects as CustomerProject[]) : []
+  const requestValidation = ChatRequestSchema.safeParse({
+    message: body.message,
+    projects: body.projects,
+  })
+
+  if (!requestValidation.success) {
+    return {
+      ok: false,
+      kind: 'validation',
+      message: requestValidation.error.issues[0]?.message || 'Invalid chat request payload',
+    }
+  }
+
   const chatHistory = parseChatHistory(body.chatHistory)
-
-  if (message.length > MAX_MESSAGE_LENGTH) {
-    return {
-      ok: false,
-      kind: 'validation',
-      message: 'Message exceeds maximum length',
-    }
-  }
-
-  if (projects.length > MAX_PROJECTS) {
-    return {
-      ok: false,
-      kind: 'validation',
-      message: 'Projects exceed maximum allowed count',
-    }
-  }
 
   return {
     ok: true,
     bodySizeMB: bodyText.length / (1024 * 1024),
     data: {
-      message,
-      projects,
+      message: requestValidation.data.message,
+      projects: requestValidation.data.projects as unknown as CustomerProject[],
       chatHistory,
     },
   }

@@ -56,6 +56,9 @@ export default function PortalDocumentsPage() {
   useEffect(() => {
     if (isReady && accessToken && selectedProject?.id && !projectLoading) {
       loadDocuments(selectedProject.id)
+    } else if (isReady && accessToken && !projectLoading && !selectedProject?.id) {
+      setIsLoading(false)
+      setError('NO_PROJECT')
     } else if (isReady && !accessToken) {
       setIsLoading(false)
       setError('NOT_AUTHENTICATED')
@@ -227,6 +230,22 @@ export default function PortalDocumentsPage() {
           </div>
           <h2 className="mt-6 text-xl font-semibold text-slate-900">Nicht angemeldet</h2>
           <p className="mt-2 text-slate-500">Bitte melden Sie sich erneut an.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error === 'NO_PROJECT') {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+            <AlertCircle className="h-8 w-8 text-amber-600" />
+          </div>
+          <h2 className="mt-6 text-xl font-semibold text-slate-900">Kein Projekt gefunden</h2>
+          <p className="mt-2 text-slate-500">
+            Ihrem Portal-Zugang ist aktuell kein Projekt zugeordnet.
+          </p>
         </div>
       </div>
     )

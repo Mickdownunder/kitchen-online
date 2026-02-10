@@ -398,6 +398,17 @@ describe('getOrdersWithProject', () => {
 })
 
 describe('getOrderStats', () => {
+  it('returns unauthorized when no user', async () => {
+    mockGetCurrentUser.mockResolvedValue(null)
+
+    const result = await getOrderStats()
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('UNAUTHORIZED')
+    }
+  })
+
   it('returns order stats', async () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' } as never)
     mockQueryResult({ data: [{ status: 'active' }, { status: 'sent' }], error: null })

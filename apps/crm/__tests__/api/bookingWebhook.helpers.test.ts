@@ -1,5 +1,7 @@
 import crypto from 'crypto'
 import {
+  buildEventIdNotesPattern,
+  escapeIlikePattern,
   extractBookingData,
   generateAccessCode,
   parseWebhookRequest,
@@ -89,5 +91,13 @@ describe('booking webhook helpers', () => {
   it('splits full names into first and last name', () => {
     expect(splitName('Ada Lovelace')).toEqual({ firstName: 'Ada', lastName: 'Lovelace' })
     expect(splitName('Madonna')).toEqual({ firstName: 'Madonna', lastName: '' })
+  })
+
+  it('escapes wildcard characters for ilike patterns', () => {
+    expect(escapeIlikePattern('evt_100%foo\\bar')).toBe('evt\\_100\\%foo\\\\bar')
+  })
+
+  it('builds an escaped notes lookup pattern for event ids', () => {
+    expect(buildEventIdNotesPattern('evt_100%foo')).toBe('%Cal.com Event ID: evt\\_100\\%foo%')
   })
 })

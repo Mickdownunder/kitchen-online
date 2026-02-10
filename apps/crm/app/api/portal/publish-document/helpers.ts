@@ -9,6 +9,13 @@ export function sanitizeFileName(fileName: string): string {
   return fileName.replace(/[^a-zA-Z0-9-_.]/g, '_')
 }
 
+export function normalizeDocumentNameForDedup(fileName: string): string {
+  const sanitized = sanitizeFileName(fileName.trim())
+  const withoutPdfExtension = sanitized.replace(/\.pdf$/i, '')
+  const withoutLegacyTimestampSuffix = withoutPdfExtension.replace(/_[0-9]{10,}$/, '')
+  return withoutLegacyTimestampSuffix.toLowerCase()
+}
+
 export function mapInvoiceItemsForInvoicePdf(project: PublishRequest['project']): InvoiceItem[] {
   return (project.items || []).map((item, index) => {
     const netTotal = item.netTotal || (item.pricePerUnit || 0) * item.quantity

@@ -6,7 +6,6 @@ import { getCurrentUser } from '../auth'
 import { mapOrderFromRow, mapOrderWithProjectFromRow } from './mappers'
 import type { OrderRow, OrderStats, OrderStatusRow, OrderWithProjectRow } from './types'
 import {
-  emptyOrderStats,
   ensureAuthenticatedUserId,
   isNotFoundError,
   toInternalErrorResult,
@@ -156,7 +155,7 @@ export async function getOrdersWithProject(status?: OrderStatus): Promise<Servic
 export async function getOrderStats(): Promise<ServiceResult<OrderStats>> {
   const userResult = ensureAuthenticatedUserId(await getCurrentUser())
   if (!userResult.ok) {
-    return ok(emptyOrderStats())
+    return fail(userResult.code, userResult.message, userResult.cause)
   }
 
   const { data, error } = await supabase.from('orders').select('status').eq('user_id', userResult.data)
