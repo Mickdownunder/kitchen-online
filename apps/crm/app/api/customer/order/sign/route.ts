@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       .eq('id', projectId)
 
     if (updateError) {
-      console.error('Order sign update error:', updateError)
+      console.warn('Order sign update error:', updateError)
       return NextResponse.json(
         { error: 'Fehler beim Speichern der Unterschrift' },
         { status: 500 }
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     })
     if (auditError) {
       // Audit-Fehler nicht an Kunde weitergeben – Unterschrift ist bereits gespeichert
-      console.error('Order sign audit insert error:', auditError)
+      console.warn('Order sign audit insert error:', auditError)
     }
 
     // Token löschen (Einmalnutzung)
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: 'Auftrag erfolgreich unterschrieben' })
   } catch (error) {
-    console.error('Order sign error:', error)
+    console.warn('Order sign error:', error)
     return NextResponse.json(
       { error: 'Ein unerwarteter Fehler ist aufgetreten' },
       { status: 500 }
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
       customerName: project.customer_name,
     })
   } catch (error) {
-    console.error('Order sign GET error:', error)
+    console.warn('Order sign GET error:', error)
     return NextResponse.json(
       { error: 'Ein unerwarteter Fehler ist aufgetreten' },
       { status: 500 }

@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       filename,
     })
   } catch (error: unknown) {
-    console.error('Error generating delivery note PDF:', error)
+    console.warn('Error generating delivery note PDF:', error)
     return apiErrors.internal(error as Error, { component: 'api/delivery-note/pdf' })
   }
 }

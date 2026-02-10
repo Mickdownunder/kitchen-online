@@ -1,11 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import type { User } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 
 // Service client with service_role key - bypasses RLS
 // Use only in API routes for admin operations
-export async function createServiceClient() {
+export async function createServiceClient(): Promise<ReturnType<typeof createSupabaseClient<Database>>> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
   
@@ -21,7 +22,7 @@ export async function createServiceClient() {
   })
 }
 
-export async function createClient() {
+export async function createClient(): Promise<ReturnType<typeof createServerClient<Database>>> {
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
@@ -49,7 +50,7 @@ export async function createClient() {
 }
 
 // Helper to get current user in server components
-export async function getCurrentUser() {
+export async function getCurrentUser(): Promise<User | null> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -58,7 +59,7 @@ export async function getCurrentUser() {
 }
 
 // Helper to get current user profile in server components
-export async function getCurrentUserProfile() {
+export async function getCurrentUserProfile(): Promise<Database['public']['Tables']['user_profiles']['Row'] | null> {
   const supabase = await createClient()
   const user = await getCurrentUser()
   if (!user) return null

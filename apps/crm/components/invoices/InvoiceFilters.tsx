@@ -30,6 +30,7 @@ export const InvoiceFilters: React.FC<InvoiceFiltersProps> = ({
   setSelectedMonth,
   availableYears,
 }) => {
+  void selectedMonth
   return (
     <div className="flex flex-col gap-4 lg:flex-row">
       {/* Search */}

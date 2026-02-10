@@ -59,7 +59,10 @@ export default function ArticlesClient() {
   }, [page, searchDebounced, categoryFilter, sortField, sortDirection])
 
   useEffect(() => {
-    loadArticles()
+    const timer = window.setTimeout(() => {
+      void loadArticles()
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [loadArticles])
 
   const handlePageChange = (newPage: number) => {

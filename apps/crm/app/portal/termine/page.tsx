@@ -264,7 +264,7 @@ export default function PortalTerminePage() {
         status: projectData?.status || '',
       })
     } catch (err) {
-      console.error('Error loading appointments:', err)
+      console.warn('Error loading appointments:', err)
       setError('Termine konnten nicht geladen werden.')
     } finally {
       setIsLoading(false)

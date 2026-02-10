@@ -8,7 +8,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-function ensureLocalStorage() {
+function ensureLocalStorage(): void {
   if (typeof globalThis === 'undefined') return
 
   const storage = (globalThis as { localStorage?: Storage }).localStorage

@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching appliances:', error)
+      console.warn('Error fetching appliances:', error)
       return apiErrors.internal(new Error('FETCH_ERROR'), { component: 'api/appliances' })
     }
 
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Get appliances error:', error)
+    console.warn('Get appliances error:', error)
     return apiErrors.internal(error as Error, { component: 'api/appliances' })
   }
 }
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating appliance:', error)
+      console.warn('Error creating appliance:', error)
       return apiErrors.internal(new Error('CREATE_ERROR'), { component: 'api/appliances' })
     }
 
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Create appliance error:', error)
+    console.warn('Create appliance error:', error)
     return apiErrors.internal(error as Error, { component: 'api/appliances' })
   }
 }

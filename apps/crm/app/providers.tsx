@@ -9,6 +9,7 @@ import React, {
   useCallback,
   useRef,
 } from 'react'
+import { usePathname } from 'next/navigation'
 import {
   CustomerProject,
   PlanningAppointment,
@@ -53,7 +54,14 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
-export function AppProvider({ children }: { children: ReactNode }) {
+const isBypassRoute = (pathname: string | null): boolean =>
+  pathname === '/login' ||
+  pathname === '/signup' ||
+  pathname === '/forgot-password' ||
+  pathname === '/reset-password' ||
+  pathname?.startsWith('/portal') === true
+
+function AuthenticatedAppProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth() // Check if user is authenticated
   const [projects, setProjects] = useState<CustomerProject[]>([])
   const [appointments, setAppointments] = useState<PlanningAppointment[]>([])
@@ -130,10 +138,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Don't load data if user is not authenticated
     if (!user) {
-      setIsLoading(false)
+      const timer = window.setTimeout(() => {
+        setIsLoading(false)
+      }, 0)
       // Reset initial load flag when user logs out
       hasInitialLoad.current = false
-      return
+      return () => window.clearTimeout(timer)
     }
 
     if (hasInitialLoad.current) return
@@ -215,6 +225,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       {children}
     </AppContext.Provider>
   )
+}
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  if (isBypassRoute(pathname)) {
+    return <>{children}</>
+  }
+  return <AuthenticatedAppProvider>{children}</AuthenticatedAppProvider>
 }
 
 export function useApp() {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { GoogleGenAI, createPartFromFunctionResponse } from '@google/genai'
 import { agentTools } from '@/lib/ai/agentTools'
 import { buildProjectSummary } from '@/lib/ai/projectSummary'

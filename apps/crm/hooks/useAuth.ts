@@ -11,7 +11,22 @@ import {
 } from '@/lib/supabase/services'
 import { logger } from '@/lib/utils/logger'
 
-export function useAuth() {
+interface UseAuthResult {
+  user: User | null
+  profile: UserProfile | null
+  permissions: Record<string, boolean> | null
+  companyRole: string | null
+  loading: boolean
+  refreshPermissions: () => Promise<void>
+  isOwner: boolean
+  isAdmin: boolean
+  isManager: boolean
+  isEmployee: boolean
+  hasPermission: (code: PermissionCode | string) => boolean
+  canManageUsers: () => boolean
+}
+
+export function useAuth(): UseAuthResult {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [permissions, setPermissions] = useState<Record<string, boolean> | null>(null)
@@ -38,7 +53,7 @@ export function useAuth() {
       .then(({ data: { session } }) => {
         setUser(session?.user ?? null)
         if (session?.user) {
-          loadProfile(session.user)
+          loadProfile()
         } else {
           setLoading(false)
         }
@@ -65,7 +80,7 @@ export function useAuth() {
             processedInviteRef.current = true
             await processPendingInvite()
           }
-          loadProfile(session.user)
+          loadProfile()
         } else {
           setProfile(null)
           setPermissions(null)
@@ -90,7 +105,7 @@ export function useAuth() {
   }, [])
 
   // Process pending invites for newly signed in users
-  const processPendingInvite = async () => {
+  const processPendingInvite = async (): Promise<void> => {
     try {
       const response = await fetch('/api/users/process-invite', {
         method: 'POST',
@@ -137,7 +152,7 @@ export function useAuth() {
     }
   }
 
-  const loadProfile = async (authUser?: User) => {
+  const loadProfile = async (): Promise<void> => {
     try {
       const userProfile = await getCurrentUserProfile()
       if (userProfile) {
@@ -182,9 +197,9 @@ export function useAuth() {
   }
 
   // Refresh permissions (call after permission changes)
-  const refreshPermissions = async () => {
+  const refreshPermissions = async (): Promise<void> => {
     if (user) {
-      await loadProfile(user)
+      await loadProfile()
     }
   }
 

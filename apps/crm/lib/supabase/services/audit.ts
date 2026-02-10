@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/utils/logger'
+import type { Json } from '@/types/database.types'
 
 /**
  * Audit logging service
@@ -11,16 +12,13 @@ export interface AuditLogInput {
   entityType: string // e.g., 'project', 'user', 'invoice'
   entityId?: string
   changes?: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    before?: Record<string, any>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    after?: Record<string, any>
+    before?: Json
+    after?: Json
   }
   ipAddress?: string
   userAgent?: string
   requestId?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  metadata?: Record<string, any> // Audit metadata can vary
+  metadata?: Json // Audit metadata can vary
 }
 
 /**
@@ -50,24 +48,22 @@ export async function logAuditEvent(input: AuditLogInput, userId?: string): Prom
     const ipAddress = input.ipAddress || 'unknown'
     const userAgent = input.userAgent || 'unknown'
 
-    // Call RPC function
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase.rpc('log_audit_event', {
       p_user_id: userId,
       p_action: input.action,
       p_entity_type: input.entityType,
-      p_entity_id: input.entityId || null,
+      p_entity_id: input.entityId || undefined,
       p_changes: input.changes
         ? {
             before: input.changes.before,
             after: input.changes.after,
-          }
-        : null,
+          } as Json
+        : undefined,
       p_ip_address: ipAddress,
       p_user_agent: userAgent,
-      p_request_id: input.requestId || null,
-      p_metadata: input.metadata || null,
-    } as any)
+      p_request_id: input.requestId || undefined,
+      p_metadata: (input.metadata || undefined) as Json | undefined,
+    })
 
     if (error) {
       logger.error(
@@ -116,16 +112,13 @@ export interface AuditLog {
   entityType: string
   entityId: string | null
   changes: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    before?: Record<string, any>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    after?: Record<string, any>
+    before?: Json
+    after?: Json
   } | null
   ipAddress: string | null
   userAgent: string | null
   requestId: string | null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  metadata: Record<string, any> | null // Audit metadata can vary
+  metadata: Json | null // Audit metadata can vary
   createdAt: string
   userEmail: string | null
   userName: string | null
@@ -135,16 +128,15 @@ export async function getAuditLogs(options: GetAuditLogsOptions = {}): Promise<A
   try {
     const supabase = await createClient()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase.rpc('get_audit_logs', {
       p_limit: options.limit || 100,
       p_offset: options.offset || 0,
-      p_action: options.action || null,
-      p_entity_type: options.entityType || null,
-      p_entity_id: options.entityId || null,
-      p_start_date: options.startDate?.toISOString() || null,
-      p_end_date: options.endDate?.toISOString() || null,
-    } as any)
+      p_action: options.action || undefined,
+      p_entity_type: options.entityType || undefined,
+      p_entity_id: options.entityId || undefined,
+      p_start_date: options.startDate?.toISOString() || undefined,
+      p_end_date: options.endDate?.toISOString() || undefined,
+    })
 
     if (error) {
       logger.error(

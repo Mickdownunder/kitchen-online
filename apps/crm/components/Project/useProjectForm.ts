@@ -89,16 +89,35 @@ export function useProjectForm(
   // Wareneinsatz aus verknüpften Eingangsrechnungen (für Marge)
   const [supplierInvoiceTotal, setSupplierInvoiceTotal] = useState(0)
   useEffect(() => {
+    let isActive = true
+
     if (!formData.id) {
-      setSupplierInvoiceTotal(0)
-      return
+      const timer = window.setTimeout(() => {
+        if (isActive) {
+          setSupplierInvoiceTotal(0)
+        }
+      }, 0)
+      return () => {
+        isActive = false
+        window.clearTimeout(timer)
+      }
     }
+
     getSupplierInvoices(formData.id)
       .then(invoices => {
+        if (!isActive) return
         const total = invoices.reduce((sum, inv) => sum + inv.netAmount, 0)
         setSupplierInvoiceTotal(total)
       })
-      .catch(() => setSupplierInvoiceTotal(0))
+      .catch(() => {
+        if (isActive) {
+          setSupplierInvoiceTotal(0)
+        }
+      })
+
+    return () => {
+      isActive = false
+    }
   }, [formData.id])
 
   // Project-Calculations Hook (nutzt Eingangsrechnungen wenn verknüpft)
@@ -116,7 +135,7 @@ export function useProjectForm(
     if (!initialProject?.id && !formData.orderNumber) {
       peekNextOrderNumber().then(num => setFormData(prev => ({ ...prev, orderNumber: num })))
     }
-  }, [initialProject?.id])
+  }, [initialProject?.id, formData.orderNumber])
 
   // Return unified API (backward compatible)
   return {

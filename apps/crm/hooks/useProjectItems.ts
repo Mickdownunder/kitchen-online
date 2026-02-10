@@ -11,11 +11,21 @@ interface UseProjectItemsProps {
   setFormData: React.Dispatch<React.SetStateAction<Partial<CustomerProject>>>
 }
 
+interface UseProjectItemsResult {
+  addItem: () => void
+  updateItem: (id: string, updates: Partial<InvoiceItem>) => void
+  removeItem: (id: string) => void
+}
+
 /**
  * Hook für CRUD-Operationen für Invoice-Items
  */
-export function useProjectItems({ formData, setFormData }: UseProjectItemsProps) {
-  const addItem = () => {
+export function useProjectItems({
+  formData: _formData,
+  setFormData,
+}: UseProjectItemsProps): UseProjectItemsResult {
+  void _formData
+  const addItem = (): void => {
     setFormData(prev => {
       const items = prev.items || []
       const newItem: InvoiceItem = {
@@ -35,7 +45,7 @@ export function useProjectItems({ formData, setFormData }: UseProjectItemsProps)
     })
   }
 
-  const updateItem = (id: string, updates: Partial<InvoiceItem>) => {
+  const updateItem = (id: string, updates: Partial<InvoiceItem>): void => {
     setFormData(prev => {
       return {
         ...prev,
@@ -87,7 +97,7 @@ export function useProjectItems({ formData, setFormData }: UseProjectItemsProps)
     })
   }
 
-  const removeItem = (id: string) => {
+  const removeItem = (id: string): void => {
     setFormData(prev => ({
       ...prev,
       items: (prev.items || []).filter(item => item.id !== id),

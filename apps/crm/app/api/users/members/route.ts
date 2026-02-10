@@ -129,13 +129,13 @@ export async function PATCH(request: NextRequest) {
     const { memberId, role } = validation.data
     const isActive = 'isActive' in validation.data ? validation.data.isActive : undefined
 
-    // Update via RPC
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.rpc('update_member_role', {
+    const rpcPayload = {
       p_member_id: memberId,
       p_role: role || undefined,
       p_is_active: isActive !== undefined ? isActive : undefined,
-    } as any)
+    } as unknown as { p_member_id: string; p_role: string; p_is_active: boolean }
+
+    const { error } = await supabase.rpc('update_member_role', rpcPayload)
 
     if (error) {
       logger.error(

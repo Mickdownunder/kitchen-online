@@ -130,7 +130,7 @@ export default function SupplierInvoicesView({ projects = [], onStatsChange }: S
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadCustomCategories])
 
   useEffect(() => {
     loadInvoices()

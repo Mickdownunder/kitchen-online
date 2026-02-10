@@ -9,9 +9,26 @@ interface UseAISpeechOptions {
   onInterimTranscript?: (text: string) => void
 }
 
-export function useAISpeech(options: UseAISpeechOptions = {}) {
+interface UseAISpeechResult {
+  isListening: boolean
+  isSpeechSupported: boolean
+  isTTSEnabled: boolean
+  isSpeaking: boolean
+  speechError: string | null
+  interimTranscript: string
+  toggleListening: () => Promise<void>
+  speakText: (text: string) => void
+  stopSpeaking: () => void
+  toggleTTS: () => void
+}
+
+export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult {
   const [isListening, setIsListening] = useState(false)
-  const [isSpeechSupported, setIsSpeechSupported] = useState(false)
+  const [isSpeechSupported] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
+  )
   const [isTTSEnabled, setIsTTSEnabled] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [speechError, setSpeechError] = useState<string | null>(null)
@@ -26,13 +43,14 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
   // in-progress speech recognition session.
   const onTranscriptRef = useRef(options.onTranscript)
   const onInterimTranscriptRef = useRef(options.onInterimTranscript)
-  onTranscriptRef.current = options.onTranscript
-  onInterimTranscriptRef.current = options.onInterimTranscript
+  useEffect(() => {
+    onTranscriptRef.current = options.onTranscript
+    onInterimTranscriptRef.current = options.onInterimTranscript
+  }, [options.onTranscript, options.onInterimTranscript])
 
   // Initialize Speech Recognition (runs once on mount)
   useEffect(() => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition
-    setIsSpeechSupported(!!SpeechRecognitionAPI)
 
     if (SpeechRecognitionAPI) {
       const recognition = new SpeechRecognitionAPI()
@@ -112,18 +130,24 @@ export function useAISpeech(options: UseAISpeechOptions = {}) {
       recognitionRef.current = recognition
     } else {
       logger.warn('[Speech] Speech Recognition nicht unterstützt', { component: 'useAISpeech' })
-      setIsSpeechSupported(false)
     }
+
+    let ttsTimer: number | null = null
 
     // Check TTS support and load preference
     if ('speechSynthesis' in window && typeof window.localStorage?.getItem === 'function') {
       const savedTTS = window.localStorage.getItem('ai_tts_enabled')
       if (savedTTS === 'true') {
-        setIsTTSEnabled(true)
+        ttsTimer = window.setTimeout(() => {
+          setIsTTSEnabled(true)
+        }, 0)
       }
     }
 
     return () => {
+      if (ttsTimer !== null) {
+        window.clearTimeout(ttsTimer)
+      }
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()

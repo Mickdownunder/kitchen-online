@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       .order('manufacturer', { ascending: true })
 
     if (error) {
-      console.error('Error fetching appliances:', error)
+      console.warn('Error fetching appliances:', error)
       return NextResponse.json(
         { success: false, error: 'FETCH_ERROR' },
         { status: 500 }
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Get appliances error:', error)
+    console.warn('Get appliances error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

@@ -154,7 +154,7 @@ export async function saveCompanySettings(
 
   const dbData = {
     user_id: user.id,
-    company_name: settings.companyName,
+    company_name: settings.companyName || '',
     display_name: settings.displayName,
     legal_form: settings.legalForm,
     street: settings.street,
@@ -193,10 +193,9 @@ export async function saveCompanySettings(
     updated_at: new Date().toISOString(),
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
     .from('company_settings')
-    .upsert(dbData as any, { onConflict: 'user_id' })
+    .upsert(dbData, { onConflict: 'user_id' })
     .select()
     .single()
 
@@ -217,8 +216,7 @@ export async function saveCompanySettings(
 // DB → Application type mapping
 // ============================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapCompanySettingsFromDB(db: Record<string, any>): CompanySettings {
+function mapCompanySettingsFromDB(db: Record<string, unknown>): CompanySettings {
   return {
     id: db.id,
     userId: db.user_id,
@@ -260,5 +258,5 @@ function mapCompanySettingsFromDB(db: Record<string, any>): CompanySettings {
     nextDeliveryNoteNumber: db.next_delivery_note_number ?? 1,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
-  }
+  } as unknown as CompanySettings
 }

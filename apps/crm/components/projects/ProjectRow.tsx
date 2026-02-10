@@ -47,15 +47,27 @@ export const ProjectRow = React.memo(function ProjectRow(props: {
   )
 
   useLayoutEffect(() => {
+    let rafId: number | null = null
+
     if (!props.isDropdownOpen || !statusTriggerRef.current) {
-      setDropdownPosition(null)
-      return
+      rafId = window.requestAnimationFrame(() => {
+        setDropdownPosition(null)
+      })
+    } else {
+      const rect = statusTriggerRef.current.getBoundingClientRect()
+      rafId = window.requestAnimationFrame(() => {
+        setDropdownPosition({
+          top: rect.bottom + 8,
+          left: rect.left,
+        })
+      })
     }
-    const rect = statusTriggerRef.current.getBoundingClientRect()
-    setDropdownPosition({
-      top: rect.bottom + 8,
-      left: rect.left,
-    })
+
+    return () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId)
+      }
+    }
   }, [props.isDropdownOpen])
 
   return (

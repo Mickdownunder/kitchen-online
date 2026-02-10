@@ -14,13 +14,24 @@ export interface WebVitals {
   id: string
   delta?: number
   rating?: 'good' | 'needs-improvement' | 'poor'
+  details?: Record<string, unknown>
 }
+
+const reportedVitalKeys = new Set<string>()
+const reportedPageLoadPaths = new Set<string>()
 
 /**
  * Track Web Vitals (LCP, FID, CLS, etc.)
  */
-export function reportWebVitals(metric: WebVitals) {
-  const { name, value, id, delta, rating } = metric
+export function reportWebVitals(metric: WebVitals): void {
+  const { name, value, id, delta, rating, details } = metric
+  const path = typeof window !== 'undefined' ? window.location.pathname : 'server'
+  const dedupeKey = `${path}|${name}|${id}|${Math.round(value)}`
+
+  if (reportedVitalKeys.has(dedupeKey)) {
+    return
+  }
+  reportedVitalKeys.add(dedupeKey)
 
   logger.info('Web Vital', {
     component: 'performance',
@@ -29,6 +40,7 @@ export function reportWebVitals(metric: WebVitals) {
     delta: delta ? Math.round(delta) : undefined,
     rating,
     id,
+    ...details,
   })
 
   // Send to analytics (optional)
@@ -43,7 +55,7 @@ export function trackAPIPerformance(
   method: string,
   duration: number,
   statusCode?: number
-) {
+): void {
   const isSlow = duration > 2000 // Consider >2s as slow
 
   if (isSlow || (statusCode && statusCode >= 400)) {
@@ -87,7 +99,7 @@ export function measurePerformance<T>(name: string, fn: () => T | Promise<T>): P
 /**
  * React hook for tracking component render performance
  */
-export function usePerformanceTracking(componentName: string) {
+export function usePerformanceTracking(componentName: string): void {
   useEffect(() => {
     const start = performance.now()
 
@@ -108,11 +120,17 @@ export function usePerformanceTracking(componentName: string) {
 /**
  * React hook for tracking page load performance
  */
-export function usePageLoadTracking() {
+export function usePageLoadTracking(): void {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const trackLoad = () => {
+    const trackLoad = (): void => {
+      const pagePath = window.location.pathname
+      if (reportedPageLoadPaths.has(pagePath)) {
+        return
+      }
+      reportedPageLoadPaths.add(pagePath)
+
       const navigation = performance.getEntriesByType(
         'navigation'
       )[0] as PerformanceNavigationTiming

@@ -44,42 +44,59 @@ export function ClientInit() {
   }, [])
 
   useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+
+    // Service workers in development often cache stale assets and cause auth/debug noise.
+    if (process.env.NODE_ENV !== 'production') {
+      void navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(registration => {
+          void registration.unregister()
+        })
+      })
+      return
+    }
+
     // Register service worker for offline support
     // Safari requires more careful error handling
-    if ('serviceWorker' in navigator) {
-      // Detect Safari
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    // Detect Safari
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    let updateIntervalId: number | null = null
 
-      navigator.serviceWorker
-        .register('/sw.js', {
-          // Safari-compatible: Don't use scope if not needed
-          scope: '/',
+    navigator.serviceWorker
+      .register('/sw.js', {
+        // Safari-compatible: Don't use scope if not needed
+        scope: '/',
+      })
+      .then(registration => {
+        logger.info('Service Worker registered', {
+          component: 'ClientInit',
+          scope: registration.scope,
         })
-        .then(registration => {
-          logger.info('Service Worker registered', {
-            component: 'ClientInit',
-            scope: registration.scope,
-          })
 
-          // Safari-compatible: Check for updates less aggressively
-          if (!isSafari) {
-            // Check for updates every hour (non-Safari)
-            setInterval(
-              () => {
-                registration.update()
-              },
-              60 * 60 * 1000
-            )
-          }
-        })
-        .catch(error => {
-          // Safari-compatible: Don't crash the app if SW registration fails
-          logger.warn(
-            'Service Worker registration failed',
-            { component: 'ClientInit', isSafari },
-            error
+        // Safari-compatible: Check for updates less aggressively
+        if (!isSafari) {
+          // Check for updates every hour (non-Safari)
+          updateIntervalId = window.setInterval(
+            () => {
+              void registration.update()
+            },
+            60 * 60 * 1000
           )
-        })
+        }
+      })
+      .catch(error => {
+        // Safari-compatible: Don't crash the app if SW registration fails
+        logger.warn(
+          'Service Worker registration failed',
+          { component: 'ClientInit', isSafari },
+          error
+        )
+      })
+
+    return () => {
+      if (updateIntervalId !== null) {
+        window.clearInterval(updateIntervalId)
+      }
     }
   }, [])
 

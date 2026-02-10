@@ -14,6 +14,8 @@ export const ProactiveSuggestions: React.FC<ProactiveSuggestionsProps> = ({
   projects,
   onSelectSuggestion,
 }) => {
+  const [referenceNow] = useState(() => Date.now())
+
   // Load open invoices from database
   const [openInvoices, setOpenInvoices] = useState<Invoice[]>([])
 
@@ -25,7 +27,10 @@ export const ProactiveSuggestions: React.FC<ProactiveSuggestionsProps> = ({
   }, [])
 
   useEffect(() => {
-    loadOpenInvoices()
+    const timer = window.setTimeout(() => {
+      void loadOpenInvoices()
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [loadOpenInvoices])
 
   const suggestions = useMemo(() => {
@@ -46,7 +51,7 @@ export const ProactiveSuggestions: React.FC<ProactiveSuggestionsProps> = ({
     // Check for projects without status update
     const staleProjects = projects.filter(p => {
       if (!p.updatedAt) return false
-      const daysSinceUpdate = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+      const daysSinceUpdate = (referenceNow - new Date(p.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
       return daysSinceUpdate > 14
     })
     if (staleProjects.length > 0) {
@@ -59,7 +64,7 @@ export const ProactiveSuggestions: React.FC<ProactiveSuggestionsProps> = ({
     const upcomingInstallations = projects.filter(p => {
       if (!p.installationDate || p.isMeasured) return false
       const installDate = new Date(p.installationDate)
-      const daysUntil = (installDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      const daysUntil = (installDate.getTime() - referenceNow) / (1000 * 60 * 60 * 24)
       return daysUntil > 0 && daysUntil < 7
     })
     if (upcomingInstallations.length > 0) {
@@ -72,7 +77,7 @@ export const ProactiveSuggestions: React.FC<ProactiveSuggestionsProps> = ({
     const dueSoonInvoices = openInvoices.filter(inv => {
       if (!inv.dueDate) return false
       const dueDate = new Date(inv.dueDate)
-      const daysUntilDue = (dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      const daysUntilDue = (dueDate.getTime() - referenceNow) / (1000 * 60 * 60 * 24)
       return daysUntilDue > 0 && daysUntilDue <= 3
     })
     if (dueSoonInvoices.length > 0) {
@@ -82,7 +87,7 @@ export const ProactiveSuggestions: React.FC<ProactiveSuggestionsProps> = ({
     }
 
     return result
-  }, [projects, openInvoices])
+  }, [projects, openInvoices, referenceNow])
 
   if (suggestions.length === 0) return null
 

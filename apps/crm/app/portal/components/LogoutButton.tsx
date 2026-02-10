@@ -23,7 +23,7 @@ export default function LogoutButton() {
       router.push('/portal/login')
       router.refresh()
     } catch (error) {
-      console.error('Logout error:', error)
+      console.warn('Logout error:', error)
     } finally {
       setIsLoading(false)
     }

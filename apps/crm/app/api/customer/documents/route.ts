@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error('Upload error:', uploadError)
+      console.warn('Upload error:', uploadError)
       return NextResponse.json(
         { success: false, error: 'UPLOAD_FAILED' },
         { status: 500 }
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
       .single() as { data: DocumentRow | null; error: unknown }
 
     if (dbError || !document) {
-      console.error('DB error:', dbError)
+      console.warn('DB error:', dbError)
       // Cleanup: File aus Storage löschen
       await supabase.storage.from('documents').remove([storagePath])
       
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Document upload error:', error)
+    console.warn('Document upload error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

@@ -1,5 +1,7 @@
 import { supabase } from '../client'
 import { UserProfile, UserRole } from '@/types'
+import type { Database } from '@/types/database.types'
+import type { AuthResponse, AuthTokenResponsePassword, User } from '@supabase/supabase-js'
 import { getCompanySettings, getEmployees } from './company'
 import { logger } from '@/lib/utils/logger'
 
@@ -8,7 +10,7 @@ export async function signUp(
   password: string,
   fullName: string,
   role: UserRole = 'verkaeufer'
-) {
+): Promise<AuthResponse['data']> {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -116,7 +118,7 @@ async function linkEmployeeToUser(email: string, userId: string): Promise<void> 
   }
 }
 
-export async function signIn(email: string, password: string) {
+export async function signIn(email: string, password: string): Promise<AuthTokenResponsePassword['data']> {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -141,12 +143,12 @@ export async function signIn(email: string, password: string) {
   return data
 }
 
-export async function signOut() {
+export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut()
   if (error) throw error
 }
 
-export async function getCurrentUser() {
+export async function getCurrentUser(): Promise<User | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -197,7 +199,6 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
         email: user.email,
       })
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: newProfile, error: createError } = await supabase
         .from('user_profiles')
         .insert({
@@ -205,7 +206,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
           email: user.email || '',
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
           role: (user.user_metadata?.role as UserRole) || 'verkaeufer',
-        } as any)
+        } as unknown as Database['public']['Tables']['user_profiles']['Insert'])
         .select()
         .single()
 

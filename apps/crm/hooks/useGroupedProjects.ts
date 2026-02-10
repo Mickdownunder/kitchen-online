@@ -3,7 +3,13 @@ import type { CustomerProject } from '@/types'
 
 export type GroupKey = string // YYYY-MM
 
-export function useGroupedProjects(filteredProjects: CustomerProject[]) {
+interface UseGroupedProjectsResult {
+  groupedProjects: [GroupKey, CustomerProject[]][]
+  expandedGroups: Set<GroupKey>
+  toggleGroup: (key: GroupKey) => void
+}
+
+export function useGroupedProjects(filteredProjects: CustomerProject[]): UseGroupedProjectsResult {
   const groupedProjects = useMemo(() => {
     const groups: Map<GroupKey, CustomerProject[]> = new Map()
     filteredProjects.forEach(project => {
@@ -24,7 +30,7 @@ export function useGroupedProjects(filteredProjects: CustomerProject[]) {
     return new Set([currentKey])
   })
 
-  const toggleGroup = (key: GroupKey) => {
+  const toggleGroup = (key: GroupKey): void => {
     setExpandedGroups(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)

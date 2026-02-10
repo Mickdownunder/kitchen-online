@@ -23,7 +23,28 @@ const INITIAL_MESSAGE: Message = {
   text: 'Hey Chef! Ich bin bereit. Was steht an? Du kannst mir auch einfach eine AB oder Rechnung rüberschieben.',
 }
 
-export function useChatSession() {
+interface UseChatSessionResult {
+  messages: Message[]
+  currentSessionId: string | null
+  chatSessions: ChatSession[]
+  showHistory: boolean
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
+  setShowHistory: React.Dispatch<React.SetStateAction<boolean>>
+  setCurrentSessionId: React.Dispatch<React.SetStateAction<string | null>>
+  loadChatSessions: () => Promise<void>
+  createNewSession: (title?: string) => Promise<ChatSession | null>
+  deleteSession: (sessionId: string) => Promise<boolean>
+  addMessage: (message: Message) => void
+  saveUserMessage: (content: string) => Promise<void>
+  saveModelMessage: (
+    content: string,
+    functionCalls?: Array<{ id: string; name: string; args: Record<string, unknown> }>
+  ) => Promise<void>
+  getOrCreateSession: (firstMessage?: string) => Promise<string | null>
+  getChatHistoryForContext: (limit?: number) => Promise<ChatMessage[]>
+}
+
+export function useChatSession(): UseChatSessionResult {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
@@ -60,7 +81,10 @@ export function useChatSession() {
   // Load chat history when session is selected
   useEffect(() => {
     if (currentSessionId) {
-      loadChatHistory(currentSessionId)
+      const timer = window.setTimeout(() => {
+        void loadChatHistory(currentSessionId)
+      }, 0)
+      return () => window.clearTimeout(timer)
     }
   }, [currentSessionId, loadChatHistory])
 

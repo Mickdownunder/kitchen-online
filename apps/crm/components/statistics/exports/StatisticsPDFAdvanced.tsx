@@ -390,6 +390,7 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Monatliche Umsatz-Entwicklung</Text>
               <View style={styles.chartContainer}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
                 <Image
                   src={chartImages.monthlyRevenue}
                   style={styles.chartImage}
@@ -490,6 +491,7 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Umsatz nach Rechnungsart</Text>
               <View style={styles.chartContainer}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
                 <Image
                   src={chartImages.invoiceTypes}
                   style={styles.chartImage}
@@ -502,6 +504,7 @@ const StatisticsPDFAdvancedDocument: React.FC<StatisticsPDFAdvancedProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Zahlungsstatus</Text>
               <View style={styles.chartContainer}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
                 <Image
                   src={chartImages.paymentStatus}
                   style={styles.chartImage}

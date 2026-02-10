@@ -47,7 +47,28 @@ export interface RolePermission {
   allowed: boolean
 }
 
-export function useUserManagement(opts: { companyId?: string }) {
+interface UseUserManagementResult {
+  canManageUsers: boolean
+  members: CompanyMember[]
+  pendingInvites: PendingInvite[]
+  permissions: Permission[]
+  rolePermissions: RolePermission[]
+  inviteEmail: string
+  setInviteEmail: React.Dispatch<React.SetStateAction<string>>
+  inviteRole: RoleKey
+  setInviteRole: React.Dispatch<React.SetStateAction<RoleKey>>
+  inviting: boolean
+  saving: boolean
+  loadMembersAndPermissions: () => Promise<void>
+  getPermissionState: (role: string, permCode: string) => boolean
+  toggleRolePermission: (role: string, permCode: string, next: boolean) => Promise<void>
+  inviteUser: () => Promise<void>
+  updateMember: (memberId: string, role: RoleKey, isActive: boolean) => Promise<void>
+  removeMember: (memberId: string) => Promise<void>
+  cancelInvite: (inviteId: string) => Promise<void>
+}
+
+export function useUserManagement(opts: { companyId?: string }): UseUserManagementResult {
   const { hasPermission, canManageUsers: authCanManageUsers, refreshPermissions } = useAuth()
   const canManageUsers = useMemo(
     () => authCanManageUsers?.() || hasPermission('manage_users'),

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import CustomerDatabase from '@/components/CustomerDatabase'
 import { Customer } from '@/types'
 import {
@@ -14,17 +14,20 @@ export default function CustomersClient() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadCustomers()
-  }, [])
-
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     const result = await getCustomers()
     if (result.ok) {
       setCustomers(result.data)
     }
     setLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadCustomers()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadCustomers])
 
   const handleSaveCustomer = async (customer: Customer) => {
     const result = customer.id && customers.find(c => c.id === customer.id)

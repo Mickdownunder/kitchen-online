@@ -33,7 +33,7 @@ self.addEventListener('install', (event) => {
         }
       })
       .catch((error) => {
-        console.error('Service Worker install error:', error);
+        console.warn('Service Worker install error:', error);
         // Don't fail silently - Safari needs explicit error handling
         // But don't block the app from loading
       })
@@ -58,7 +58,7 @@ self.addEventListener('activate', (event) => {
         }
       })
       .catch((error) => {
-        console.error('Service Worker activate error:', error);
+        console.warn('Service Worker activate error:', error);
         // Don't fail the activation
       })
   );
@@ -118,15 +118,15 @@ self.addEventListener('fetch', (event) => {
             })
             .catch((error) => {
               // Safari-compatible: Return original fetch error, don't create fake response
-              console.error('Service Worker fetch error:', error);
+              console.warn('Service Worker fetch error:', error);
               // Let browser handle the error naturally
               throw error;
             });
         })
-        .catch((error) => {
+        .catch(() => {
           // If cache match fails, try network
           return fetch(request).catch((err) => {
-            console.error('Service Worker network fallback failed:', err);
+            console.warn('Service Worker network fallback failed:', err);
             // Return a minimal error response for Safari
             return new Response('Network error', { 
               status: 408,
@@ -137,7 +137,7 @@ self.addEventListener('fetch', (event) => {
     );
   } catch (error) {
     // Safari-compatible: If respondWith fails, don't break the app
-    console.error('Service Worker respondWith error:', error);
+    console.warn('Service Worker respondWith error:', error);
     // Let the browser handle the request normally
   }
 });

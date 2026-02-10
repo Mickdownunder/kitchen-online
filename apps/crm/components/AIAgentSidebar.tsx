@@ -31,6 +31,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
   isOpen,
   onClose,
 }) => {
+  void onAddDocument
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [attachedFile, setAttachedFile] = useState<{

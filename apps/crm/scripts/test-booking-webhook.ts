@@ -42,10 +42,10 @@ async function testWebhook() {
   const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
   const url = `${baseUrl}/api/booking/webhook`
 
-  console.log('🧪 Testing Cal.com Webhook...')
-  console.log(`📍 URL: ${url}`)
-  console.log(`📧 Test Email: ${TEST_PAYLOAD.payload.attendees[0].email}`)
-  console.log('')
+  console.warn('🧪 Testing Cal.com Webhook...')
+  console.warn(`📍 URL: ${url}`)
+  console.warn(`📧 Test Email: ${TEST_PAYLOAD.payload.attendees[0].email}`)
+  console.warn('')
 
   try {
     const response = await fetch(url, {
@@ -59,30 +59,30 @@ async function testWebhook() {
     const data = await response.json()
 
     if (response.ok) {
-      console.log('✅ Webhook erfolgreich!')
-      console.log('')
-      console.log('📋 Ergebnis:')
-      console.log(`   Customer ID: ${data.customerId}`)
-      console.log(`   Project ID:  ${data.projectId}`)
-      console.log(`   Order Number: ${data.orderNumber}`)
-      console.log(`   Access Code: ${data.accessCode}`)
-      console.log('')
-      console.log('📧 Prüfe dein Email-Postfach (auch Spam)!')
-      console.log('')
-      console.log('🔍 Nächste Schritte:')
-      console.log('   1. Im CRM prüfen: Customers → Suche "Max Mustermann"')
-      console.log('   2. Im CRM prüfen: Projects → Suche nach Order Number')
-      console.log('   3. Im CRM prüfen: Calendar → Termin sollte erscheinen')
+      console.warn('✅ Webhook erfolgreich!')
+      console.warn('')
+      console.warn('📋 Ergebnis:')
+      console.warn(`   Customer ID: ${data.customerId}`)
+      console.warn(`   Project ID:  ${data.projectId}`)
+      console.warn(`   Order Number: ${data.orderNumber}`)
+      console.warn(`   Access Code: ${data.accessCode}`)
+      console.warn('')
+      console.warn('📧 Prüfe dein Email-Postfach (auch Spam)!')
+      console.warn('')
+      console.warn('🔍 Nächste Schritte:')
+      console.warn('   1. Im CRM prüfen: Customers → Suche "Max Mustermann"')
+      console.warn('   2. Im CRM prüfen: Projects → Suche nach Order Number')
+      console.warn('   3. Im CRM prüfen: Calendar → Termin sollte erscheinen')
     } else {
-      console.log('❌ Webhook fehlgeschlagen!')
-      console.log(`   Status: ${response.status}`)
-      console.log(`   Error: ${data.error || JSON.stringify(data)}`)
+      console.warn('❌ Webhook fehlgeschlagen!')
+      console.warn(`   Status: ${response.status}`)
+      console.warn(`   Error: ${data.error || JSON.stringify(data)}`)
     }
   } catch (error) {
-    console.log('❌ Verbindungsfehler!')
-    console.log(`   ${error}`)
-    console.log('')
-    console.log('💡 Ist der Dev Server gestartet? (pnpm dev)')
+    console.warn('❌ Verbindungsfehler!')
+    console.warn(`   ${error}`)
+    console.warn('')
+    console.warn('💡 Ist der Dev Server gestartet? (pnpm dev)')
   }
 }
 

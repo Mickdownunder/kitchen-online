@@ -154,13 +154,6 @@ function setEmployeeAuth(user: Record<string, unknown> | null, error: unknown = 
   mockAuthGetUser.mockResolvedValue({ data: { user }, error })
 }
 
-function setRpc(name: string, result: { data: unknown; error: unknown }): void {
-  mockRpc.mockImplementation((rpcName: string) => {
-    if (rpcName === name) return Promise.resolve(result)
-    return Promise.resolve({ data: null, error: null })
-  })
-}
-
 // ─── Test Suites ─────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -209,8 +202,7 @@ describe('Employee Auth: GET /api/tickets', () => {
     const body = await res.json()
 
     if (res.status !== 403) {
-      // eslint-disable-next-line no-console
-      console.error('Unexpected response:', res.status, body)
+      console.warn('Unexpected response:', res.status, body)
     }
     expect(res.status).toBe(403)
   })

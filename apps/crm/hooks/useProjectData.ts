@@ -7,13 +7,22 @@ import { getInvoices } from '@/lib/supabase/services/invoices'
 import { getComplaints } from '@/lib/supabase/services/complaints'
 import { logger } from '@/lib/utils/logger'
 
+interface UseProjectDataResult {
+  customers: Customer[]
+  invoices: Invoice[]
+  complaintsByProject: Map<string, number>
+  refreshCustomers: () => Promise<void>
+  refreshInvoices: () => Promise<void>
+  refreshComplaints: () => Promise<void>
+}
+
 /**
  * Loads supplementary data for the project list:
  * customers, invoices, and complaints-per-project counts.
  *
  * Each dataset is fetched once on mount and can be manually refreshed.
  */
-export function useProjectData() {
+export function useProjectData(): UseProjectDataResult {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [complaintsByProject, setComplaintsByProject] = useState<Map<string, number>>(new Map())
@@ -44,9 +53,15 @@ export function useProjectData() {
   }, [])
 
   useEffect(() => {
-    loadCustomers()
-    loadInvoices()
-    loadComplaints()
+    const timer = window.setTimeout(() => {
+      void loadCustomers()
+      void loadInvoices()
+      void loadComplaints()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
   }, [loadCustomers, loadInvoices, loadComplaints])
 
   return {

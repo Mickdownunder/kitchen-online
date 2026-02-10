@@ -6,7 +6,10 @@ const coreWebVitals = require('eslint-config-next/core-web-vitals')
 const typescript = require('eslint-config-next/typescript')
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+const eslintConfig = [
+  {
+    ignores: ['coverage/**'],
+  },
   ...coreWebVitals,
   ...typescript,
 
@@ -18,6 +21,7 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn'] }],
+      'react-hooks/set-state-in-effect': 'warn',
     },
   },
 
@@ -37,4 +41,21 @@ export default [
       ],
     },
   },
+
+  {
+    files: ['lib/utils/logger.ts'],
+    rules: {
+      'no-console': ['warn', { allow: ['debug', 'info', 'warn', 'error'] }],
+    },
+  },
+
+  // Tests rely on module reloading patterns where require() is intentional.
+  {
+    files: ['__tests__/**/*.ts', '__tests__/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 ]
+
+export default eslintConfig

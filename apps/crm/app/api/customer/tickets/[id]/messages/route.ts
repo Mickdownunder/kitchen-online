@@ -135,7 +135,7 @@ export async function POST(
         })
 
       if (uploadError) {
-        console.error('Upload error:', uploadError)
+        console.warn('Upload error:', uploadError)
         // Weitermachen ohne File
       } else {
         fileUrl = storagePath
@@ -157,7 +157,7 @@ export async function POST(
       .single()
 
     if (messageError) {
-      console.error('Message create error:', messageError)
+      console.warn('Message create error:', messageError)
       return NextResponse.json(
         { success: false, error: 'MESSAGE_CREATE_FAILED' },
         { status: 500 }
@@ -190,7 +190,7 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Message create error:', error)
+    console.warn('Message create error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

@@ -54,13 +54,13 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error('Error updating invoice item appliance data:', error)
+      console.warn('Error updating invoice item appliance data:', error)
       return apiErrors.internal(error as unknown as Error, { component: 'api/invoice-items/appliance', itemId: id })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error('Error in appliance PATCH:', error)
+    console.warn('Error in appliance PATCH:', error)
     return apiErrors.internal(error as Error, { component: 'api/invoice-items/appliance' })
   }
 }

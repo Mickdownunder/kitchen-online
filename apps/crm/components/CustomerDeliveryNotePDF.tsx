@@ -361,6 +361,7 @@ const CustomerDeliveryNotePDFDocument: React.FC<CustomerDeliveryNotePDFProps> = 
               <View style={styles.signatureBox}>
                 {deliveryNote.customerSignature ? (
                   <>
+                    {/* eslint-disable-next-line jsx-a11y/alt-text */}
                     <Image
                       src={deliveryNote.customerSignature}
                       style={styles.signatureImage}

@@ -10,6 +10,12 @@ import Image from 'next/image'
 
 const LOGO_URL = 'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-02%20schwarz.png'
 
+const isAbortError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return error.name === 'AbortError' || message.includes('aborted')
+}
+
 export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,15 +36,25 @@ export default function LoginForm() {
 
       logger.info('Login successful', { component: 'LoginForm', userId: result.user.id })
 
-      // Verify session is stored
-      const {
-        data: { session: verifySession },
-      } = await supabase.auth.getSession()
-      if (!verifySession) {
-        throw new Error('Session wurde nicht gespeichert')
+      // Verify session best-effort; an aborted check should not fail a successful login
+      try {
+        const {
+          data: { session: verifySession },
+        } = await supabase.auth.getSession()
+        if (!verifySession) {
+          logger.warn('Session verification returned empty session after sign in', {
+            component: 'LoginForm',
+          })
+        }
+      } catch (verifyError) {
+        if (isAbortError(verifyError)) {
+          logger.warn('Session verification aborted after sign in', { component: 'LoginForm' })
+        } else {
+          logger.warn('Session verification failed after sign in', { component: 'LoginForm' })
+        }
       }
 
-      logger.debug('Session verified in storage', { component: 'LoginForm' })
+      logger.debug('Sign-in completed, redirecting to dashboard', { component: 'LoginForm' })
 
       // Small delay to ensure cookies are set
       await new Promise(resolve => setTimeout(resolve, 500))

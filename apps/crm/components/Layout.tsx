@@ -29,7 +29,14 @@ import { logger } from '@/lib/utils/logger'
 const LOGO_URL_FALLBACK =
   'https://tdpyouguwmdrvhwkpdca.supabase.co/storage/v1/object/public/Bilder/8105_%20web%20logo_%20CMYK-03%20weis.png'
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const isBypassRoute = (pathname: string | null): boolean =>
+  pathname === '/login' ||
+  pathname === '/signup' ||
+  pathname === '/forgot-password' ||
+  pathname === '/reset-password' ||
+  pathname?.startsWith('/portal') === true
+
+const CrmLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const [displayName, setDisplayName] = React.useState<string>('')
   const [logoUrl, setLogoUrl] = React.useState<string>(LOGO_URL_FALLBACK)
@@ -41,6 +48,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
     if (user) hasRedirectedToLogin.current = false
   }, [user])
+
+  useEffect(() => {
+    const isAuthPage =
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/forgot-password' ||
+      pathname === '/reset-password'
+    const isPortalRoute = pathname?.startsWith('/portal')
+
+    if (!loading && !user && !isAuthPage && !isPortalRoute && !hasRedirectedToLogin.current) {
+      hasRedirectedToLogin.current = true
+      router.replace('/login')
+    }
+  }, [loading, pathname, router, user])
 
   // Load company display name + Logo (firmenspezifisch)
   React.useEffect(() => {
@@ -96,10 +117,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // If not logged in and not on auth page: redirect to login (nur einmal, um replaceState-Limit zu vermeiden)
   if (!user) {
-    if (!hasRedirectedToLogin.current) {
-      hasRedirectedToLogin.current = true
-      router.replace('/login')
-    }
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
@@ -362,4 +379,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   )
 }
 
-export default Layout
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+
+  if (isBypassRoute(pathname)) {
+    return <>{children}</>
+  }
+
+  return <CrmLayout>{children}</CrmLayout>
+}

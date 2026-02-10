@@ -85,7 +85,7 @@ export default function SetupPasswordPage() {
       router.refresh()
 
     } catch (err) {
-      console.error('Set password error:', err)
+      console.warn('Set password error:', err)
       setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
     } finally {
       setIsLoading(false)

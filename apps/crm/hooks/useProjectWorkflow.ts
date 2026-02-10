@@ -8,17 +8,29 @@ interface UseProjectWorkflowProps {
   onUpdateProject: (project: CustomerProject) => void
 }
 
+interface UseProjectWorkflowResult {
+  applyOverrides: (project: CustomerProject) => CustomerProject
+  scheduleUpdate: (project: CustomerProject, updates: Partial<CustomerProject>) => void
+  toggleStep: (
+    project: CustomerProject,
+    step: 'measured' | 'ordered' | 'delivered' | 'installation' | 'completed',
+    e: React.MouseEvent,
+  ) => void
+}
+
 /**
  * Manages optimistic workflow step toggling with debounced DB persistence.
  *
  * Local state is updated instantly (no flicker); the actual Supabase
  * write happens after a 500 ms debounce so rapid toggles are batched.
  */
-export function useProjectWorkflow({ onUpdateProject }: UseProjectWorkflowProps) {
+export function useProjectWorkflow({
+  onUpdateProject,
+}: UseProjectWorkflowProps): UseProjectWorkflowResult {
   const [localOverrides, setLocalOverrides] = useState<Map<string, Partial<CustomerProject>>>(
     new Map(),
   )
-  const [pendingTimeouts, setPendingTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map())
+  const [, setPendingTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map())
 
   /** Merge local overrides into a project snapshot. */
   const applyOverrides = useCallback(

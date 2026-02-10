@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { CustomerProject } from '@/types'
 import { logger } from '@/lib/utils/logger'
 import {
@@ -25,7 +26,6 @@ import {
   X,
   KeyRound,
 } from 'lucide-react'
-import type { InvoiceData } from '../InvoicePDF'
 import CustomerDeliveryNoteViewModal from '../CustomerDeliveryNoteViewModal'
 import { useToast } from '@/components/providers/ToastProvider'
 import {
@@ -526,9 +526,12 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
               Auftrag {project.orderNumber} · Online unterschrieben
             </p>
             <div className="mb-4 rounded-xl border-2 border-slate-200 bg-slate-50 p-4">
-              <img
+              <Image
                 src={project.customerSignature}
                 alt="Unterschrift des Kunden"
+                width={800}
+                height={256}
+                unoptimized
                 className="mx-auto max-h-32 w-full object-contain"
               />
             </div>

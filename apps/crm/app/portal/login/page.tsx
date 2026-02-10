@@ -76,7 +76,7 @@ export default function PortalLoginPage() {
         })
 
         if (sessionError) {
-          console.error('Session set error:', sessionError)
+          console.warn('Session set error:', sessionError)
           setError('Session konnte nicht gespeichert werden.')
           return
         }
@@ -91,7 +91,7 @@ export default function PortalLoginPage() {
       router.refresh()
 
     } catch (err) {
-      console.error('Login error:', err)
+      console.warn('Login error:', err)
       setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
     } finally {
       setIsLoading(false)

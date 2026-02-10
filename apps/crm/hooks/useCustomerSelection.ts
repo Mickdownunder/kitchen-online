@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { Customer, CustomerProject } from '@/types'
 import { getCustomers } from '@/lib/supabase/services'
 import { parseCustomerName, formatCustomerName } from '@/lib/utils/customerNameParser'
@@ -14,6 +14,30 @@ interface UseCustomerSelectionProps {
   setIsManualNameUpdate: (value: boolean) => void
 }
 
+interface UseCustomerSelectionResult {
+  customers: Customer[]
+  selectedCustomerId: string
+  setSelectedCustomerId: React.Dispatch<React.SetStateAction<string>>
+  customerSearchTerm: string
+  setCustomerSearchTerm: React.Dispatch<React.SetStateAction<string>>
+  showCustomerDropdown: boolean
+  setShowCustomerDropdown: React.Dispatch<React.SetStateAction<boolean>>
+  filteredCustomers: Customer[]
+  firstName: string
+  setFirstName: React.Dispatch<React.SetStateAction<string>>
+  lastName: string
+  setLastName: React.Dispatch<React.SetStateAction<string>>
+  salutation: string
+  setSalutation: React.Dispatch<React.SetStateAction<string>>
+  companyName: string
+  setCompanyName: React.Dispatch<React.SetStateAction<string>>
+  taxId: string
+  setTaxId: React.Dispatch<React.SetStateAction<string>>
+  contactPerson: string
+  setContactPerson: React.Dispatch<React.SetStateAction<string>>
+  setIsManualNameUpdate: (value: boolean) => void
+}
+
 /**
  * Hook für Customer-Suche, -Auswahl und -Mapping auf Form-Felder
  */
@@ -23,7 +47,7 @@ export function useCustomerSelection({
   setFormData,
   setAddressInput,
   setIsManualNameUpdate,
-}: UseCustomerSelectionProps) {
+}: UseCustomerSelectionProps): UseCustomerSelectionResult {
   const [customers, setCustomers] = useState<Customer[]>(existingCustomers)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
   const [customerSearchTerm, setCustomerSearchTerm] = useState('')
@@ -36,19 +60,22 @@ export function useCustomerSelection({
   const [contactPerson, setContactPerson] = useState<string>(formData.contactPerson || '')
   const [isManualNameUpdate, setIsManualNameUpdateLocal] = useState(false)
 
-  // Load customers if not provided
-  useEffect(() => {
-    if (existingCustomers.length === 0) {
-      loadCustomers()
-    }
-  }, [existingCustomers.length])
-
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     const result = await getCustomers()
     if (result.ok) {
       setCustomers(result.data)
     }
-  }
+  }, [])
+
+  // Load customers if not provided
+  useEffect(() => {
+    if (existingCustomers.length === 0) {
+      const timer = window.setTimeout(() => {
+        void loadCustomers()
+      }, 0)
+      return () => window.clearTimeout(timer)
+    }
+  }, [existingCustomers.length, loadCustomers])
 
   // Filter customers by search term
   const filteredCustomers = useMemo(() => {
@@ -72,50 +99,62 @@ export function useCustomerSelection({
         )
 
         const addr = customer.address
-        setFormData(prev => ({
-          ...prev,
-          customerId: customer.id,
-          customerName: fullName,
-          address: fullAddress,
-          addressStreet: addr?.street ?? '',
-          addressHouseNumber: addr?.houseNumber ?? '',
-          addressPostalCode: addr?.postalCode ?? '',
-          addressCity: addr?.city ?? '',
-          phone: customer.contact.phone || '',
-          email: customer.contact.email || '',
-        }))
-        setAddressInput(fullAddress)
-        setFirstName(customer.firstName)
-        setLastName(customer.lastName)
-        setSalutation(customer.salutation || '')
-        setCompanyName(customer.companyName || '')
-        setTaxId(customer.taxId || '')
-        setShowCustomerDropdown(false)
+        const timer = window.setTimeout(() => {
+          setFormData(prev => ({
+            ...prev,
+            customerId: customer.id,
+            customerName: fullName,
+            address: fullAddress,
+            addressStreet: addr?.street ?? '',
+            addressHouseNumber: addr?.houseNumber ?? '',
+            addressPostalCode: addr?.postalCode ?? '',
+            addressCity: addr?.city ?? '',
+            phone: customer.contact.phone || '',
+            email: customer.contact.email || '',
+          }))
+          setAddressInput(fullAddress)
+          setFirstName(customer.firstName)
+          setLastName(customer.lastName)
+          setSalutation(customer.salutation || '')
+          setCompanyName(customer.companyName || '')
+          setTaxId(customer.taxId || '')
+          setShowCustomerDropdown(false)
+        }, 0)
+        return () => window.clearTimeout(timer)
       }
     }
   }, [selectedCustomerId, customers, setFormData, setAddressInput])
 
   // Parse customerName into firstName and lastName for display (nur beim initialen Laden)
   useEffect(() => {
+    const timers: number[] = []
+
     // Nur parsen, wenn wir nicht manuell aktualisieren und kein Kunde ausgewählt ist
     if (formData.customerName && !selectedCustomerId && !isManualNameUpdate) {
       const parsed = parseCustomerName(formData.customerName)
 
-      if (parsed.salutation && parsed.salutation !== salutation) {
-        setSalutation(parsed.salutation)
-      }
-      if (parsed.firstName && parsed.firstName !== firstName) {
-        setFirstName(parsed.firstName)
-      }
-      if (parsed.lastName && parsed.lastName !== lastName) {
-        setLastName(parsed.lastName)
-      }
+      timers.push(
+        window.setTimeout(() => {
+          if (parsed.salutation && parsed.salutation !== salutation) {
+            setSalutation(parsed.salutation)
+          }
+          if (parsed.firstName && parsed.firstName !== firstName) {
+            setFirstName(parsed.firstName)
+          }
+          if (parsed.lastName && parsed.lastName !== lastName) {
+            setLastName(parsed.lastName)
+          }
+        }, 0)
+      )
     }
 
     // Reset flag nach kurzer Zeit
     if (isManualNameUpdate) {
-      const timer = setTimeout(() => setIsManualNameUpdateLocal(false), 100)
-      return () => clearTimeout(timer)
+      timers.push(window.setTimeout(() => setIsManualNameUpdateLocal(false), 100))
+    }
+
+    return () => {
+      timers.forEach(timer => window.clearTimeout(timer))
     }
   }, [
     formData.customerName,
@@ -127,7 +166,7 @@ export function useCustomerSelection({
   ])
 
   // Wrapper für setIsManualNameUpdate um beide States zu aktualisieren
-  const handleSetIsManualNameUpdate = (value: boolean) => {
+  const handleSetIsManualNameUpdate = (value: boolean): void => {
     setIsManualNameUpdateLocal(value)
     setIsManualNameUpdate(value)
   }

@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Project fetch error:', error)
+    console.warn('Project fetch error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

@@ -5,7 +5,7 @@
  * The auth module is mocked to control getCurrentUser() results.
  */
 
-import { mockQueryResult, mockGetUser, resetMock } from './__mocks__/supabase'
+import { mockQueryResult, resetMock } from './__mocks__/supabase'
 
 // ─── Mock wiring ──────────────────────────────────────────────────────
 

@@ -41,7 +41,7 @@ function ResetPasswordForm() {
           })
 
           if (error) {
-            console.error('Session error:', error)
+            console.warn('Session error:', error)
             setError('Der Link ist ungültig oder abgelaufen.')
             setTokenValid(false)
           } else {
@@ -60,7 +60,7 @@ function ResetPasswordForm() {
           }
         }
       } catch (err) {
-        console.error('Token validation error:', err)
+        console.warn('Token validation error:', err)
         setError('Ein Fehler ist aufgetreten.')
         setTokenValid(false)
       } finally {
@@ -124,7 +124,7 @@ function ResetPasswordForm() {
       }, 2000)
 
     } catch (err) {
-      console.error('Reset error:', err)
+      console.warn('Reset error:', err)
       setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
     } finally {
       setIsLoading(false)

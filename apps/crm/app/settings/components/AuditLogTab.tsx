@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Clock, User, FileText, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { FileText, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 
 const PAGE_SIZE = 50

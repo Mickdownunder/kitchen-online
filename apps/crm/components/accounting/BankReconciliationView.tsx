@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  Landmark,
   Upload,
   Link2,
   ArrowDownLeft,

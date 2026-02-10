@@ -14,12 +14,24 @@ interface UseAddressAutocompleteProps {
   setFormData: React.Dispatch<React.SetStateAction<Partial<CustomerProject>>>
 }
 
+interface UseAddressAutocompleteResult {
+  addressSuggestions: AddressSuggestion[]
+  setAddressSuggestions: React.Dispatch<React.SetStateAction<AddressSuggestion[]>>
+  addressInput: string
+  setAddressInput: React.Dispatch<React.SetStateAction<string>>
+  isLoadingAddress: boolean
+  handleAddressInput: (value: string) => void
+}
+
 /**
  * Hook für Address-Autocomplete mit Debouncing
  *
  * Verwendet OpenStreetMap Nominatim API via Next.js Proxy-Route
  */
-export function useAddressAutocomplete({ formData, setFormData }: UseAddressAutocompleteProps) {
+export function useAddressAutocomplete({
+  formData,
+  setFormData,
+}: UseAddressAutocompleteProps): UseAddressAutocompleteResult {
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([])
   const [addressInput, setAddressInput] = useState('')
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
@@ -27,8 +39,9 @@ export function useAddressAutocomplete({ formData, setFormData }: UseAddressAuto
 
   // Sync addressInput from formData when formData.address is set (z. B. Kunde übernehmen, Projekt bearbeiten)
   useEffect(() => {
-    if (formData.address != null && formData.address !== '' && formData.address !== addressInput) {
-      setAddressInput(formData.address)
+    const nextAddress = formData.address
+    if (typeof nextAddress === 'string' && nextAddress !== '') {
+      setAddressInput(prev => (prev === nextAddress ? prev : nextAddress))
     }
   }, [formData.address])
 
@@ -41,7 +54,7 @@ export function useAddressAutocomplete({ formData, setFormData }: UseAddressAuto
     }
   }, [])
 
-  const handleAddressInput = (value: string) => {
+  const handleAddressInput = (value: string): void => {
     setAddressInput(value)
     setFormData(prev => ({ ...prev, address: value }))
 

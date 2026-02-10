@@ -5,7 +5,7 @@
  * Meeus/Jones/Butcher Easter algorithm against known reference dates.
  */
 
-import { getAustrianHolidays, getHolidayForDate, Holiday } from '@/lib/utils/austrianHolidays'
+import { getAustrianHolidays, getHolidayForDate } from '@/lib/utils/austrianHolidays'
 
 // ─── Helper ─────────────────────────────────────────────────────────
 

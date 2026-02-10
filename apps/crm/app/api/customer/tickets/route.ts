@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (ticketError) {
-      console.error('Ticket create error:', ticketError)
+      console.warn('Ticket create error:', ticketError)
       return NextResponse.json(
         { success: false, error: 'TICKET_CREATE_FAILED' },
         { status: 500 }
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (messageError) {
-      console.error('Message create error:', messageError)
+      console.warn('Message create error:', messageError)
       // Ticket wurde erstellt, Nachricht nicht - trotzdem Erfolg melden
       // aber loggen für Debugging
     }
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Ticket create error:', error)
+    console.warn('Ticket create error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

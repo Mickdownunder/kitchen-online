@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       filename: `Rechnung_${invoice.invoiceNumber.replace(/\//g, '-')}_${project.customerName.replace(/\s/g, '_')}.pdf`,
     })
   } catch (error: unknown) {
-    console.error('Error generating PDF:', error)
+    console.warn('Error generating PDF:', error)
     return apiErrors.internal(error as Error, { component: 'api/invoice/pdf' })
   }
 }

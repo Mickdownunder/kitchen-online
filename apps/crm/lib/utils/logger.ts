@@ -19,6 +19,13 @@ interface LogContext {
   [key: string]: unknown // Logger metadata can have any additional properties
 }
 
+interface ApiLogScope {
+  start: () => number
+  end: (explicitStartTime: number, statusCode?: number) => void
+  complete: (metadata?: Record<string, unknown>) => void
+  error: (err: Error, statusCode?: number) => void
+}
+
 export class Logger {
   private minLevel: LogLevel
   private isDevelopment: boolean
@@ -52,14 +59,12 @@ export class Logger {
 
     const formatted = this.formatMessage(level, message, context, error)
 
-    // Console output
+    // Map log levels to the matching console API to avoid false warning noise in DevTools
     switch (level) {
       case LogLevel.DEBUG:
-        // eslint-disable-next-line no-console
         console.debug(formatted)
         break
       case LogLevel.INFO:
-        // eslint-disable-next-line no-console
         console.info(formatted)
         break
       case LogLevel.WARN:
@@ -88,7 +93,7 @@ export class Logger {
   }
 
   // Convenience method for API routes
-  api(route: string, method: string, context?: LogContext) {
+  api(route: string, method: string, context?: LogContext): ApiLogScope {
     let startTime = 0
     return {
       start: () => {
@@ -132,9 +137,11 @@ export class Logger {
 export const logger = new Logger()
 
 // Export convenience functions
-export const logDebug = (message: string, context?: LogContext) => logger.debug(message, context)
-export const logInfo = (message: string, context?: LogContext) => logger.info(message, context)
-export const logWarn = (message: string, context?: LogContext, error?: Error) =>
+export const logDebug = (message: string, context?: LogContext): void =>
+  logger.debug(message, context)
+export const logInfo = (message: string, context?: LogContext): void =>
+  logger.info(message, context)
+export const logWarn = (message: string, context?: LogContext, error?: Error): void =>
   logger.warn(message, context, error)
-export const logError = (message: string, context?: LogContext, error?: Error) =>
+export const logError = (message: string, context?: LogContext, error?: Error): void =>
   logger.error(message, context, error)

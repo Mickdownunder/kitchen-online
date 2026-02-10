@@ -322,7 +322,7 @@ export async function upsertRolePermission(
   role: CompanyMemberRole,
   code: PermissionCode,
   allowed: boolean
-) {
+): Promise<void> {
   // Security enforced in RPC (manage_users permission)
   const { error } = await supabase.rpc('upsert_role_permission', {
     p_company_id: companyId,
@@ -338,7 +338,7 @@ export async function upsertUserPermission(
   userId: string,
   code: PermissionCode,
   allowed: boolean
-) {
+): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await supabase.rpc('upsert_user_permission' as any, {
     p_company_id: companyId,

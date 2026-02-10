@@ -46,7 +46,7 @@ export default function CustomerDeliveryNoteModal({
         .then(m => m.peekNextDeliveryNoteNumber())
         .then(num => setDeliveryNoteNumber(num))
     }
-  }, [existingDeliveryNote])
+  }, [existingDeliveryNote, deliveryNoteNumber])
 
   const loadCompanySettings = async () => {
     try {

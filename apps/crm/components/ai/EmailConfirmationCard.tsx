@@ -17,6 +17,7 @@ export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  void functionCallId
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

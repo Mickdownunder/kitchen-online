@@ -23,7 +23,7 @@ export const supabaseAdmin = supabaseServiceKey
   : null
 
 // Helper to check if admin client is available
-export function requireAdminClient() {
+export function requireAdminClient(): NonNullable<typeof supabaseAdmin> {
   if (!supabaseAdmin) {
     throw new Error('Admin client not available - SUPABASE_SERVICE_ROLE_KEY not configured')
   }
@@ -91,7 +91,7 @@ export async function createInviteAndSendEmail(
       })
 
       if (memberError) {
-        console.error('Error adding existing user to company:', memberError)
+        console.warn('Error adding existing user to company:', memberError)
 
         // Check if RPC doesn't exist
         if (memberError.code === 'PGRST202' || memberError.message?.includes('does not exist')) {
@@ -118,7 +118,7 @@ export async function createInviteAndSendEmail(
     })
 
     if (inviteError) {
-      console.error('Error creating pending invite:', inviteError)
+      console.warn('Error creating pending invite:', inviteError)
       return { success: false, error: inviteError.message }
     }
 
@@ -132,7 +132,7 @@ export async function createInviteAndSendEmail(
     })
 
     if (emailError) {
-      console.error('Error sending invite email:', emailError)
+      console.warn('Error sending invite email:', emailError)
       // Delete pending invite if email fails
       await admin.from('pending_invites').delete().eq('id', inviteData)
       return { success: false, error: `E-Mail konnte nicht gesendet werden: ${emailError.message}` }
@@ -140,7 +140,7 @@ export async function createInviteAndSendEmail(
 
     return { success: true, inviteId: inviteData }
   } catch (error: unknown) {
-    console.error('Invite error:', error)
+    console.warn('Invite error:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
 }
@@ -156,13 +156,13 @@ export async function processPendingInviteForUser(userId: string, email: string)
     })
 
     if (error) {
-      console.error('Error processing pending invite:', error)
+      console.warn('Error processing pending invite:', error)
       return false
     }
 
     return data === true
   } catch (error) {
-    console.error('Error processing invite:', error)
+    console.warn('Error processing invite:', error)
     return false
   }
 }

@@ -16,7 +16,6 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '@/lib/utils/logger'
-import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 // Import all handler implementations from domain-specific files
 import {

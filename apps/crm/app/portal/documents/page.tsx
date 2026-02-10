@@ -88,7 +88,7 @@ function DocumentCard({
     try {
       await onDownload()
     } catch (error) {
-      console.error('Download error:', error)
+      console.warn('Download error:', error)
       alert('Fehler beim Download')
     } finally {
       setIsDownloading(false)
@@ -183,7 +183,7 @@ export default function PortalDocumentsPage() {
 
       setDocuments(data || [])
     } catch (err) {
-      console.error('Error loading documents:', err)
+      console.warn('Error loading documents:', err)
       setError('Dokumente konnten nicht geladen werden.')
     } finally {
       setIsLoading(false)
@@ -241,7 +241,7 @@ export default function PortalDocumentsPage() {
         await loadDocuments(selectedProject.id)
       }
     } catch (err) {
-      console.error('Upload error:', err)
+      console.warn('Upload error:', err)
       setUploadError(err instanceof Error ? err.message : 'Upload fehlgeschlagen')
     } finally {
       setIsUploading(false)
@@ -273,7 +273,7 @@ export default function PortalDocumentsPage() {
       // Remove from local state
       setDocuments(prev => prev.filter(d => d.id !== document.id))
     } catch (err) {
-      console.error('Delete error:', err)
+      console.warn('Delete error:', err)
       alert('Fehler beim Löschen des Dokuments')
     } finally {
       setDeletingId(null)

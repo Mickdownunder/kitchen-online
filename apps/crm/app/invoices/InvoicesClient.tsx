@@ -19,9 +19,18 @@ function InvoicesPageContent() {
 
   // Lade Rechnung direkt aus DB wenn invoiceId angegeben
   useEffect(() => {
+    let isActive = true
+
     if (invoiceId) {
-      setLoadingInvoice(true)
+      const startTimer = window.setTimeout(() => {
+        if (isActive) {
+          setLoadingInvoice(true)
+        }
+      }, 0)
+
       getInvoice(invoiceId).then(result => {
+        if (!isActive) return
+
         if (result.ok) {
           const invoice = result.data
           if (invoice) {
@@ -33,8 +42,23 @@ function InvoicesPageContent() {
         }
         setLoadingInvoice(false)
       })
+
+      return () => {
+        isActive = false
+        window.clearTimeout(startTimer)
+      }
     } else {
-      setDirectInvoice(null)
+      const resetTimer = window.setTimeout(() => {
+        if (isActive) {
+          setDirectInvoice(null)
+          setLoadingInvoice(false)
+        }
+      }, 0)
+
+      return () => {
+        isActive = false
+        window.clearTimeout(resetTimer)
+      }
     }
   }, [invoiceId, projects])
 

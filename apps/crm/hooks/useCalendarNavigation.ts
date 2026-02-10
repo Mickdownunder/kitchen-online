@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 
 export type ViewMode = 'day' | 'week' | 'month'
 
@@ -31,12 +32,29 @@ const monthNames = [
 const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 const dayNamesShort = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-export function useCalendarNavigation() {
+interface UseCalendarNavigationResult {
+  currentDate: Date
+  setCurrentDate: Dispatch<SetStateAction<Date>>
+  viewMode: ViewMode
+  setViewMode: Dispatch<SetStateAction<ViewMode>>
+  goToToday: () => void
+  goToPrev: () => void
+  goToNext: () => void
+  daysForView: (Date | null)[]
+  weekStart: Date
+  formatHeaderDate: () => string
+  getWeekNumber: (date: Date) => number
+  monthNames: string[]
+  dayNames: string[]
+  dayNamesShort: string[]
+}
+
+export function useCalendarNavigation(): UseCalendarNavigationResult {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('month')
 
-  const goToToday = () => setCurrentDate(new Date())
-  const goToPrev = () => {
+  const goToToday = (): void => setCurrentDate(new Date())
+  const goToPrev = (): void => {
     const newDate = new Date(currentDate)
     if (viewMode === 'day') {
       newDate.setDate(newDate.getDate() - 1)
@@ -47,7 +65,7 @@ export function useCalendarNavigation() {
     }
     setCurrentDate(newDate)
   }
-  const goToNext = () => {
+  const goToNext = (): void => {
     const newDate = new Date(currentDate)
     if (viewMode === 'day') {
       newDate.setDate(newDate.getDate() + 1)
@@ -95,7 +113,7 @@ export function useCalendarNavigation() {
     return startOfWeek
   }, [currentDate])
 
-  const formatHeaderDate = () => {
+  const formatHeaderDate = (): string => {
     if (viewMode === 'day') {
       return `${dayNames[(currentDate.getDay() + 6) % 7]}, ${currentDate.getDate()}. ${
         monthNames[currentDate.getMonth()]

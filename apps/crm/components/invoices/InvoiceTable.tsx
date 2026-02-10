@@ -86,7 +86,17 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
     )
   }
 
-  let remaining = visibleRows
+  const groupRenderCounts: Record<string, number> = {}
+  let remainingRows = visibleRows
+  for (const [groupKey, groupInvoices] of groupedInvoices) {
+    if (!expandedGroups.has(groupKey)) {
+      groupRenderCounts[groupKey] = 0
+      continue
+    }
+    const count = Math.min(groupInvoices.length, Math.max(0, remainingRows))
+    groupRenderCounts[groupKey] = count
+    remainingRows -= count
+  }
 
   return (
     <div className="divide-y divide-slate-100">
@@ -97,9 +107,8 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
         })
         const isExpanded = expandedGroups.has(groupKey)
         const totalAmount = groupInvoices.reduce((sum, inv) => sum + inv.amount, 0)
-        const renderCount = isExpanded ? Math.min(groupInvoices.length, Math.max(0, remaining)) : 0
+        const renderCount = groupRenderCounts[groupKey] ?? 0
         const groupInvoicesToRender = isExpanded ? groupInvoices.slice(0, renderCount) : []
-        remaining -= renderCount
 
         return (
           <div key={groupKey} className="bg-white/50">

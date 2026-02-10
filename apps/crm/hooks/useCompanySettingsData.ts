@@ -14,7 +14,26 @@ import {
 } from '@/lib/supabase/services'
 import { logger } from '@/lib/utils/logger'
 
-export function useCompanySettingsData() {
+interface UseCompanySettingsDataResult {
+  loading: boolean
+  saving: boolean
+  companySettings: Partial<CompanySettings>
+  setCompanySettings: React.Dispatch<React.SetStateAction<Partial<CompanySettings>>>
+  bankAccounts: BankAccount[]
+  editingBank: Partial<BankAccount> | null
+  setEditingBank: React.Dispatch<React.SetStateAction<Partial<BankAccount> | null>>
+  employees: Employee[]
+  editingEmployee: Partial<Employee> | null
+  setEditingEmployee: React.Dispatch<React.SetStateAction<Partial<Employee> | null>>
+  reload: () => Promise<void>
+  saveCompany: () => Promise<CompanySettings>
+  saveBank: () => Promise<BankAccount | null>
+  removeBank: (id: string) => Promise<void>
+  saveEmployeeEntry: () => Promise<Employee | null>
+  removeEmployee: (id: string) => Promise<void>
+}
+
+export function useCompanySettingsData(): UseCompanySettingsDataResult {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 

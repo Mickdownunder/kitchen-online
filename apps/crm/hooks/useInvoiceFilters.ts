@@ -17,6 +17,20 @@ export interface ListInvoice extends DBInvoice {
   project: CustomerProject
 }
 
+interface UseInvoiceFiltersOptions {
+  invoices: ListInvoice[]
+  searchTerm: string
+  filterType: InvoiceFilterType
+  filterStatus: InvoiceFilterStatus
+  selectedYear: number | 'all'
+  selectedMonth: number | 'all'
+}
+
+interface UseInvoiceFiltersResult {
+  filteredInvoices: ListInvoice[]
+  availableYears: number[]
+}
+
 /**
  * Konvertiert eine DB-Invoice in eine ListInvoice für die UI
  */
@@ -29,14 +43,7 @@ export function toListInvoice(invoice: DBInvoice, project: CustomerProject): Lis
   }
 }
 
-export function useInvoiceFilters(opts: {
-  invoices: ListInvoice[]
-  searchTerm: string
-  filterType: InvoiceFilterType
-  filterStatus: InvoiceFilterStatus
-  selectedYear: number | 'all'
-  selectedMonth: number | 'all'
-}) {
+export function useInvoiceFilters(opts: UseInvoiceFiltersOptions): UseInvoiceFiltersResult {
   const filteredInvoices = useMemo(() => {
     const q = opts.searchTerm.trim().toLowerCase()
     return opts.invoices.filter(inv => {

@@ -80,7 +80,7 @@ export async function DELETE(
         .remove([document.file_path])
 
       if (storageError) {
-        console.error('Storage delete error:', storageError)
+        console.warn('Storage delete error:', storageError)
         // Weitermachen - DB-Eintrag trotzdem löschen
       }
     }
@@ -92,7 +92,7 @@ export async function DELETE(
       .eq('id', documentId)
 
     if (deleteError) {
-      console.error('DB delete error:', deleteError)
+      console.warn('DB delete error:', deleteError)
       return NextResponse.json(
         { success: false, error: 'DELETE_FAILED' },
         { status: 500 }
@@ -103,7 +103,7 @@ export async function DELETE(
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Document delete error:', error)
+    console.warn('Document delete error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

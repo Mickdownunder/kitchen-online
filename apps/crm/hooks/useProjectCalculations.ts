@@ -15,6 +15,20 @@ interface UseProjectCalculationsProps {
   supplierInvoiceTotal?: number
 }
 
+interface ProjectCalculations {
+  netTotal: number
+  taxTotal: number
+  grossTotal: number
+  totalPurchaseNet: number
+  profitNet: number | null
+  marginPercent: number | null
+  taxByRate: Record<number, number>
+}
+
+interface UseProjectCalculationsResult {
+  calculations: ProjectCalculations
+}
+
 /**
  * Hook für Preisberechnungen für Projekte
  *
@@ -26,7 +40,7 @@ export function useProjectCalculations({
   formData,
   setFormData,
   supplierInvoiceTotal = 0,
-}: UseProjectCalculationsProps) {
+}: UseProjectCalculationsProps): UseProjectCalculationsResult {
   // Calculations - verwendet zentrale Utility-Funktionen
   const calculations = useMemo(() => {
     const items = formData.items || []

@@ -45,10 +45,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     setCustomerSearchTerm,
     showCustomerDropdown,
     setShowCustomerDropdown,
-    addressSuggestions,
     setAddressSuggestions,
     addressInput,
-    handleAddressInput,
     filteredCustomers,
     firstName,
     setFirstName,
@@ -56,7 +54,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     setLastName,
     salutation,
     setSalutation,
-    isLoadingAddress,
     setIsManualNameUpdate,
     companyName,
     setCompanyName,
@@ -163,10 +160,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
               setCustomerSearchTerm={setCustomerSearchTerm}
               showCustomerDropdown={showCustomerDropdown}
               setShowCustomerDropdown={setShowCustomerDropdown}
-              addressSuggestions={addressSuggestions}
               setAddressSuggestions={setAddressSuggestions}
-              addressInput={addressInput}
-              handleAddressInput={handleAddressInput}
               filteredCustomers={filteredCustomers}
               firstName={firstName}
               setFirstName={setFirstName}
@@ -174,7 +168,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
               setLastName={setLastName}
               salutation={salutation}
               setSalutation={setSalutation}
-              isLoadingAddress={isLoadingAddress}
               setIsManualNameUpdate={setIsManualNameUpdate}
               companyName={companyName}
               setCompanyName={setCompanyName}

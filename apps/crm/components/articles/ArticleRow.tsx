@@ -89,10 +89,13 @@ export const ArticleRow = React.memo(function ArticleRow({
 }: ArticleRowProps) {
   // Lokaler State für die Bearbeitung - wird erst beim Speichern übertragen
   const [editData, setEditData] = useState<Article>(article)
-  
+
   // Reset editData wenn article sich ändert oder Bearbeitung beginnt
   useEffect(() => {
-    setEditData(article)
+    const timer = window.setTimeout(() => {
+      setEditData(article)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [article, isEditing])
 
   const handleSave = () => {

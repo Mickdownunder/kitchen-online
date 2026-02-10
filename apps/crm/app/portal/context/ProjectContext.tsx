@@ -58,7 +58,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .order('created_at', { ascending: false })
 
       if (projectsError) {
-        console.error('Error loading projects:', projectsError)
+        console.warn('Error loading projects:', projectsError)
         setError('Fehler beim Laden der Projekte')
         return
       }
@@ -91,7 +91,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (err) {
-      console.error('Error in loadProjects:', err)
+      console.warn('Error in loadProjects:', err)
       setError('Fehler beim Laden')
     } finally {
       setIsLoading(false)

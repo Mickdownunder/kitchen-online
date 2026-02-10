@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { renderToBuffer } from '@react-pdf/renderer'
+import type { DocumentProps } from '@react-pdf/renderer'
 import React from 'react'
 import { InvoicePDFDocumentServer } from '@/lib/pdf/InvoicePDFServer'
 import { CustomerDeliveryNotePDFDocumentServer } from '@/lib/pdf/DeliveryNotePDFServer'
@@ -13,6 +14,7 @@ import { CustomerProject, InvoiceItem } from '@/types'
 import { apiErrors } from '@/lib/utils/errorHandling'
 
 type DocumentType = 'invoice' | 'delivery_note' | 'order'
+type PortalDocumentType = 'RECHNUNGEN' | 'LIEFERSCHEINE' | 'KAUFVERTRAG'
 
 interface PublishRequest {
   documentType: DocumentType
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     let pdfBuffer: Buffer
     let fileName: string
-    let portalType: string
+    let portalType: PortalDocumentType
 
     if (documentType === 'invoice' && invoice) {
       // Generate invoice PDF
@@ -208,8 +210,7 @@ export async function POST(request: NextRequest) {
         InvoicePDFDocumentServer,
         { invoice: invoiceData }
       )
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pdfBuffer = await renderToBuffer(pdfElement as any)
+      pdfBuffer = await renderToBuffer(pdfElement as React.ReactElement<DocumentProps>)
       
       const invoiceTypeLabel = invoice.type === 'credit' 
         ? 'Stornorechnung' 
@@ -248,8 +249,7 @@ export async function POST(request: NextRequest) {
         }
       )
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pdfBuffer = await renderToBuffer(deliveryNoteElement as any)
+      pdfBuffer = await renderToBuffer(deliveryNoteElement as React.ReactElement<DocumentProps>)
       
       fileName = `Lieferschein_${body.deliveryNote.deliveryNoteNumber.replace(/\//g, '-')}.pdf`
       portalType = 'LIEFERSCHEINE'
@@ -287,8 +287,7 @@ export async function POST(request: NextRequest) {
         appendAgb: body.appendAgb ?? true,
       })
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pdfBuffer = await renderToBuffer(orderElement as any)
+      pdfBuffer = await renderToBuffer(orderElement as React.ReactElement<DocumentProps>)
       
       fileName = `Auftrag_${(project.orderNumber || project.id.slice(0, 8)).replace(/\//g, '-')}.pdf`
       portalType = 'KAUFVERTRAG'
@@ -301,17 +300,16 @@ export async function POST(request: NextRequest) {
     // Extract base name without timestamp for duplicate check
     const baseFileName = fileName.replace('.pdf', '')
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingDocs } = await serviceClient
       .from('documents')
       .select('id, name')
       .eq('project_id', projectId)
-      .eq('type', portalType as any)
+      .eq('type', portalType)
       .ilike('name', `${baseFileName}%`)
     
     if (existingDocs && existingDocs.length > 0) {
       // Document already exists - return the existing one
-      console.log(`Document already exists: ${existingDocs[0].name}`)
+      console.warn(`Document already exists: ${existingDocs[0].name}`)
       return NextResponse.json({
         success: true,
         documentId: existingDocs[0].id,
@@ -334,12 +332,11 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error('Storage upload error:', uploadError)
+      console.warn('Storage upload error:', uploadError)
       return apiErrors.internal(uploadError as unknown as Error, { component: 'api/portal/publish-document' })
     }
 
     // Create document record
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: document, error: dbError } = await serviceClient
       .from('documents')
       .insert({
@@ -352,12 +349,12 @@ export async function POST(request: NextRequest) {
         mime_type: 'application/pdf',
         uploaded_at: new Date().toISOString(),
         uploaded_by: user.id,
-      } as any)
+      })
       .select('id')
       .single()
 
     if (dbError) {
-      console.error('Database insert error:', dbError)
+      console.warn('Database insert error:', dbError)
       // Cleanup storage
       await serviceClient.storage.from('documents').remove([storagePath])
       return apiErrors.internal(new Error(dbError.message), { component: 'api/portal/publish-document' })
@@ -371,7 +368,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: unknown) {
-    console.error('Error publishing document:', error)
+    console.warn('Error publishing document:', error)
     return apiErrors.internal(error as Error, { component: 'api/portal/publish-document' })
   }
 }

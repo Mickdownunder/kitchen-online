@@ -3,13 +3,20 @@ import type { CustomerProject } from '@/types'
 
 export type ProjectListFilterType = 'all' | 'measurement' | 'order' | 'installation'
 
-export function useProjectFilters(opts: {
+interface UseProjectFiltersOptions {
   projects: CustomerProject[]
   searchTerm: string
   filterType: ProjectListFilterType
   selectedYear: number | 'all'
   selectedMonth: number | 'all'
-}) {
+}
+
+interface UseProjectFiltersResult {
+  filteredProjects: CustomerProject[]
+  availableYears: number[]
+}
+
+export function useProjectFilters(opts: UseProjectFiltersOptions): UseProjectFiltersResult {
   const filteredProjects = useMemo(() => {
     const q = opts.searchTerm.trim().toLowerCase()
     return opts.projects.filter(p => {

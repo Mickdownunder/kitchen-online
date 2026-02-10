@@ -13,11 +13,27 @@ interface UseArticleSelectionProps {
   setFormData: React.Dispatch<React.SetStateAction<Partial<CustomerProject>>>
 }
 
+interface UseArticleSelectionResult {
+  articles: Article[]
+  articleSearchTerm: string
+  setArticleSearchTerm: React.Dispatch<React.SetStateAction<string>>
+  articleSearchLoading: boolean
+  showArticleDropdown: boolean
+  setShowArticleDropdown: React.Dispatch<React.SetStateAction<boolean>>
+  filteredArticles: Article[]
+  addArticleAsItem: (article: Article) => void
+  selectedArticleForPosition: string | null
+  setSelectedArticleForPosition: React.Dispatch<React.SetStateAction<string | null>>
+}
+
 /**
  * Hook für Artikel-Suche (server-seitig) und Hinzufügen zu Items.
  * Lädt nur begrenzte Treffer pro Suche, kein voller Artikelstamm.
  */
-export function useArticleSelection({ formData, setFormData }: UseArticleSelectionProps) {
+export function useArticleSelection({
+  formData,
+  setFormData,
+}: UseArticleSelectionProps): UseArticleSelectionResult {
   const [articles, setArticles] = useState<Article[]>([])
   const [articleSearchTerm, setArticleSearchTerm] = useState('')
   const [articleSearchLoading, setArticleSearchLoading] = useState(false)
@@ -41,7 +57,7 @@ export function useArticleSelection({ formData, setFormData }: UseArticleSelecti
   // Treffer der Suche (server-seitig)
   const filteredArticles = articles
 
-  const addArticleAsItem = (article: Article) => {
+  const addArticleAsItem = (article: Article): void => {
     const items = formData.items || []
     const quantity = 1
     const taxRate = article.taxRate || 20

@@ -156,7 +156,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
   })
 
   // Für Monats-Tab-Counts: Rechnungen nur nach Jahr filtern (nicht nach Monat)
-  const { filteredInvoices: invoicesForMonthCounts } = useInvoiceFilters({
+  useInvoiceFilters({
     invoices,
     searchTerm,
     filterType,

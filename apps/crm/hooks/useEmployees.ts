@@ -1,23 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Employee } from '@/types'
 import { getEmployees } from '@/lib/supabase/services'
 import { logger } from '@/lib/utils/logger'
+
+interface UseEmployeesResult {
+  employees: Employee[]
+}
 
 /**
  * Hook für das Laden von Employee-Daten
  *
  * @returns { employees } - Array von Employees
  */
-export function useEmployees() {
+export function useEmployees(): UseEmployeesResult {
   const [employees, setEmployees] = useState<Employee[]>([])
 
-  useEffect(() => {
-    loadEmployees()
-  }, [])
-
-  const loadEmployees = async () => {
+  const loadEmployees = useCallback(async () => {
     try {
       const data = await getEmployees()
       setEmployees(data)
@@ -29,7 +29,14 @@ export function useEmployees() {
       }
       logger.error('Error loading employees', { component: 'useEmployees' }, error as Error)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadEmployees()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadEmployees])
 
   return { employees }
 }

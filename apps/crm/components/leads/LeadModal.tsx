@@ -16,7 +16,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react'
-import { CustomerProject, ProjectStatus } from '@/types'
+import { CustomerProject } from '@/types'
 
 interface LeadModalProps {
   lead: CustomerProject

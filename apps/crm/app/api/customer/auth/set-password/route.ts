@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (updateError) {
-      console.error('Failed to update password:', updateError)
+      console.warn('Failed to update password:', updateError)
       return NextResponse.json(
         { success: false, error: 'PASSWORD_UPDATE_FAILED' },
         { status: 500 }
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Set password error:', error)
+    console.warn('Set password error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

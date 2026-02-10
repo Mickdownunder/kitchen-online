@@ -8,12 +8,11 @@ import { WifiOff } from 'lucide-react'
  * Shows when the app is offline
  */
 export function OfflineIndicator() {
-  const [isOnline, setIsOnline] = useState(true)
+  const [isOnline, setIsOnline] = useState(
+    () => (typeof navigator === 'undefined' ? true : navigator.onLine)
+  )
 
   useEffect(() => {
-    // Set initial state
-    setIsOnline(navigator.onLine)
-
     // Listen for online/offline events
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)

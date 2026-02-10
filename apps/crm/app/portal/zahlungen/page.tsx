@@ -79,7 +79,7 @@ function InvoiceCard({
     try {
       await onDownload()
     } catch (error) {
-      console.error('Download error:', error)
+      console.warn('Download error:', error)
       alert('Fehler beim Download')
     } finally {
       setIsDownloading(false)
@@ -226,7 +226,7 @@ export default function PortalZahlungenPage() {
         isFinalPaid: projectData?.is_final_paid || false,
       })
     } catch (err) {
-      console.error('Error loading payment data:', err)
+      console.warn('Error loading payment data:', err)
       setError('Zahlungsdaten konnten nicht geladen werden.')
     } finally {
       setIsLoading(false)

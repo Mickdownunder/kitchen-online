@@ -8,7 +8,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Ensure localStorage exists (for SSR compatibility)
-function ensureLocalStorage() {
+function ensureLocalStorage(): void {
   if (typeof globalThis === 'undefined') return
 
   const storage = (globalThis as { localStorage?: Storage }).localStorage

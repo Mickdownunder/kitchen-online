@@ -3,7 +3,13 @@ import type { ListInvoice } from './useInvoiceFilters'
 
 export type GroupKey = string // YYYY-MM
 
-export function useGroupedInvoices(filteredInvoices: ListInvoice[]) {
+interface UseGroupedInvoicesResult {
+  groupedInvoices: [GroupKey, ListInvoice[]][]
+  expandedGroups: Set<GroupKey>
+  toggleGroup: (key: GroupKey) => void
+}
+
+export function useGroupedInvoices(filteredInvoices: ListInvoice[]): UseGroupedInvoicesResult {
   const groupedInvoices = useMemo(() => {
     const groups: Map<GroupKey, ListInvoice[]> = new Map()
     filteredInvoices.forEach(invoice => {
@@ -25,7 +31,7 @@ export function useGroupedInvoices(filteredInvoices: ListInvoice[]) {
     return new Set([currentKey])
   })
 
-  const toggleGroup = (key: GroupKey) => {
+  const toggleGroup = (key: GroupKey): void => {
     setExpandedGroups(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)

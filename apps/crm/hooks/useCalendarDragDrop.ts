@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import {
   CollisionDetection,
   DragEndEvent,
@@ -21,7 +22,18 @@ interface UseCalendarDragDropOptions {
   onUpdateProject: (project: CustomerProject) => void
 }
 
-export function useCalendarDragDrop(options: UseCalendarDragDropOptions) {
+interface UseCalendarDragDropResult {
+  sensors: ReturnType<typeof useSensors>
+  collisionDetection: CollisionDetection
+  draggedEvent: CalendarEvent | null
+  handleDragStart: (event: DragStartEvent) => void
+  handleDragEnd: (event: DragEndEvent) => void
+  setDraggedEvent: Dispatch<SetStateAction<CalendarEvent | null>>
+}
+
+export function useCalendarDragDrop(
+  options: UseCalendarDragDropOptions
+): UseCalendarDragDropResult {
   const { daysForView, getEventsForDate, onUpdateAppointment, onUpdateProject } = options
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null)
 

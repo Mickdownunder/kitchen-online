@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 
 interface UsePriceInputOptions {
@@ -8,6 +8,14 @@ interface UsePriceInputOptions {
   allowEmpty?: boolean // default: false
   min?: number
   max?: number
+}
+
+interface UsePriceInputResult {
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onFocus: () => void
+  onBlur: () => void
+  ref: React.RefObject<HTMLInputElement | null>
 }
 
 /**
@@ -24,7 +32,7 @@ export function usePriceInput({
   allowEmpty = false,
   min,
   max,
-}: UsePriceInputOptions) {
+}: UsePriceInputOptions): UsePriceInputResult {
   const [rawInput, setRawInput] = useState<string>('')
   const [isFocused, setIsFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -78,15 +86,6 @@ export function usePriceInput({
     const parsed = parseFloat(cleaned)
     return isNaN(parsed) ? 0 : parsed
   }, [])
-
-  // Initialisiere rawInput wenn initialValue sich ändert (aber nicht während Fokus)
-  useEffect(() => {
-    if (!isFocused && initialValue !== undefined && initialValue !== null) {
-      setRawInput(formatNumber(initialValue, true))
-    } else if (!isFocused && (initialValue === undefined || initialValue === null)) {
-      setRawInput('')
-    }
-  }, [initialValue, isFocused, formatNumber])
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,8 +167,8 @@ export function usePriceInput({
     }
   }, [rawInput, formatOnBlur, parseNumber, formatNumber, allowEmpty, onValueChange, initialValue])
 
-  // Display-Wert: Während Fokus roher Input, sonst formatiert
-  const displayValue = isFocused ? rawInput : rawInput || formatNumber(initialValue, true)
+  // Display-Wert: Während Fokus roher Input, sonst strikt aus Source of Truth formatiert
+  const displayValue = isFocused ? rawInput : formatNumber(initialValue, true)
 
   return {
     value: displayValue,

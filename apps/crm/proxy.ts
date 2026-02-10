@@ -62,7 +62,7 @@ export async function proxy(request: NextRequest) {
 
   // Check env vars
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.error('[Proxy] Missing Supabase environment variables!')
+    console.warn('[Proxy] Missing Supabase environment variables!')
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -127,7 +127,7 @@ export async function proxy(request: NextRequest) {
       } = await portalSupabase.auth.getUser()
       portalUser = user
     } catch (error) {
-      console.error('[Proxy] Portal auth error:', error)
+      console.warn('[Proxy] Portal auth error:', error)
     }
 
     const userRole = portalUser?.app_metadata?.role
@@ -169,7 +169,7 @@ export async function proxy(request: NextRequest) {
       } = await crmSupabase.auth.getUser()
       crmUser = user
     } catch (error) {
-      console.error('[Proxy] CRM auth error:', error)
+      console.warn('[Proxy] CRM auth error:', error)
     }
 
     if (!crmUser) {

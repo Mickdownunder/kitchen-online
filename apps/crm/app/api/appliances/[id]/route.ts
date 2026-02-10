@@ -71,7 +71,7 @@ export async function GET(
     return NextResponse.json({ success: true, data: appliance })
 
   } catch (error) {
-    console.error('Get appliance error:', error)
+    console.warn('Get appliance error:', error)
     return apiErrors.internal(error as Error, { component: 'api/appliances/[id]' })
   }
 }
@@ -147,14 +147,14 @@ export async function PATCH(
       .single()
 
     if (error || !appliance) {
-      console.error('Error updating appliance:', error)
+      console.warn('Error updating appliance:', error)
       return apiErrors.internal(new Error('UPDATE_ERROR'), { component: 'api/appliances/[id]' })
     }
 
     return NextResponse.json({ success: true, data: appliance })
 
   } catch (error) {
-    console.error('Update appliance error:', error)
+    console.warn('Update appliance error:', error)
     return apiErrors.internal(error as Error, { component: 'api/appliances/[id]' })
   }
 }
@@ -205,14 +205,14 @@ export async function DELETE(
       .eq('company_id', companyMember.company_id)
 
     if (error) {
-      console.error('Error deleting appliance:', error)
+      console.warn('Error deleting appliance:', error)
       return apiErrors.internal(new Error('DELETE_ERROR'), { component: 'api/appliances/[id]' })
     }
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Delete appliance error:', error)
+    console.warn('Delete appliance error:', error)
     return apiErrors.internal(error as Error, { component: 'api/appliances/[id]' })
   }
 }

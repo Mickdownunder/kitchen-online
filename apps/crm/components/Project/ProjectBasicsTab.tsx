@@ -28,10 +28,7 @@ interface ProjectBasicsTabProps {
   setCustomerSearchTerm: (term: string) => void
   showCustomerDropdown: boolean
   setShowCustomerDropdown: (show: boolean) => void
-  addressSuggestions: Array<{ display: string; full: string }>
   setAddressSuggestions: (suggestions: Array<{ display: string; full: string }>) => void
-  addressInput: string
-  handleAddressInput: (value: string) => void
   filteredCustomers: Customer[]
   firstName: string
   setFirstName: (name: string) => void
@@ -39,7 +36,6 @@ interface ProjectBasicsTabProps {
   setLastName: (name: string) => void
   salutation: string
   setSalutation: (salutation: string) => void
-  isLoadingAddress: boolean
   setIsManualNameUpdate: (value: boolean) => void
   companyName: string
   setCompanyName: (name: string) => void
@@ -59,10 +55,7 @@ export function ProjectBasicsTab({
   setCustomerSearchTerm,
   showCustomerDropdown,
   setShowCustomerDropdown,
-  addressSuggestions,
   setAddressSuggestions,
-  addressInput,
-  handleAddressInput,
   filteredCustomers,
   firstName,
   setFirstName,
@@ -70,7 +63,6 @@ export function ProjectBasicsTab({
   setLastName,
   salutation,
   setSalutation,
-  isLoadingAddress,
   setIsManualNameUpdate,
   companyName,
   setCompanyName,

@@ -55,10 +55,30 @@ function PaymentsPageContent() {
 
   // Lade Rechnungen wenn Projekt ausgewählt wird
   useEffect(() => {
+    let isActive = true
+
     if (selectedProject?.id) {
-      loadProjectInvoices(selectedProject.id)
+      const timer = window.setTimeout(() => {
+        if (isActive) {
+          void loadProjectInvoices(selectedProject.id)
+        }
+      }, 0)
+
+      return () => {
+        isActive = false
+        window.clearTimeout(timer)
+      }
     } else {
-      setInvoices([])
+      const timer = window.setTimeout(() => {
+        if (isActive) {
+          setInvoices([])
+        }
+      }, 0)
+
+      return () => {
+        isActive = false
+        window.clearTimeout(timer)
+      }
     }
   }, [selectedProject?.id, loadProjectInvoices])
 
@@ -88,8 +108,12 @@ function PaymentsPageContent() {
     if (projectIdParam && projects.length > 0) {
       const project = projects.find(p => p.id === projectIdParam)
       if (project && project.id !== selectedProject?.id) {
-        setSelectedProject(project)
-        resetForm()
+        const timer = window.setTimeout(() => {
+          setSelectedProject(project)
+          resetForm()
+        }, 0)
+
+        return () => window.clearTimeout(timer)
       }
     }
   }, [projectIdParam, projects, selectedProject?.id, resetForm])

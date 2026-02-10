@@ -30,7 +30,7 @@ export async function POST() {
       message: processed ? 'Einladung angenommen - Willkommen!' : 'Keine ausstehende Einladung',
     })
   } catch (error: unknown) {
-    console.error('Process invite API error:', error)
+    console.warn('Process invite API error:', error)
     return apiErrors.internal(error as Error, { component: 'api/users/process-invite' })
   }
 }

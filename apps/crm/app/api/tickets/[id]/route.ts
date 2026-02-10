@@ -108,7 +108,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Get ticket error:', error)
+    console.warn('Get ticket error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }
@@ -196,7 +196,7 @@ export async function POST(
       .single()
 
     if (messageError) {
-      console.error('Message create error:', messageError)
+      console.warn('Message create error:', messageError)
       return NextResponse.json(
         { success: false, error: 'MESSAGE_CREATE_FAILED' },
         { status: 500 }
@@ -228,7 +228,7 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Reply error:', error)
+    console.warn('Reply error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }
@@ -301,7 +301,7 @@ export async function PATCH(
     })
 
   } catch (error) {
-    console.error('Update ticket error:', error)
+    console.warn('Update ticket error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

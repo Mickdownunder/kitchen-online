@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.auth.signOut()
 
     if (error) {
-      console.error('Logout error:', error)
+      console.warn('Logout error:', error)
       // Trotzdem als erfolgreich melden - Token ist möglicherweise schon ungültig
     }
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Logout error:', error)
+    console.warn('Logout error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

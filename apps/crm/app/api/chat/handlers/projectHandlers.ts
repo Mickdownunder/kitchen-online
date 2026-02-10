@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServerHandler } from '../serverHandlers'
 import { findProject, appendProjectNote, timestamp } from '../serverHandlers'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'

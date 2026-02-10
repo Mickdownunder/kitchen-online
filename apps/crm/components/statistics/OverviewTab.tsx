@@ -45,11 +45,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  const formatPercent = (value: number) => {
-    if (value === Infinity || isNaN(value)) return '+0%'
-    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
-  }
-
   // Current period metrics - Buchhalterischer Umsatz = nur Schlussrechnungen (nach Rechnungsdatum)
   const currentMetrics = useMemo(() => {
     return {

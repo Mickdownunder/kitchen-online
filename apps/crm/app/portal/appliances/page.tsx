@@ -39,23 +39,6 @@ interface Appliance {
   notes: string | null
 }
 
-// Category icons
-const categoryIcons: Record<string, typeof Refrigerator> = {
-  'Kühlschrank': Refrigerator,
-  'Kühl-Gefrier-Kombi': Refrigerator,
-  'Gefrierschrank': Refrigerator,
-  'Backofen': Flame,
-  'Kochfeld': Flame,
-  'Mikrowelle': Flame,
-  'Dunstabzug': Wind,
-  'Geschirrspüler': Waves,
-  'Waschmaschine': Waves,
-  'Trockner': Wind,
-  'Kaffeevollautomat': Coffee,
-  'Wärmeschublade': Flame,
-  'Weinkühlschrank': Refrigerator,
-}
-
 // Category colors
 const categoryColors: Record<string, { bg: string; text: string; iconBg: string }> = {
   'Kühlschrank': { bg: 'bg-blue-50', text: 'text-blue-700', iconBg: 'bg-blue-100' },
@@ -69,8 +52,29 @@ const categoryColors: Record<string, { bg: string; text: string; iconBg: string 
   'Kaffeevollautomat': { bg: 'bg-amber-50', text: 'text-amber-800', iconBg: 'bg-amber-100' },
 }
 
-function getCategoryIcon(category: string) {
-  return categoryIcons[category] || Package
+function CategoryIcon({ category, className }: { category: string; className?: string }) {
+  switch (category) {
+    case 'Kühlschrank':
+    case 'Kühl-Gefrier-Kombi':
+    case 'Gefrierschrank':
+    case 'Weinkühlschrank':
+      return <Refrigerator className={className} />
+    case 'Backofen':
+    case 'Kochfeld':
+    case 'Mikrowelle':
+    case 'Wärmeschublade':
+      return <Flame className={className} />
+    case 'Dunstabzug':
+    case 'Trockner':
+      return <Wind className={className} />
+    case 'Geschirrspüler':
+    case 'Waschmaschine':
+      return <Waves className={className} />
+    case 'Kaffeevollautomat':
+      return <Coffee className={className} />
+    default:
+      return <Package className={className} />
+  }
 }
 
 function getCategoryColors(category: string) {
@@ -138,7 +142,6 @@ function getWarrantyStatus(warrantyUntil: string | null): {
 }
 
 function ApplianceCard({ appliance }: { appliance: Appliance }) {
-  const Icon = getCategoryIcon(appliance.category)
   const colors = getCategoryColors(appliance.category)
   const warranty = getWarrantyStatus(appliance.warranty_until)
   const WarrantyIcon = warranty.icon
@@ -152,7 +155,7 @@ function ApplianceCard({ appliance }: { appliance: Appliance }) {
         {/* Header */}
         <div className="flex items-start gap-4">
           <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${colors.iconBg}`}>
-            <Icon className={`h-7 w-7 ${colors.text}`} />
+            <CategoryIcon category={appliance.category} className={`h-7 w-7 ${colors.text}`} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-lg font-bold text-slate-900">{appliance.manufacturer}</p>
@@ -265,7 +268,7 @@ export default function AppliancesPage() {
         setError(response.error || 'Fehler beim Laden')
       }
     } catch (err) {
-      console.error('Error loading appliances:', err)
+      console.warn('Error loading appliances:', err)
       setError('Fehler beim Laden der Geräte')
     } finally {
       setIsLoading(false)

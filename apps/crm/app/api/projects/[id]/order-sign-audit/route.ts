@@ -49,13 +49,13 @@ export async function GET(
       .maybeSingle()
 
     if (error) {
-      console.error('Order sign audit fetch error:', error)
+      console.warn('Order sign audit fetch error:', error)
       return apiErrors.internal(error as unknown as Error, { component: 'api/projects/order-sign-audit', projectId })
     }
 
     return NextResponse.json(data || null)
   } catch (error) {
-    console.error('Order sign audit API error:', error)
+    console.warn('Order sign audit API error:', error)
     return apiErrors.internal(error as Error, { component: 'api/projects/order-sign-audit' })
   }
 }

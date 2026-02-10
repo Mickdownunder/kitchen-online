@@ -5,7 +5,7 @@
  *         getRemainingCancellableAmount, createCreditNote, getInvoiceStats.
  */
 
-import { mockQueryResult, mockGetUser, resetMock } from './__mocks__/supabase'
+import { mockQueryResult, resetMock } from './__mocks__/supabase'
 
 // ─── Mock wiring ──────────────────────────────────────────────────────
 

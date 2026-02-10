@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     )
 
   } catch (error) {
-    console.error('Login error:', error)
+    console.warn('Login error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }
@@ -286,7 +286,7 @@ async function handleCodeLogin(
     })
 
     if (createError || !newUser.user) {
-      console.error('Failed to create user:', createError)
+      console.warn('Failed to create user:', createError)
       return NextResponse.json(
         { success: false, error: 'SESSION_CREATE_FAILED' },
         { status: 500 }
@@ -310,7 +310,7 @@ async function handleCodeLogin(
   })
 
   if (sessionError || !sessionData.session) {
-    console.error('Failed to create session:', sessionError)
+    console.warn('Failed to create session:', sessionError)
     return NextResponse.json(
       { success: false, error: 'SESSION_CREATE_FAILED' },
       { status: 500 }

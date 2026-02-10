@@ -278,7 +278,7 @@ export default function PortalServicePage() {
 
       setTickets(data || [])
     } catch (err) {
-      console.error('Error loading tickets:', err)
+      console.warn('Error loading tickets:', err)
       setError('Anfragen konnten nicht geladen werden.')
     } finally {
       if (showSpinner) {

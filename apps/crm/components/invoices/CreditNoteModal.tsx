@@ -29,16 +29,31 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({
 
   // Prüfen ob Rechnung stornierbar ist
   useEffect(() => {
+    let isActive = true
+
     if (!isOpen || !invoice) {
-      setChecking(false)
-      return
+      const timer = window.setTimeout(() => {
+        if (isActive) {
+          setChecking(false)
+        }
+      }, 0)
+      return () => {
+        isActive = false
+        window.clearTimeout(timer)
+      }
     }
 
-    setChecking(true)
-    setError(null)
+    const timer = window.setTimeout(() => {
+      if (isActive) {
+        setChecking(true)
+        setError(null)
+      }
+    }, 0)
 
     canCancelInvoice(invoice.id)
       .then(result => {
+        if (!isActive) return
+
         if (result.ok) {
           setCanCancel(result.data.canCancel)
           setReason(result.data.reason || '')
@@ -50,7 +65,16 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({
           setCanCancel(false)
         }
       })
-      .finally(() => setChecking(false))
+      .finally(() => {
+        if (isActive) {
+          setChecking(false)
+        }
+      })
+
+    return () => {
+      isActive = false
+      window.clearTimeout(timer)
+    }
   }, [isOpen, invoice])
 
   const handleSubmit = async () => {

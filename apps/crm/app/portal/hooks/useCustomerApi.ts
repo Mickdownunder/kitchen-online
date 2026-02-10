@@ -83,7 +83,7 @@ export function useCustomerApi() {
 
       return data as ApiResponse<T>
     } catch (error) {
-      console.error('API fetch error:', error)
+      console.warn('API fetch error:', error)
       return { success: false, error: 'NETWORK_ERROR' }
     }
   }, [accessToken])
@@ -129,10 +129,16 @@ export function useProjectData(projectId?: string | null) {
   // Load when projectId changes or on initial mount
   useEffect(() => {
     if (isReady && accessToken) {
-      loadProject(projectId)
+      const timer = window.setTimeout(() => {
+        void loadProject(projectId)
+      }, 0)
+      return () => window.clearTimeout(timer)
     } else if (isReady && !accessToken) {
-      setIsLoading(false)
-      setError('NOT_AUTHENTICATED')
+      const timer = window.setTimeout(() => {
+        setIsLoading(false)
+        setError('NOT_AUTHENTICATED')
+      }, 0)
+      return () => window.clearTimeout(timer)
     }
   }, [isReady, accessToken, projectId, loadProject])
 

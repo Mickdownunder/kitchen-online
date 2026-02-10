@@ -164,8 +164,11 @@ export function useDeliveryFilters() {
 
   // Reset pagination on filter changes
   useEffect(() => {
-    setVisibleCount(120)
-    setCurrentPage(1)
+    const timer = window.setTimeout(() => {
+      setVisibleCount(120)
+      setCurrentPage(1)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [activeTab, selectedYear, selectedMonth, statusFilter, sortField, sortDirection, search])
 
   // ── Derived: available years ──────────────────────────────────

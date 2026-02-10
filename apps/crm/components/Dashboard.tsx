@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useMemo, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { TrendingUp, ArrowRight, Loader2 } from 'lucide-react'
@@ -38,7 +38,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   openInvoices,
   ticketStats,
 }) => {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
   const { profile } = useAuth()
 
   const getGreetingName = () => {
@@ -47,10 +51,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
     return 'Chef'
   }
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

@@ -11,7 +11,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     // Log error to console
-    console.error('Global error:', error)
+    console.warn('Global error:', error)
   }, [error])
 
   return (

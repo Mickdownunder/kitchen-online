@@ -71,6 +71,7 @@ const ProjectList: React.FC<ProjectListProps> = ({
   const { customers, invoices, complaintsByProject } = useProjectData()
   const { applyOverrides, scheduleUpdate, toggleStep } = useProjectWorkflow({ onUpdateProject: onUpdateProject })
   const modals = useProjectModals()
+  const { openProjectModal } = modals
 
   // ==========================================================================
   // UI State
@@ -100,9 +101,9 @@ const ProjectList: React.FC<ProjectListProps> = ({
     if (!initialOpenProjectId) return
     const p = projects.find(pr => pr.id === initialOpenProjectId)
     if (p) {
-      modals.openProjectModal(p)
+      openProjectModal(p)
     }
-  }, [initialOpenProjectId, projects, modals.openProjectModal])
+  }, [initialOpenProjectId, projects, openProjectModal])
 
   // ==========================================================================
   // Memoized project counts and filtering (performance optimization)
@@ -233,7 +234,6 @@ const ProjectList: React.FC<ProjectListProps> = ({
   // ==========================================================================
   const statsData = useMemo(() => {
     const totalRevenue = filteredProjects.reduce((sum, p) => sum + (p.totalAmount || 0), 0)
-    const totalNet = filteredProjects.reduce((sum, p) => sum + (p.netAmount || 0), 0)
     let marginSum = 0
     let netWithPurchaseSum = 0
     filteredProjects.forEach(p => {

@@ -61,6 +61,13 @@ interface StatisticsViewProps {
 }
 
 type TimeRange = 'month' | 'quarter' | 'year' | 'all'
+const VALID_STATISTICS_TABS: StatisticsTab[] = [
+  'overview',
+  'projects',
+  'invoices',
+  'deliveries',
+  'customers',
+]
 
 function StatisticsViewContent({ projects }: StatisticsViewProps) {
   const { supplierDeliveryNotes, customerDeliveryNotes } = useApp()
@@ -71,10 +78,9 @@ function StatisticsViewContent({ projects }: StatisticsViewProps) {
   const [activeTab, setActiveTab] = useState<StatisticsTab>(initialTab)
 
   // Sync activeTab when URL changes (e.g. when clicking Details links from Overview cards)
-  const validTabs: StatisticsTab[] = ['overview', 'projects', 'invoices', 'deliveries', 'customers']
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab') as StatisticsTab
-    if (tabFromUrl && validTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+    if (tabFromUrl && VALID_STATISTICS_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl)
     }
   }, [searchParams, activeTab])

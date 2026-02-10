@@ -332,12 +332,12 @@ export default function TicketDetailPage() {
         .order('created_at', { ascending: true })
 
       if (messagesError) {
-        console.error('Error loading messages:', messagesError)
+        console.warn('Error loading messages:', messagesError)
       }
 
       setMessages(messagesData || [])
     } catch (err) {
-      console.error('Error loading ticket:', err)
+      console.warn('Error loading ticket:', err)
       setError('LOAD_ERROR')
     } finally {
       if (showSpinner) {

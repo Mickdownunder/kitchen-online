@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
 
       setSuccess(true)
     } catch (err) {
-      console.error('Reset password error:', err)
+      console.warn('Reset password error:', err)
       setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.')
     } finally {
       setIsLoading(false)

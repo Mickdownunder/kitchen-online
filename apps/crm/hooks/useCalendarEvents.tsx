@@ -97,13 +97,27 @@ interface UseCalendarEventsOptions {
   teamMap?: Record<string, string>
 }
 
+interface UseCalendarEventsResult {
+  getEventsForDate: (date: Date) => CalendarEvent[]
+  projectsToAssign: CustomerProject[]
+  getStatusColor: (status: ProjectStatus) => string
+  formatDate: (dateStr?: string) => string
+  typeLegendEntries: Array<{
+    key: string
+    label: string
+    color: string
+    bgColor: string
+    borderColor: string
+  }>
+}
+
 const formatDateString = (date: Date): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
     date.getDate()
   ).padStart(2, '0')}`
 }
 
-export function useCalendarEvents(options: UseCalendarEventsOptions) {
+export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalendarEventsResult {
   const { projects, appointments, showOnlyMyAppointments, userId, debouncedSearchQuery, sortBy, teamMap } =
     options
 

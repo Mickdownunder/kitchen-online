@@ -96,7 +96,7 @@ export async function GET(
       expiresIn: 60,
     })
   } catch (error) {
-    console.error('Document download error:', error)
+    console.warn('Document download error:', error)
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }

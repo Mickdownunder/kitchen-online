@@ -5,7 +5,6 @@ import Layout from '@/components/Layout'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/providers/ToastProvider'
 import { ClientInit } from '@/components/ClientInit'
-import { PerformanceTracker } from '@/components/PerformanceTracker'
 import './globals.css'
 
 // System font stack (globals.css) – robust für Offline-Builds, keine Google-Fonts-Abhängigkeit
@@ -38,9 +37,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const headersList = await headers()
   const pathname = headersList.get('x-pathname') || headersList.get('x-invoke-path') || ''
   const isPortalRoute = pathname.startsWith('/portal')
+  const isAuthRoute =
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password'
 
-  // Portal routes get minimal layout (portal has its own layout)
-  if (isPortalRoute) {
+  // Portal + auth routes get minimal layout
+  if (isPortalRoute || isAuthRoute) {
     return (
       <html lang="de" className={fontClass}>
         <body className="bg-slate-50 text-slate-900">
@@ -61,7 +65,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </AppProvider>
           </ToastProvider>
           <ClientInit />
-          <PerformanceTracker />
         </ErrorBoundary>
       </body>
     </html>
