@@ -35,6 +35,11 @@ export function resetMock(): void {
   _resultQueue.length = 0
   _getUserResult = { data: { user: null }, error: null }
   _rpcResult = { data: null, error: null }
+  _resetPasswordResult = { data: null, error: null }
+  _updateUserResult = { data: null, error: null }
+  _signUpResult = { data: null, error: null }
+  _signInResult = { data: null, error: null }
+  _signOutResult = { error: null }
 }
 
 function dequeueResult(): QueryResult {
@@ -93,6 +98,37 @@ export function mockGetUser(user: Record<string, unknown> | null, error: unknown
   _getUserResult = { data: { user }, error }
 }
 
+// ─── Auth: resetPasswordForEmail, updateUser, signUp, signIn, signOut ─────
+
+let _resetPasswordResult: { data: unknown; error: unknown } = { data: null, error: null }
+let _updateUserResult: { data: unknown; error: unknown } = { data: null, error: null }
+let _signUpResult: { data: unknown; error: unknown } = { data: null, error: null }
+let _signInResult: { data: { session?: unknown; user?: unknown }; error: unknown } = {
+  data: { session: null, user: null },
+  error: null,
+}
+let _signOutResult: { error: unknown } = { error: null }
+
+export function mockResetPasswordForEmail(result: Partial<{ data: unknown; error: unknown }>): void {
+  _resetPasswordResult = { data: null, error: null, ...result }
+}
+
+export function mockUpdateUser(result: Partial<{ data: unknown; error: unknown }>): void {
+  _updateUserResult = { data: null, error: null, ...result }
+}
+
+export function mockSignUpResult(result: Partial<{ data: unknown; error: unknown }>): void {
+  _signUpResult = { data: null, error: null, ...result }
+}
+
+export function mockSignInResult(result: Partial<{ data: { session?: unknown; user?: unknown }; error: unknown }>): void {
+  _signInResult = { data: { session: null, user: null }, error: null, ...result }
+}
+
+export function mockSignOutResult(error: unknown = null): void {
+  _signOutResult = { error }
+}
+
 // ─── RPC mock ────────────────────────────────────────────────────────────
 
 let _rpcResult: { data: unknown; error: unknown } = { data: null, error: null }
@@ -109,8 +145,10 @@ export const supabase = {
   rpc: jest.fn().mockImplementation(() => Promise.resolve(_rpcResult)),
   auth: {
     getUser: jest.fn().mockImplementation(() => Promise.resolve(_getUserResult)),
-    signUp: jest.fn(),
-    signInWithPassword: jest.fn(),
-    signOut: jest.fn(),
+    signUp: jest.fn().mockImplementation(() => Promise.resolve(_signUpResult)),
+    signInWithPassword: jest.fn().mockImplementation(() => Promise.resolve(_signInResult)),
+    signOut: jest.fn().mockImplementation(() => Promise.resolve(_signOutResult)),
+    resetPasswordForEmail: jest.fn().mockImplementation(() => Promise.resolve(_resetPasswordResult)),
+    updateUser: jest.fn().mockImplementation(() => Promise.resolve(_updateUserResult)),
   },
 }

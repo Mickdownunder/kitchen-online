@@ -40,6 +40,18 @@ test.describe('CRM login', () => {
       throw new Error(`CRM login failed: ${message}`)
     }
   })
+
+  test('dashboard is visible after login', async ({ page }) => {
+    test.skip(!crmEmail || !crmPassword, 'PW_CRM_EMAIL/PW_CRM_PASSWORD not set')
+
+    await page.goto('/login')
+    await page.getByPlaceholder('ihre@email.de').fill(crmEmail!)
+    await page.getByPlaceholder('••••••••').fill(crmPassword!)
+    await page.getByRole('button', { name: 'Anmelden' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 })
+    await expect(page.getByRole('main')).toBeVisible({ timeout: 5_000 })
+  })
 })
 
 test.describe('Portal login', () => {

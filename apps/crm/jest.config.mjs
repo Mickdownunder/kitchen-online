@@ -14,10 +14,13 @@ const config = {
   },
   clearMocks: true,
   collectCoverageFrom: [
+    // Basis: alle lib-Module. Excludes unten mit Begründung + Kompensation (Weltklasse-Stand).
+    // Dokumentation: Excluded Services werden durch Unit/Route/E2E-Tests kompensiert.
     'lib/**/*.{ts,tsx}',
     '!**/*.d.ts',
     '!**/__tests__/**',
     '!**/node_modules/**',
+    // Infrastruktur (Next/Supabase-Client, PDF, AI, E-Mail-Templates)
     '!lib/pdf/**',
     '!lib/ai/**',
     '!lib/email-templates/**',
@@ -27,6 +30,13 @@ const config = {
     '!lib/supabase/server.ts',
     '!lib/supabase/admin.ts',
     '!lib/supabase/portal-client.ts',
+    // Services exkludiert, Kompensation:
+    // auth.ts     → auth.service.test.ts (Unit)
+    // audit.ts    → Logging/DB; kritische Flows über API-Tests
+    // email.ts    → booking webhook route test (E-Mail im Flow)
+    // chat.ts     → chat stream route test (API)
+    // portalDocuments.ts → publish-document route + persist tests
+    // bankTransactions.ts, supplierInvoices.ts → vorhandene Service-Tests (queries/mappers)
     '!lib/supabase/services/auth.ts',
     '!lib/supabase/services/audit.ts',
     '!lib/supabase/services/email.ts',
@@ -36,8 +46,7 @@ const config = {
     '!lib/supabase/services/supplierInvoices.ts',
     '!lib/supabase/services.ts',
     '!lib/supabase/services/index.ts',
-    '!lib/supabase/services/projects.ts',
-    '!lib/supabase/services/delivery.ts',
+    // projects/delivery: in Coverage (Tests vorhanden)
     '!lib/utils/logger.ts',
     '!lib/utils/auditLogger.ts',
     '!lib/utils/performance.ts',
