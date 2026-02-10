@@ -1,13 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { ArrowLeft, Download, FileText, Loader2 } from 'lucide-react'
-import { CompanySettings, BankAccount, InvoiceItem, CustomerProject } from '@/types'
 import { ListInvoice } from '@/hooks/useInvoiceFilters'
-// PDF function is dynamically imported when needed to reduce initial bundle size
-import type { InvoiceData } from './InvoicePDF'
-import { getCompanySettings, getBankAccounts, getInvoices, getProject, getInvoice } from '@/lib/supabase/services'
-import { logger } from '@/lib/utils/logger'
+import { useInvoiceViewData } from '@/hooks/useInvoiceViewData'
 
 interface InvoiceViewProps {
   invoice: ListInvoice
@@ -21,201 +17,31 @@ const formatCurrency = (amount: number): string => {
 }
 
 const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack }) => {
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null)
-  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null)
-  const [loadingSettings, setLoadingSettings] = useState(true)
-  const [partialInvoices, setPartialInvoices] = useState<ListInvoice[]>([])
-  
-  // Lokaler State für die aktuelle Rechnung - wird beim Mount mit frischen Daten geladen
-  const [currentInvoice, setCurrentInvoice] = useState(invoiceProp)
-  const invoice = currentInvoice
-
-  const [projectData, setProjectData] = useState<CustomerProject | null>(invoiceProp.project || null)
-  const project = projectData
-  const isDeposit = invoice.type === 'partial'
-  const isCredit = invoice.type === 'credit'
-  const items = (isDeposit || isCredit) ? [] : project?.items || []
-
-  // Lade frische Rechnungsdaten beim Mount
-  useEffect(() => {
-    const loadFreshInvoice = async () => {
-      const result = await getInvoice(invoiceProp.id)
-      if (result.ok) {
-        const freshInvoice = result.data
-        if (freshInvoice) {
-          // Merge mit ListInvoice Feldern
-          setCurrentInvoice({
-            ...invoiceProp,
-            ...freshInvoice,
-            date: freshInvoice.invoiceDate,
-            status: freshInvoice.isPaid ? 'paid' : 'sent',
-          } as ListInvoice)
-        }
-      } else {
-        logger.error('Error loading fresh invoice', { component: 'InvoiceView' }, new Error(result.message))
-      }
-    }
-    loadFreshInvoice()
-  }, [invoiceProp.id, invoiceProp])
-
-  // Lade Projekt inkl. Positionen (für Schlussrechnung)
-  useEffect(() => {
-    const loadProjectWithItems = async () => {
-      const projectId = project?.id || invoice.projectId
-      if (!projectId || isDeposit) return
-      if (project?.items && project.items.length > 0) return
-
-      try {
-        const fullProject = await getProject(projectId)
-        if (fullProject) {
-          setProjectData(fullProject)
-        }
-      } catch (error) {
-        logger.error('Error loading project details', { component: 'InvoiceView' }, error as Error)
-      }
-    }
-    loadProjectWithItems()
-  }, [invoice.projectId, isDeposit, project?.id, project?.items])
-
-  // Lade alle Anzahlungen für dieses Projekt (für Schlussrechnung)
-  useEffect(() => {
-    const loadPartials = async () => {
-      if (!isDeposit && (project?.id || invoice.projectId)) {
-        const result = await getInvoices(project?.id || invoice.projectId)
-        const allInvoices = result.ok ? result.data : []
-        const partials = allInvoices.filter(inv => inv.type === 'partial')
-        setPartialInvoices(partials as unknown as ListInvoice[])
-      }
-    }
-    loadPartials()
-  }, [project?.id, invoice.projectId, isDeposit])
-
-  // Anzahlungen summieren (Brutto) - aus der neuen invoices Tabelle
-  const totalPartialPayments = partialInvoices.reduce((sum, p) => sum + p.amount, 0)
-
-  // MwSt.-Aufschlüsselung für Buchhaltung/Steuerberatung
-  const projectGrossTotal =
-    project?.items?.reduce(
-      (sum, item) => sum + (item.grossTotal ?? (item.netTotal ?? 0) + (item.taxAmount ?? 0)),
-      0
-    ) || invoice.amount + totalPartialPayments
-  const projectNetTotal = projectGrossTotal / 1.2
-  const projectTaxTotal = projectGrossTotal - projectNetTotal
-
-  // Anzahlungen (bereits versteuert)
-  const partialPaymentsNet = totalPartialPayments / 1.2
-  const partialPaymentsTax = totalPartialPayments - partialPaymentsNet
-
-  // Restbetrag (noch zu versteuern)
-  const restGross = invoice.amount
-  const restNet = projectNetTotal - partialPaymentsNet
-  const restTax = projectTaxTotal - partialPaymentsTax
-
-  // Beträge direkt aus Invoice oder berechnet
-  const netAmount = invoice.netAmount || (isDeposit ? invoice.amount / 1.2 : restNet)
-  const taxAmount =
-    invoice.taxAmount || (isDeposit ? invoice.amount - invoice.amount / 1.2 : restTax)
-
-  // Load company settings on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const settings = await getCompanySettings()
-        setCompanySettings(settings)
-
-        if (settings?.id) {
-          const banks = await getBankAccounts(settings.id)
-          // Get default bank or first one
-          const defaultBank = banks.find(b => b.isDefault) || banks[0]
-          setBankAccount(defaultBank || null)
-        }
-      } catch (error: unknown) {
-        // Ignore aborted requests (normal during page navigation)
-        const errMessage = error instanceof Error ? error.message : ''
-        const errName = error instanceof Error ? error.name : ''
-        if (errMessage.includes('aborted') || errName === 'AbortError') {
-          return
-        }
-        logger.error('Error loading company settings', { component: 'InvoiceView' }, error as Error)
-      } finally {
-        setLoadingSettings(false)
-      }
-    }
-    loadSettings()
-  }, [])
-
-  // Build display data using company settings or fallback
-  const companyName = companySettings?.companyName
-    ? `${companySettings.companyName}${companySettings.legalForm ? ` ${companySettings.legalForm}` : ''}`
-    : 'Ihr Unternehmen GmbH'
-  const companyAddress = companySettings
-    ? `${companySettings.street || ''} ${companySettings.houseNumber || ''} · ${companySettings.postalCode || ''} ${companySettings.city || ''} · ${companySettings.country || 'Österreich'}`
-    : 'Musterstraße 123 · 1010 Wien · Österreich'
-
-  const handleDownloadPDF = async () => {
-    setIsGenerating(true)
-    try {
-      // Always fetch the latest invoice data to ensure isPaid status is current
-      const result = await getInvoice(invoice.id)
-      const currentInvoice = result.ok && result.data ? result.data : invoice
-
-      // Konvertiere partialInvoices zu PartialPayment-Format für PDF-Kompatibilität
-      const partialPaymentsForPDF = partialInvoices.map(inv => ({
-        id: inv.id,
-        invoiceNumber: inv.invoiceNumber,
-        amount: inv.amount,
-        date: inv.invoiceDate,
-        isPaid: inv.isPaid,
-        paidDate: inv.paidDate,
-        description: inv.description,
-      }))
-
-      // Debug logging before creating invoice data
-      logger.debug('[InvoiceView] Creating PDF data', {
-        'currentInvoice.isPaid': currentInvoice.isPaid,
-        'currentInvoice.paidDate': currentInvoice.paidDate,
-        invoiceNumber: currentInvoice.invoiceNumber,
-        invoiceType: currentInvoice.type,
-      })
-
-      const invoiceData: InvoiceData = {
-        type: currentInvoice.type === 'credit' 
-          ? 'credit' 
-          : currentInvoice.type === 'partial' 
-            ? 'deposit' 
-            : 'final',
-        invoiceNumber: currentInvoice.invoiceNumber,
-        amount: currentInvoice.amount,
-        date: currentInvoice.invoiceDate || invoice.date,
-        description: currentInvoice.description,
-        isPaid: currentInvoice.isPaid,
-        paidDate: currentInvoice.paidDate,
-        originalInvoiceNumber: currentInvoice.originalInvoiceNumber,
-        project: {
-          customerName: project?.customerName || '',
-          address: project?.address,
-          phone: project?.phone,
-          email: project?.email,
-          orderNumber: project?.orderNumber || '',
-          customerId: project?.customerId,
-          id: project?.id || invoice.projectId,
-          items: project?.items,
-        },
-        priorInvoices: partialPaymentsForPDF,
-        company: companySettings,
-        bankAccount: bankAccount,
-      }
-      // Dynamic import to reduce initial bundle size
-      const { downloadInvoicePDF } = await import('./InvoicePDF')
-      await downloadInvoicePDF(invoiceData)
-    } catch (error) {
-      logger.error('Error generating PDF', { component: 'InvoiceView' }, error as Error)
-      alert('Fehler beim Erstellen der PDF. Bitte versuchen Sie es erneut.')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
+  const {
+    isGenerating,
+    companySettings,
+    bankAccount,
+    loadingSettings,
+    partialInvoiceDisplays,
+    invoice,
+    project,
+    isDeposit,
+    isCredit,
+    items,
+    totalPartialPayments,
+    projectGrossTotal,
+    projectNetTotal,
+    projectTaxTotal,
+    partialPaymentsTax,
+    restGross,
+    restNet,
+    restTax,
+    netAmount,
+    taxAmount,
+    companyName,
+    companyAddress,
+    handleDownloadPDF,
+  } = useInvoiceViewData(invoiceProp)
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8">
@@ -366,7 +192,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
                     <td className="px-4 py-4 text-slate-400">-</td>
                   </tr>
                 ) : (
-                  items.map((item: InvoiceItem, index: number) => (
+                  items.map((item, index: number) => (
                   <tr key={item.id || index} className="border-b border-slate-300">
                       <td className="px-4 py-4 text-slate-600">
                         {item.quantity} {item.unit}
@@ -414,9 +240,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
                     <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
                       Abzüglich bereits erhaltene Anzahlungen
                     </p>
-                    {partialInvoices.map((inv, idx) => {
-                      const paymentNet = inv.amount / 1.2
-                      const paymentTax = inv.amount - paymentNet
+                    {partialInvoiceDisplays.map((inv, idx) => {
                       return (
                         <div key={inv.id} className="mb-3">
                           <div className="flex items-start justify-between">
@@ -434,7 +258,7 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice: invoiceProp, onBack 
                             </span>
                           </div>
                           <p className="ml-0 text-xs text-slate-400">
-                            (darin enth. MwSt. 20%: {formatCurrency(paymentTax)})
+                            (darin enth. MwSt. 20%: {formatCurrency(inv.paymentTax)})
                           </p>
                         </div>
                       )

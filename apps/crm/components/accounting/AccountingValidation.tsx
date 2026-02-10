@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react'
 import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react'
 import { SupplierInvoice } from '@/types'
+import { calculateTaxAmount } from '@/lib/utils/accountingAmounts'
 
 interface ValidationWarning {
   id: string
@@ -135,7 +136,7 @@ export function AccountingValidation({
 
     // 6. Prüfe auf Rundungsdifferenzen
     const outgoingRoundingIssues = outgoingInvoices.filter(inv => {
-      const expectedTax = inv.netAmount * (inv.taxRate / 100)
+      const expectedTax = calculateTaxAmount(inv.netAmount, inv.taxRate)
       const diff = Math.abs(inv.taxAmount - expectedTax)
       return diff > 0.02 // Mehr als 2 Cent Differenz
     })

@@ -1,30 +1,27 @@
 'use client'
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import { CustomerProject, CompanySettings, Invoice as DBInvoice } from '@/types'
+import React from 'react'
+import { CustomerProject } from '@/types'
 import InvoiceView from './InvoiceView'
-import { getInvoicesWithProject, markInvoicePaid, markInvoiceUnpaid } from '@/lib/supabase/services'
-import { useInvoiceFilters, type ListInvoice, toListInvoice } from '@/hooks/useInvoiceFilters'
-import { useGroupedInvoices } from '@/hooks/useGroupedInvoices'
+import { type ListInvoice } from '@/hooks/useInvoiceFilters'
 import { PaymentReminderBanner } from './PaymentReminderBanner'
 import { DueSecondPaymentsList } from './DueSecondPaymentsList'
 import { RemindersTab } from './RemindersTab'
 import { MissingInvoicesList } from './MissingInvoicesList'
 import { useApp } from '@/app/providers'
-import { getCompanySettings } from '@/lib/supabase/services/company'
+import { useInvoiceListData } from '@/hooks/useInvoiceListData'
 import { InvoiceFilters } from './invoices/InvoiceFilters'
 import { InvoiceStatsCards } from './invoices/InvoiceStatsCards'
 import { InvoiceTable } from './invoices/InvoiceTable'
 import { InvoiceTableSimple } from './invoices/InvoiceTableSimple'
 import {
   ReminderPreviewModal,
-  type ReminderPreviewData,
 } from './invoices/ReminderPreviewModal'
 import { CreditNoteModal } from './invoices/CreditNoteModal'
 import { useToast } from '@/components/providers/ToastProvider'
-import { logger } from '@/lib/utils/logger'
 import { OpenProjectsOverview } from '@/components/OpenProjectsOverview'
 import { ClipboardList } from 'lucide-react'
+import { useInvoiceForm } from '@/hooks/useInvoiceForm'
 
 interface InvoiceListProps {
   projects: CustomerProject[]
@@ -34,255 +31,78 @@ interface InvoiceListProps {
 const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) => {
   const { success, error: showError } = useToast()
   const { customerDeliveryNotes } = useApp()
-  const [sortField, setSortField] = useState<'invoiceNumber' | 'customer' | 'amount' | 'date'>('date')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'deposit' | 'final' | 'credit'>('all')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'sent'>('all')
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth() + 1)
-  const [selectedInvoice, setSelectedInvoice] = useState<ListInvoice | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'invoice'>('list')
-  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null)
-  const [paidDateInput, setPaidDateInput] = useState<string>(new Date().toISOString().split('T')[0])
-  const [saving, setSaving] = useState(false)
-  const [visibleRows, setVisibleRows] = useState(200)
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null)
-  const [reminderDropdownOpen, setReminderDropdownOpen] = useState<string | null>(null)
-  const [sendingReminder, setSendingReminder] = useState<string | null>(null)
-  const [reminderModalOpen, setReminderModalOpen] = useState(false)
-  const [reminderPreviewData, setReminderPreviewData] = useState<ReminderPreviewData | null>(null)
-  const [reminderPreviewLoading, setReminderPreviewLoading] = useState(false)
-  const [reminderModalInvoice, setReminderModalInvoice] = useState<ListInvoice | null>(null)
-  const [reminderModalType, setReminderModalType] = useState<'first' | 'second' | 'final' | null>(
-    null
-  )
-  const [activeTab, setActiveTab] = useState<'invoices' | 'reminders' | 'missing'>('invoices')
-  const [showDuePayments, setShowDuePayments] = useState(false)
-  const [showOverview, setShowOverview] = useState(false)
-  const [dbInvoices, setDbInvoices] = useState<DBInvoice[]>([])
-  const [loadingInvoices, setLoadingInvoices] = useState(true)
-  // Storno-Dialog State
-  const [cancelModalOpen, setCancelModalOpen] = useState(false)
-  const [invoiceToCancel, setInvoiceToCancel] = useState<ListInvoice | null>(null)
-
-  // Lade Rechnungen aus der Datenbank
-  // silent=true: Kein Lade-Spinner, Liste bleibt sichtbar (für Live-Updates bei Status-Änderung)
-  const loadInvoices = useCallback(async (silent = false) => {
-    if (!silent) setLoadingInvoices(true)
-    const result = await getInvoicesWithProject()
-    if (result.ok) {
-      setDbInvoices(result.data)
-    }
-    if (!silent) setLoadingInvoices(false)
-  }, [])
-
-  useEffect(() => {
-    loadInvoices()
-  }, [loadInvoices])
-
-  useEffect(() => {
-    getCompanySettings().then(settings => setCompanySettings(settings))
-  }, [])
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (reminderDropdownOpen && !(e.target as HTMLElement).closest('.relative')) {
-        setReminderDropdownOpen(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [reminderDropdownOpen])
-
-  useEffect(() => {
-    setVisibleRows(200)
-  }, [searchTerm, filterType, filterStatus, selectedYear, selectedMonth])
-
-  // Konvertiere DB-Invoices zu ListInvoices mit Projekt-Daten
-  const invoices = useMemo(() => {
-    // Erstelle eine Map von projectId zu project für schnellen Zugriff
-    const projectMap = new Map(projects.map(p => [p.id, p]))
-
-    return dbInvoices
-      .map(invoice => {
-        const project = invoice.project || projectMap.get(invoice.projectId)
-        if (!project) return null
-        return toListInvoice(invoice, project as CustomerProject)
-      })
-      .filter((inv): inv is ListInvoice => inv !== null)
-      .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime())
-  }, [dbInvoices, projects])
-
-  // Update selectedInvoice when invoices are reloaded (e.g., after status change)
-  useEffect(() => {
-    if (selectedInvoice) {
-      const updatedInvoice = invoices.find(inv => inv.id === selectedInvoice.id)
-      if (updatedInvoice && (
-        updatedInvoice.isPaid !== selectedInvoice.isPaid ||
-        updatedInvoice.paidDate !== selectedInvoice.paidDate
-      )) {
-        setSelectedInvoice(updatedInvoice)
-      }
-    }
-  }, [invoices, selectedInvoice])
-
-  const handleMarkAsPaid = async (invoice: ListInvoice) => {
-    setSaving(true)
-    await markInvoicePaid(invoice.id, paidDateInput)
-    setMarkingPaidId(null)
-    // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
-    await loadInvoices(true)
-    if (onProjectUpdate) onProjectUpdate()
-    setSaving(false)
-  }
-
-  const handleUnmarkAsPaid = async (invoice: ListInvoice) => {
-    setSaving(true)
-    await markInvoiceUnpaid(invoice.id)
-    // Silent reload: Liste bleibt sichtbar, nur Daten aktualisieren
-    await loadInvoices(true)
-    if (onProjectUpdate) onProjectUpdate()
-    setSaving(false)
-  }
-
-  const { filteredInvoices, availableYears } = useInvoiceFilters({
-    invoices,
+  const {
+    sortField,
+    sortDirection,
     searchTerm,
+    setSearchTerm,
     filterType,
+    setFilterType,
     filterStatus,
+    setFilterStatus,
     selectedYear,
+    setSelectedYear,
     selectedMonth,
+    setSelectedMonth,
+    selectedInvoice,
+    setSelectedInvoice,
+    viewMode,
+    setViewMode,
+    markingPaidId,
+    setMarkingPaidId,
+    paidDateInput,
+    setPaidDateInput,
+    saving,
+    visibleRows,
+    setVisibleRows,
+    companySettings,
+    activeTab,
+    setActiveTab,
+    showDuePayments,
+    setShowDuePayments,
+    showOverview,
+    setShowOverview,
+    dbInvoices,
+    loadingInvoices,
+    filteredInvoices,
+    availableYears,
+    groupedInvoices,
+    expandedGroups,
+    toggleGroup,
+    invoicesByMonth,
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    totalPages,
+    paginatedInvoices,
+    currentMonthInvoices,
+    stats,
+    loadInvoices,
+    handleMarkAsPaid,
+    handleUnmarkAsPaid,
+    handleInvoiceSort,
+  } = useInvoiceListData({ projects, onProjectUpdate })
+  const {
+    reminderDropdownOpen,
+    setReminderDropdownOpen,
+    sendingReminder,
+    reminderModalOpen,
+    reminderPreviewData,
+    reminderPreviewLoading,
+    cancelModalOpen,
+    invoiceToCancel,
+    handleOpenReminderPreview,
+    handleConfirmSendReminder,
+    closeReminderModal,
+    openCancelModal,
+    closeCancelModal,
+    handleCreditNoteSuccess,
+  } = useInvoiceForm({
+    loadInvoices,
+    onProjectUpdate,
+    onSuccessMessage: success,
+    onErrorMessage: showError,
   })
-
-  // Für Monats-Tab-Counts: Rechnungen nur nach Jahr filtern (nicht nach Monat)
-  useInvoiceFilters({
-    invoices,
-    searchTerm,
-    filterType,
-    filterStatus,
-    selectedYear,
-    selectedMonth: 'all',
-  })
-
-  const handleInvoiceSort = (field: 'invoiceNumber' | 'customer' | 'amount' | 'date') => {
-    if (sortField === field) {
-      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortField(field)
-      setSortDirection('asc')
-    }
-  }
-
-  const sortedInvoices = useMemo(() => {
-    const sorted = [...filteredInvoices]
-    sorted.sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'invoiceNumber') {
-        cmp = (a.invoiceNumber || '').localeCompare(b.invoiceNumber || '')
-      } else if (sortField === 'customer') {
-        const nameA = a.project?.customerName || ''
-        const nameB = b.project?.customerName || ''
-        cmp = nameA.localeCompare(nameB)
-      } else if (sortField === 'amount') {
-        cmp = (a.amount || 0) - (b.amount || 0)
-      } else {
-        const da = new Date(a.invoiceDate || a.date || 0).getTime()
-        const db = new Date(b.invoiceDate || b.date || 0).getTime()
-        cmp = da - db
-      }
-      return sortDirection === 'asc' ? cmp : -cmp
-    })
-    return sorted
-  }, [filteredInvoices, sortField, sortDirection])
-
-  const { groupedInvoices, expandedGroups, toggleGroup } = useGroupedInvoices(sortedInvoices)
-
-  // Gruppiere nach Monat für die horizontalen Tabs
-  const invoicesByMonth = useMemo(() => {
-    const months: Map<number, ListInvoice[]> = new Map()
-    // Initialisiere alle 12 Monate
-    for (let i = 1; i <= 12; i++) {
-      months.set(i, [])
-    }
-    // Füge Rechnungen hinzu (nur wenn ein Jahr gewählt ist)
-    if (selectedYear !== 'all') {
-      sortedInvoices.forEach(invoice => {
-        const dateStr = invoice.invoiceDate || invoice.date
-        const date = dateStr ? new Date(dateStr) : new Date()
-        if (date.getFullYear() === selectedYear) {
-          const month = date.getMonth() + 1
-          months.get(month)!.push(invoice)
-        }
-      })
-    }
-    return months
-  }, [sortedInvoices, selectedYear])
-
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 20
-
-  // Reset pagination when month changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [selectedMonth, selectedYear])
-
-  // Rechnungen für den aktuellen Monat mit Pagination
-  const currentMonthInvoices = useMemo(() => {
-    if (selectedYear === 'all') return sortedInvoices
-    if (selectedMonth === 'all') return sortedInvoices
-    return invoicesByMonth.get(selectedMonth as number) || []
-  }, [invoicesByMonth, selectedMonth, selectedYear, sortedInvoices])
-
-  const totalPages = Math.ceil(currentMonthInvoices.length / itemsPerPage)
-  const paginatedInvoices = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    return currentMonthInvoices.slice(start, start + itemsPerPage)
-  }, [currentMonthInvoices, currentPage, itemsPerPage])
-
-  const stats = useMemo(() => {
-    // Stornos haben negative Beträge, werden automatisch subtrahiert
-    const total = filteredInvoices.reduce((acc, inv) => acc + inv.amount, 0)
-    const paid = filteredInvoices
-      .filter(inv => inv.isPaid)
-      .reduce((acc, inv) => acc + inv.amount, 0)
-    const outstanding = total - paid
-    // 'partial' in neuer DB-Struktur = 'deposit' in UI
-    const depositCount = filteredInvoices.filter(inv => inv.type === 'partial').length
-    const finalCount = filteredInvoices.filter(inv => inv.type === 'final').length
-    const creditCount = filteredInvoices.filter(inv => inv.type === 'credit').length
-    // Buchhalterischer Umsatz = Auftragswert (project.totalAmount), nicht Restbetrag (inv.amount)
-    const invoicedRevenue = filteredInvoices
-      .filter(inv => inv.type === 'final')
-      .reduce(
-        (acc, inv) =>
-          acc + (inv.project?.totalAmount != null && inv.project.totalAmount > 0
-            ? inv.project.totalAmount
-            : inv.amount),
-        0
-      )
-    const depositRevenue = filteredInvoices
-      .filter(inv => inv.type === 'partial')
-      .reduce((acc, inv) => acc + inv.amount, 0)
-    // Storno-Summe (negativer Betrag, daher Math.abs für Anzeige)
-    const creditAmount = filteredInvoices
-      .filter(inv => inv.type === 'credit')
-      .reduce((acc, inv) => acc + Math.abs(inv.amount), 0)
-
-    return {
-      total,
-      paid,
-      outstanding,
-      depositCount,
-      finalCount,
-      creditCount,
-      totalCount: filteredInvoices.length,
-      invoicedRevenue,
-      depositRevenue,
-      creditAmount,
-    }
-  }, [filteredInvoices])
 
   const handleViewInvoice = (invoice: ListInvoice) => {
     setSelectedInvoice(invoice)
@@ -293,91 +113,6 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     setSelectedInvoice(invoice)
     setViewMode('invoice')
     setTimeout(() => window.print(), 500)
-  }
-
-  // Vorschau laden und Modal öffnen – keine E-Mail wird gesendet
-  const handleOpenReminderPreview = async (
-    invoice: ListInvoice,
-    reminderType: 'first' | 'second' | 'final'
-  ) => {
-    setReminderDropdownOpen(null)
-    setReminderModalInvoice(invoice)
-    setReminderModalType(reminderType)
-    setReminderPreviewData(null)
-    setReminderModalOpen(true)
-    setReminderPreviewLoading(true)
-
-    try {
-      const response = await fetch('/api/reminders/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: invoice.projectId,
-          invoiceId: invoice.id,
-          reminderType,
-        }),
-      })
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Vorschau konnte nicht geladen werden')
-      }
-      setReminderPreviewData(data)
-    } catch (error: unknown) {
-      logger.error('Error loading reminder preview', { component: 'InvoiceList' }, error as Error)
-      showError(
-        error instanceof Error ? error.message : 'Vorschau konnte nicht geladen werden'
-      )
-      setReminderModalOpen(false)
-    } finally {
-      setReminderPreviewLoading(false)
-    }
-  }
-
-  // Nach Prüfung in Modal: E-Mail tatsächlich senden
-  const handleConfirmSendReminder = async (payload: {
-    recipientEmail: string
-    subject: string
-    text: string
-    html: string
-  }) => {
-    if (!reminderModalInvoice || !reminderModalType) return
-
-    setSendingReminder(reminderModalInvoice.id)
-    try {
-      const response = await fetch('/api/reminders/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: reminderModalInvoice.projectId,
-          invoiceId: reminderModalInvoice.id,
-          reminderType: reminderModalType,
-          recipientEmail: payload.recipientEmail,
-          subject: payload.subject,
-          html: payload.html,
-          text: payload.text,
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Fehler beim Senden der Mahnung')
-      }
-
-      success(
-        `${reminderModalType === 'first' ? '1.' : reminderModalType === 'second' ? '2.' : 'Letzte'} Mahnung erfolgreich gesendet!`
-      )
-      setReminderModalOpen(false)
-      setReminderModalInvoice(null)
-      setReminderModalType(null)
-      setReminderPreviewData(null)
-      setSendingReminder(null)
-      if (onProjectUpdate) onProjectUpdate()
-      await loadInvoices(true)
-    } catch (err) {
-      setSendingReminder(null)
-      throw err
-    }
   }
 
   if (viewMode === 'invoice' && selectedInvoice) {
@@ -613,10 +348,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
             onSetPaidDateInput={setPaidDateInput}
             onSetReminderDropdownOpen={setReminderDropdownOpen}
             onSendReminder={handleOpenReminderPreview}
-            onCancelInvoice={(invoice) => {
-              setInvoiceToCancel(invoice)
-              setCancelModalOpen(true)
-            }}
+            onCancelInvoice={openCancelModal}
           />
         ) : (
           /* "Alle" Ansicht - Gruppierte Akkordeon-Ansicht */
@@ -642,10 +374,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
             onSetPaidDateInput={setPaidDateInput}
             onSetReminderDropdownOpen={setReminderDropdownOpen}
             onSendReminder={handleOpenReminderPreview}
-            onCancelInvoice={(invoice) => {
-              setInvoiceToCancel(invoice)
-              setCancelModalOpen(true)
-            }}
+            onCancelInvoice={openCancelModal}
             onLoadMore={() => setVisibleRows(v => v + 400)}
           />
         )}
@@ -653,12 +382,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
 
       <ReminderPreviewModal
         isOpen={reminderModalOpen}
-        onClose={() => {
-          setReminderModalOpen(false)
-          setReminderModalInvoice(null)
-          setReminderModalType(null)
-          setReminderPreviewData(null)
-        }}
+        onClose={closeReminderModal}
         previewData={reminderPreviewData}
         loading={reminderPreviewLoading}
         onSend={handleConfirmSendReminder}
@@ -668,15 +392,8 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
       <CreditNoteModal
         isOpen={cancelModalOpen}
         invoice={invoiceToCancel}
-        onClose={() => {
-          setCancelModalOpen(false)
-          setInvoiceToCancel(null)
-        }}
-        onSuccess={async () => {
-          success('Stornorechnung erfolgreich erstellt')
-          await loadInvoices(true)
-          if (onProjectUpdate) onProjectUpdate()
-        }}
+        onClose={closeCancelModal}
+        onSuccess={handleCreditNoteSuccess}
       />
     </div>
   )

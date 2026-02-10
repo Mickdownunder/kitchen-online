@@ -1,368 +1,53 @@
 'use client'
 
-import { useEffect, useState, Suspense, useCallback } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import {
-  createInvoice,
-  updateInvoice,
-  deleteInvoice,
-  markInvoicePaid,
-  markInvoiceUnpaid,
-  getInvoices,
-  getInvoiceByNumber,
-} from '@/lib/supabase/services'
-import { peekNextInvoiceNumber } from '@/lib/supabase/services/company'
-import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
-import { CustomerProject, Invoice } from '@/types'
 import { CreditCard, Plus, ArrowLeft } from 'lucide-react'
 import { useApp } from '../providers'
+import { usePaymentFlow } from '@/hooks/usePaymentFlow'
 import { ProjectSelector } from './components/ProjectSelector'
 import { PaymentForm } from './components/PaymentForm'
 import { PaymentRow } from './components/PaymentRow'
 import { PaymentSummary } from './components/PaymentSummary'
-
-// Form-Daten für neue/bearbeitete Zahlungen
-interface PaymentFormData {
-  amount?: number
-  description?: string
-  date?: string
-}
 
 function PaymentsPageContent() {
   const searchParams = useSearchParams()
   const projectIdParam = searchParams.get('projectId')
 
   const { projects, isLoading } = useApp()
-  const [selectedProject, setSelectedProject] = useState<CustomerProject | null>(null)
-  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
-  const [newPaymentForm, setNewPaymentForm] = useState<PaymentFormData | null>(null)
-  const [percentInput, setPercentInput] = useState('')
-  const [editingPercentInput, setEditingPercentInput] = useState('')
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loadingInvoices, setLoadingInvoices] = useState(false)
-  const [invoiceNumber, setInvoiceNumber] = useState('')
-  const [suggestedInvoiceNumber, setSuggestedInvoiceNumber] = useState('')
-
-  // Lade Rechnungen für das ausgewählte Projekt
-  const loadProjectInvoices = useCallback(async (projectId: string) => {
-    setLoadingInvoices(true)
-    const result = await getInvoices(projectId)
-    if (result.ok) {
-      setInvoices(result.data)
-    }
-    setLoadingInvoices(false)
-  }, [])
-
-  // Lade Rechnungen wenn Projekt ausgewählt wird
-  useEffect(() => {
-    let isActive = true
-
-    if (selectedProject?.id) {
-      const timer = window.setTimeout(() => {
-        if (isActive) {
-          void loadProjectInvoices(selectedProject.id)
-        }
-      }, 0)
-
-      return () => {
-        isActive = false
-        window.clearTimeout(timer)
-      }
-    } else {
-      const timer = window.setTimeout(() => {
-        if (isActive) {
-          setInvoices([])
-        }
-      }, 0)
-
-      return () => {
-        isActive = false
-        window.clearTimeout(timer)
-      }
-    }
-  }, [selectedProject?.id, loadProjectInvoices])
-
-  // Berechne Summen aus den neuen Invoices
-  const partialPayments = invoices.filter(inv => inv.type === 'partial')
-  const finalInvoice = invoices.find(inv => inv.type === 'final')
-
-  const calculations = selectedProject
-    ? {
-        grossTotal: selectedProject.totalAmount || 0,
-        netTotal: selectedProject.netAmount || 0,
-        taxTotal: selectedProject.taxAmount || 0,
-      }
-    : { grossTotal: 0, netTotal: 0, taxTotal: 0 }
-
-  const resetForm = useCallback(() => {
-    setEditingPaymentId(null)
-    setNewPaymentForm(null)
-    setPercentInput('')
-    setEditingPercentInput('')
-    setInvoiceNumber('')
-    setSuggestedInvoiceNumber('')
-  }, [])
-
-  // Auto-select project if projectId is in URL
-  useEffect(() => {
-    if (projectIdParam && projects.length > 0) {
-      const project = projects.find(p => p.id === projectIdParam)
-      if (project && project.id !== selectedProject?.id) {
-        const timer = window.setTimeout(() => {
-          setSelectedProject(project)
-          resetForm()
-        }, 0)
-
-        return () => window.clearTimeout(timer)
-      }
-    }
-  }, [projectIdParam, projects, selectedProject?.id, resetForm])
-
-  const handleSelectProject = useCallback(
-    (project: CustomerProject) => {
-      setSelectedProject(project)
-      resetForm()
-    },
-    [resetForm]
-  )
-
-  const handleQuickPercent = useCallback(
-    (percent: number) => {
-      if (!selectedProject || calculations.grossTotal <= 0) return
-      const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)
-      setNewPaymentForm({ ...newPaymentForm, amount })
-      setPercentInput(percent.toString())
-    },
-    [selectedProject, calculations.grossTotal, newPaymentForm]
-  )
-
-  const handlePercentChange = useCallback(
-    (value: string, fromAmountField?: boolean) => {
-      setPercentInput(value)
-      // Nur Betrag neu berechnen wenn User im PROZENT-Feld tippt – nicht wenn wir Prozent aus Betrag ableiten
-      if (fromAmountField) return
-      const percent = parseFloat(value) || 0
-      if (!isNaN(percent) && percent >= 0 && percent <= 100 && calculations.grossTotal > 0) {
-        const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)
-        setNewPaymentForm(prev => ({ ...prev, amount }))
-      } else if (value === '' || value === '.') {
-        setNewPaymentForm(prev => ({ ...prev, amount: undefined }))
-      }
-    },
-    [calculations.grossTotal]
-  )
-
-  const handlePercentBlur = useCallback(() => {
-    if (percentInput) {
-      const percent = parseFloat(percentInput) || 0
-      if (percent >= 0 && percent <= 100) {
-        setPercentInput(percent.toFixed(1))
-      } else {
-        setPercentInput('')
-      }
-    }
-  }, [percentInput])
-
-  const handleEditingPercentChange = useCallback(
-    (value: string, fromAmountField?: boolean) => {
-      setEditingPercentInput(value)
-      if (fromAmountField) return
-      const percent = parseFloat(value) || 0
-      if (!isNaN(percent) && percent >= 0 && percent <= 100 && calculations.grossTotal > 0) {
-        const amount = roundTo2Decimals((calculations.grossTotal * percent) / 100)
-        setNewPaymentForm(prev => ({ ...prev, amount }))
-      } else if (value === '' || value === '.') {
-        setNewPaymentForm(prev => ({ ...prev, amount: undefined }))
-      }
-    },
-    [calculations.grossTotal]
-  )
-
-  const handleEditingPercentBlur = useCallback(() => {
-    if (editingPercentInput) {
-      const percent = parseFloat(editingPercentInput) || 0
-      if (percent >= 0 && percent <= 100) {
-        setEditingPercentInput(percent.toFixed(1))
-      } else {
-        setEditingPercentInput('')
-      }
-    }
-  }, [editingPercentInput])
-
-  const handleSavePayment = async (projectId: string) => {
-    if (!newPaymentForm || !newPaymentForm.amount || !newPaymentForm.description) {
-      alert('Bitte füllen Sie Beschreibung und Betrag aus.')
-      return
-    }
-
-    const amountRounded = roundTo2Decimals(newPaymentForm.amount)
-
-    if (editingPaymentId) {
-      const result = await updateInvoice(editingPaymentId, {
-        amount: amountRounded,
-        description: newPaymentForm.description,
-        invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
-      })
-      if (!result.ok) {
-        alert('Fehler beim Speichern der Zahlung')
-        return
-      }
-    } else {
-      // Prüfe ob die Rechnungsnummer bereits existiert
-      if (invoiceNumber) {
-        const existing = await getInvoiceByNumber(invoiceNumber)
-        if (existing.ok) {
-          alert(`Die Rechnungsnummer "${invoiceNumber}" ist bereits vergeben. Bitte wählen Sie eine andere Nummer.`)
-          return
-        }
-      }
-
-      const result = await createInvoice({
-        projectId,
-        type: 'partial',
-        amount: amountRounded,
-        invoiceDate: newPaymentForm.date || new Date().toISOString().split('T')[0],
-        description: newPaymentForm.description,
-        invoiceNumber: invoiceNumber || undefined,
-      })
-      if (!result.ok) {
-        alert('Fehler beim Speichern der Zahlung')
-        return
-      }
-    }
-
-    await loadProjectInvoices(projectId)
-    resetForm()
-  }
-
-  const handleDeletePayment = async (projectId: string, paymentId: string) => {
-    if (!confirm('Möchten Sie diese Zahlung wirklich löschen?')) return
-    await deleteInvoice(paymentId)
-    await loadProjectInvoices(projectId)
-  }
-
-  const handleMarkPaymentPaid = async (paymentId: string, paidDate: string) => {
-    if (!selectedProject) return
-    await markInvoicePaid(paymentId, paidDate)
-    await loadProjectInvoices(selectedProject.id)
-  }
-
-  const handleUnmarkPaymentPaid = async (paymentId: string) => {
-    if (!selectedProject) return
-    await markInvoiceUnpaid(paymentId)
-    await loadProjectInvoices(selectedProject.id)
-  }
-
-  const handleGenerateFinalInvoice = async (invoiceDate: string) => {
-    if (!selectedProject) return
-    const projectId = selectedProject.id
-
-    const project = projects.find(p => p.id === projectId)
-    if (!project) return
-
-    const totalPartial = partialPayments.reduce((sum, p) => sum + p.amount, 0)
-    const remaining = project.totalAmount - totalPartial
-
-    if (remaining <= 0) {
-      alert('Es gibt keinen verbleibenden Betrag für die Schlussrechnung.')
-      return
-    }
-
-    if (partialPayments.some(p => !p.isPaid)) {
-      alert(
-        '⚠️ Schlussrechnungen können erst erzeugt werden, wenn alle Anzahlungen bezahlt sind.',
-      )
-      return
-    }
-
-    if (finalInvoice) {
-      alert('Es existiert bereits eine Schlussrechnung für dieses Projekt.')
-      return
-    }
-
-    const result = await createInvoice({
-      projectId,
-      type: 'final',
-      amount: remaining,
-      description: 'Schlussrechnung',
-      invoiceDate: invoiceDate || new Date().toISOString().split('T')[0],
-    })
-
-    if (!result.ok) {
-      alert('Fehler beim Erstellen der Schlussrechnung')
-      return
-    }
-
-    await loadProjectInvoices(projectId)
-    alert('Schlussrechnung wurde erstellt!')
-  }
-
-  const handleMarkFinalInvoicePaid = async (paidDate: string) => {
-    if (!finalInvoice) return
-    await markInvoicePaid(finalInvoice.id, paidDate)
-    if (selectedProject) {
-      await loadProjectInvoices(selectedProject.id)
-    }
-  }
-
-  const handleUnmarkFinalInvoicePaid = async () => {
-    if (!finalInvoice) return
-    await markInvoiceUnpaid(finalInvoice.id)
-    if (selectedProject) {
-      await loadProjectInvoices(selectedProject.id)
-    }
-  }
-
-  const handleDeleteFinalInvoice = async () => {
-    if (!finalInvoice || !selectedProject) return
-
-    const confirmMessage = finalInvoice.isPaid
-      ? 'Die Schlussrechnung ist als bezahlt markiert. Trotzdem löschen?'
-      : 'Möchten Sie die Schlussrechnung wirklich löschen?'
-    if (!confirm(confirmMessage)) return
-
-    const result = await deleteInvoice(finalInvoice.id)
-    if (!result.ok) {
-      alert('Fehler beim Löschen der Schlussrechnung')
-      return
-    }
-    await loadProjectInvoices(selectedProject.id)
-  }
-
-  const startNewPayment = async () => {
-    if (!selectedProject) return
-    const paymentCount = partialPayments.length
-    
-    // Lade die vorgeschlagene Rechnungsnummer
-    const suggested = await peekNextInvoiceNumber()
-    setSuggestedInvoiceNumber(suggested)
-    setInvoiceNumber(suggested)
-    
-    setNewPaymentForm({
-      description: `Anzahlung ${paymentCount + 1}`,
-      amount: undefined,
-      date: new Date().toISOString().split('T')[0],
-    })
-    setEditingPaymentId(null)
-    setPercentInput('')
-    setEditingPercentInput('')
-  }
-
-  const startEditPayment = (invoice: Invoice) => {
-    setEditingPaymentId(invoice.id)
-    setNewPaymentForm({
-      description: invoice.description,
-      amount: invoice.amount,
-      date: invoice.invoiceDate,
-    })
-    if (calculations.grossTotal > 0 && invoice.amount > 0) {
-      setEditingPercentInput(((invoice.amount / calculations.grossTotal) * 100).toFixed(1))
-    } else {
-      setEditingPercentInput('')
-    }
-  }
-
-  const showProjectList = !projectIdParam
+  const {
+    selectedProject,
+    editingPaymentId,
+    newPaymentForm,
+    setNewPaymentForm,
+    percentInput,
+    editingPercentInput,
+    partialPayments,
+    finalInvoice,
+    calculations,
+    showProjectList,
+    resetForm,
+    handleSelectProject,
+    handleQuickPercent,
+    handlePercentChange,
+    handlePercentBlur,
+    handleEditingPercentChange,
+    handleEditingPercentBlur,
+    handleSavePayment,
+    handleDeletePayment,
+    handleMarkPaymentPaid,
+    handleUnmarkPaymentPaid,
+    handleGenerateFinalInvoice,
+    handleMarkFinalInvoicePaid,
+    handleUnmarkFinalInvoicePaid,
+    handleDeleteFinalInvoice,
+    startNewPayment,
+    startEditPayment,
+    loadingInvoices,
+    invoiceNumber,
+    setInvoiceNumber,
+    suggestedInvoiceNumber,
+  } = usePaymentFlow({ projects, projectIdParam })
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-slate-50 via-white to-slate-50 p-8">
@@ -454,7 +139,7 @@ function PaymentsPageContent() {
                     {!newPaymentForm && (
                       <button
                         type="button"
-                        onClick={startNewPayment}
+                        onClick={() => void startNewPayment()}
                         className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-amber-600"
                       >
                         <Plus className="h-4 w-4" />
@@ -476,7 +161,7 @@ function PaymentsPageContent() {
                       onPercentBlur={handlePercentBlur}
                       onQuickPercent={handleQuickPercent}
                       onInvoiceNumberChange={setInvoiceNumber}
-                      onSave={() => handleSavePayment(selectedProject.id)}
+                      onSave={() => void handleSavePayment(selectedProject.id)}
                       onCancel={resetForm}
                     />
                   )}
@@ -506,28 +191,22 @@ function PaymentsPageContent() {
                           editingPercentInput={editingPercentInput}
                           grossTotal={calculations.grossTotal}
                           onEdit={() => startEditPayment(invoice)}
-                          onSave={() => handleSavePayment(selectedProject.id)}
+                          onSave={() => void handleSavePayment(selectedProject.id)}
                           onCancel={() => {
                             if (invoice.amount === 0) {
-                              handleDeletePayment(selectedProject.id, invoice.id)
+                              void handleDeletePayment(selectedProject.id, invoice.id)
                             }
                             resetForm()
                           }}
-                          onDelete={() => handleDeletePayment(selectedProject.id, invoice.id)}
+                          onDelete={() => void handleDeletePayment(selectedProject.id, invoice.id)}
                           onFormChange={setNewPaymentForm}
                           onPercentChange={handleEditingPercentChange}
                           onPercentBlur={handleEditingPercentBlur}
-                          onQuickPercent={percent => {
-                            const amount = roundTo2Decimals(
-                              (calculations.grossTotal * percent) / 100
-                            )
-                            setNewPaymentForm(prev => ({ ...prev, amount }))
-                            setEditingPercentInput(percent.toString())
-                          }}
-                          onMarkAsPaid={paidDate =>
-                            handleMarkPaymentPaid(invoice.id, paidDate)
+                          onQuickPercent={(percent) => handleEditingPercentChange(percent.toString())}
+                          onMarkAsPaid={(paidDate) =>
+                            void handleMarkPaymentPaid(invoice.id, paidDate)
                           }
-                          onUnmarkAsPaid={() => handleUnmarkPaymentPaid(invoice.id)}
+                          onUnmarkAsPaid={() => void handleUnmarkPaymentPaid(invoice.id)}
                         />
                       ))
                     ) : (
@@ -544,14 +223,14 @@ function PaymentsPageContent() {
                   {/* Summary and Final Invoice – auch bei 0 Anzahlungen (Direkt Schlussrechnung) */}
                   {calculations.grossTotal > 0 && (
                     <PaymentSummary
-                      partialPayments={partialPayments.map(inv => ({
-                        id: inv.id,
-                        invoiceNumber: inv.invoiceNumber,
-                        amount: inv.amount,
-                        date: inv.invoiceDate,
-                        description: inv.description,
-                        isPaid: inv.isPaid,
-                        paidDate: inv.paidDate,
+                      partialPayments={partialPayments.map((invoice) => ({
+                        id: invoice.id,
+                        invoiceNumber: invoice.invoiceNumber,
+                        amount: invoice.amount,
+                        date: invoice.invoiceDate,
+                        description: invoice.description,
+                        isPaid: invoice.isPaid,
+                        paidDate: invoice.paidDate,
                       }))}
                       grossTotal={calculations.grossTotal}
                       finalInvoice={
@@ -566,10 +245,10 @@ function PaymentsPageContent() {
                             }
                           : undefined
                       }
-                      onGenerateFinalInvoice={(invoiceDate) => handleGenerateFinalInvoice(invoiceDate)}
-                      onMarkFinalInvoicePaid={handleMarkFinalInvoicePaid}
-                      onUnmarkFinalInvoicePaid={handleUnmarkFinalInvoicePaid}
-                      onDeleteFinalInvoice={handleDeleteFinalInvoice}
+                      onGenerateFinalInvoice={(invoiceDate) => void handleGenerateFinalInvoice(invoiceDate)}
+                      onMarkFinalInvoicePaid={(paidDate) => void handleMarkFinalInvoicePaid(paidDate)}
+                      onUnmarkFinalInvoicePaid={() => void handleUnmarkFinalInvoicePaid()}
+                      onDeleteFinalInvoice={() => void handleDeleteFinalInvoice()}
                     />
                   )}
                 </div>
