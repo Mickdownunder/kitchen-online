@@ -24,18 +24,27 @@ interface FunctionCallInfo {
   id: string
   name: string
   args: Record<string, unknown>
+  /** Gemini 3: required when sending function response back; from stream or use dummy. */
+  thoughtSignature?: string
 }
 
+/** History must start with a user turn (Gemini API requirement). */
 function normalizeHistory(
   chatHistory: ChatHistoryEntry[],
 ): Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> {
-  return chatHistory.map((message) => {
+  const mapped = chatHistory.map((message) => {
     const role = message.role === 'user' ? 'user' : 'model'
     return {
       role,
       parts: [{ text: message.content }],
     }
   })
+  // Drop leading model messages so the first turn is always user
+  let start = 0
+  while (start < mapped.length && mapped[start].role === 'model') {
+    start += 1
+  }
+  return mapped.slice(start)
 }
 
 async function streamAndCollect(
@@ -50,13 +59,16 @@ async function streamAndCollect(
     }
 
     if (chunk.functionCalls?.length) {
-      for (const functionCall of chunk.functionCalls) {
+      for (let i = 0; i < chunk.functionCalls.length; i += 1) {
+        const functionCall = chunk.functionCalls[i]
+        const raw = functionCall as typeof functionCall & { thoughtSignature?: string }
         collectedFunctionCalls.push({
           id:
             functionCall.id ||
             `fc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: functionCall.name || 'unknown',
           args: (functionCall.args || {}) as Record<string, unknown>,
+          thoughtSignature: raw.thoughtSignature,
         })
       }
     }
@@ -65,14 +77,17 @@ async function streamAndCollect(
   return collectedFunctionCalls
 }
 
+/** Dummy thought_signature when stream does not provide one (Gemini 3 requirement). */
+const THOUGHT_SIGNATURE_SKIP = 'skip_thought_signature_validator'
+
 async function executeFunctionCalls(
   functionCalls: FunctionCallInfo[],
   supabase: SupabaseClient,
   userId: string,
   send: (data: Record<string, unknown>) => void,
   allUpdatedProjectIds: Set<string>,
-): Promise<ReturnType<typeof createPartFromFunctionResponse>[]> {
-  const functionResponseParts = []
+): Promise<unknown[]> {
+  const parts: unknown[] = []
 
   for (const functionCall of functionCalls) {
     logger.info('Executing server function call', {
@@ -104,14 +119,24 @@ async function executeFunctionCalls(
       })
     }
 
-    functionResponseParts.push(
+    // Gemini 3: must send model's functionCall part with thoughtSignature, then our response
+    parts.push({
+      functionCall: {
+        id: functionCall.id,
+        name: functionCall.name,
+        args: functionCall.args,
+      },
+      thoughtSignature:
+        functionCall.thoughtSignature ?? THOUGHT_SIGNATURE_SKIP,
+    })
+    parts.push(
       createPartFromFunctionResponse(functionCall.id, functionCall.name, {
         result: handlerResult.result,
       }),
     )
   }
 
-  return functionResponseParts
+  return parts
 }
 
 export function createChatStreamResponse(input: CreateChatStreamResponseInput): Response {
@@ -150,15 +175,14 @@ export function createChatStreamResponse(input: CreateChatStreamResponseInput): 
           round += 1
           send({ type: 'functionCalls', functionCalls: pendingFunctionCalls, executing: true })
 
-          const functionResponseParts = await executeFunctionCalls(
+          const nextMessageParts = await executeFunctionCalls(
             pendingFunctionCalls,
             input.supabase,
             input.userId,
             send,
             allUpdatedProjectIds,
           )
-
-          const nextStream = await chat.sendMessageStream({ message: functionResponseParts })
+          const nextStream = await chat.sendMessageStream({ message: nextMessageParts })
           pendingFunctionCalls = await streamAndCollect(nextStream, send)
         }
 
