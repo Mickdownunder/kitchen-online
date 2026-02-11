@@ -2,8 +2,7 @@ import type {
   CustomerDeliveryNote,
   DeliveryNote,
   DeliveryNoteItem,
-  GoodsReceipt,
-  GoodsReceiptItem,
+  GoodsReceiptItemStatus,
 } from '@/types'
 
 export type CreateDeliveryNoteInput = Omit<
@@ -15,8 +14,23 @@ export type CreateDeliveryNoteInput = Omit<
 
 export type UpdateDeliveryNoteInput = Partial<DeliveryNote>
 
-export type CreateGoodsReceiptInput = Omit<GoodsReceipt, 'id' | 'createdAt' | 'updatedAt'> & {
-  items?: GoodsReceiptItem[]
+export interface CreateGoodsReceiptInput {
+  projectId: string
+  deliveryNoteId?: string
+  supplierOrderId?: string
+  receiptDate?: string
+  receiptType: 'partial' | 'complete'
+  idempotencyKey?: string
+  status?: 'pending' | 'verified' | 'booked'
+  notes?: string
+  items?: Array<{
+    projectItemId: string
+    deliveryNoteItemId?: string
+    quantityReceived: number
+    quantityExpected: number
+    status?: GoodsReceiptItemStatus
+    notes?: string
+  }>
 }
 
 export type CreateCustomerDeliveryNoteInput = Omit<

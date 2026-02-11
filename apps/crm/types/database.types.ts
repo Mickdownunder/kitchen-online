@@ -336,6 +336,9 @@ export type Database = {
           ab_confirmed_delivery_date: string | null
           ab_deviations: Json
           ab_received_at: string | null
+          ab_document_url: string | null
+          ab_document_name: string | null
+          ab_document_mime_type: string | null
           supplier_delivery_note_id: string | null
           goods_receipt_id: string | null
           notes: string | null
@@ -364,6 +367,9 @@ export type Database = {
           ab_confirmed_delivery_date?: string | null
           ab_deviations?: Json
           ab_received_at?: string | null
+          ab_document_url?: string | null
+          ab_document_name?: string | null
+          ab_document_mime_type?: string | null
           supplier_delivery_note_id?: string | null
           goods_receipt_id?: string | null
           notes?: string | null
@@ -392,6 +398,9 @@ export type Database = {
           ab_confirmed_delivery_date?: string | null
           ab_deviations?: Json
           ab_received_at?: string | null
+          ab_document_url?: string | null
+          ab_document_name?: string | null
+          ab_document_mime_type?: string | null
           supplier_delivery_note_id?: string | null
           goods_receipt_id?: string | null
           notes?: string | null

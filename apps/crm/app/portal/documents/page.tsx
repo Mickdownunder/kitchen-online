@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, CloudUpload, FileText, FolderOpen, Loader2, Upload } from 'lucide-react'
 import { portalSupabase } from '@/lib/supabase/portal-client'
+import { CUSTOMER_PORTAL_DOCUMENT_TYPES } from '@/lib/portal/documentVisibility'
 import { useProject } from '../context/ProjectContext'
 import { useCustomerApi } from '../hooks/useCustomerApi'
 import { DocumentCard, documentTypeConfig, type PortalDocument } from './documents.ui'
@@ -39,6 +40,7 @@ export default function PortalDocumentsPage() {
         .from('documents')
         .select('id, name, type, file_path, file_size, mime_type, uploaded_at, uploaded_by')
         .eq('project_id', projectId)
+        .in('type', Array.from(CUSTOMER_PORTAL_DOCUMENT_TYPES))
         .order('uploaded_at', { ascending: false })
 
       if (fetchError) {

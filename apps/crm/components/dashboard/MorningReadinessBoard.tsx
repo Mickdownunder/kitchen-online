@@ -115,7 +115,7 @@ export default function MorningReadinessBoard({ projects }: MorningReadinessBoar
             {showReady ? 'Bereit ausblenden' : 'Bereit anzeigen'}
           </button>
           <Link
-            href="/projects?filter=material_risk"
+            href="/orders?queue=brennt"
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
           >
             Risiko-Liste <ArrowRight className="h-3.5 w-3.5" />

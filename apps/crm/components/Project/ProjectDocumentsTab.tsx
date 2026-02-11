@@ -165,7 +165,7 @@ export function ProjectDocumentsTab({ project, onPortalAccessSent }: ProjectDocu
     }
 
     if (doc.type === 'supplier-delivery-note') {
-      router.push(`/deliveries?type=supplier&search=${encodeURIComponent(doc.number || '')}`)
+      router.push(`/orders?queue=lieferschein-da&search=${encodeURIComponent(doc.number || '')}`)
       return
     }
 

@@ -151,6 +151,7 @@ export async function proxy(request: NextRequest) {
     '/tickets',
     '/payments',
     '/invoices',
+    '/orders',
     '/deliveries',
     '/statistics',
     '/accounting',

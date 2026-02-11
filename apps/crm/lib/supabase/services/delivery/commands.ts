@@ -3,7 +3,6 @@ import type {
   CustomerDeliveryNote,
   DeliveryNote,
   GoodsReceipt,
-  GoodsReceiptItem,
 } from '@/types'
 import { logger } from '@/lib/utils/logger'
 import { supabase } from '../../client'
@@ -337,7 +336,7 @@ export async function createGoodsReceipt(
   }
 
   if (goodsReceipt.items && goodsReceipt.items.length > 0) {
-    const itemsToInsert = goodsReceipt.items.map((item: GoodsReceiptItem) => ({
+    const itemsToInsert = goodsReceipt.items.map((item) => ({
       goods_receipt_id: data.id,
       project_item_id: item.projectItemId,
       delivery_note_item_id: item.deliveryNoteItemId || null,
@@ -374,7 +373,7 @@ export async function createGoodsReceipt(
       .from('supplier_orders')
       .update({
         goods_receipt_id: data.id,
-        booked_at: new Date().toISOString(),
+        booked_at: projectState?.all_items_delivered ? new Date().toISOString() : null,
         status: targetStatus,
       })
       .eq('id', goodsReceipt.supplierOrderId)

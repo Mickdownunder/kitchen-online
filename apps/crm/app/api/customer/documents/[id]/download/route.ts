@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireCustomerSession } from '@/lib/auth/requireCustomerSession'
-
-const ALLOWED_TYPES = [
-  'PLANE',
-  'INSTALLATIONSPLANE',
-  'KAUFVERTRAG',
-  'RECHNUNGEN',
-  'LIEFERSCHEINE',
-  'AUSMESSBERICHT',
-  'KUNDEN_DOKUMENT',
-]
+import { isCustomerPortalDocumentType } from '@/lib/portal/documentVisibility'
 
 async function isCustomerProject(
   supabase: SupabaseClient,
@@ -65,7 +56,7 @@ export async function GET(
       )
     }
 
-    if (!document.type || !ALLOWED_TYPES.includes(document.type)) {
+    if (!isCustomerPortalDocumentType(document.type)) {
       return NextResponse.json(
         { success: false, error: 'FORBIDDEN' },
         { status: 403 }

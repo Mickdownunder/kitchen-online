@@ -16,7 +16,7 @@ import {
   LogOut,
   ReceiptText,
   Building2,
-  Truck,
+  ShoppingCart,
   BarChart3,
   FileCheck,
   MessageSquare,
@@ -156,9 +156,9 @@ const CrmLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       permission: 'menu_invoices' as const,
     },
     {
-      id: '/deliveries',
-      label: 'Lieferscheine',
-      icon: Truck,
+      id: '/orders',
+      label: 'Bestellungen',
+      icon: ShoppingCart,
       permission: 'menu_deliveries' as const,
     },
     {

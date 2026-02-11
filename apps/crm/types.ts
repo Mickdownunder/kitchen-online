@@ -910,6 +910,9 @@ export interface SupplierOrder {
   abConfirmedDeliveryDate?: string
   abDeviations: SupplierOrderDeviation[]
   abReceivedAt?: string
+  abDocumentUrl?: string
+  abDocumentName?: string
+  abDocumentMimeType?: string
   supplierDeliveryNoteId?: string
   goodsReceiptId?: string
   notes?: string

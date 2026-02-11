@@ -6,6 +6,11 @@ import { sendEmail } from '@/lib/supabase/services/email'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import type { Json } from '@/types/database.types'
 import {
+  collectSupplierOrderCandidateInvoiceItemIds,
+  deriveProjectDeliveryStatus,
+  toFiniteNumber,
+} from '@/lib/orders/orderFulfillment'
+import {
   buildSupplierOrderTemplate,
   supplierOrderPdfFileName,
   type SupplierOrderTemplateInput,
@@ -52,6 +57,7 @@ interface SupplierOrderRouteRow {
       }[]
     | null
   supplier_order_items: Array<{
+    invoice_item_id: string | null
     position_number: number
     description: string
     quantity: number
@@ -85,16 +91,7 @@ function relationToSingle<T>(value: T | T[] | null): T | null {
 }
 
 function toNumber(value: unknown): number {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : 0
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number.parseFloat(value)
-    return Number.isFinite(parsed) ? parsed : 0
-  }
-
-  return 0
+  return toFiniteNumber(value)
 }
 
 function getSupplierIdFromRelation(
@@ -120,10 +117,11 @@ function getSupplierIdFromRelation(
 
 async function markProjectItemsOrderedForSupplier(
   supabase: Awaited<ReturnType<typeof createClient>>,
+  orderId: string,
   projectId: string,
   supplierId: string,
 ): Promise<void> {
-  const { data: itemRows } = await supabase
+  const { data: itemRows, error: itemRowsError } = await supabase
     .from('invoice_items')
     .select(
       `
@@ -137,11 +135,37 @@ async function markProjectItemsOrderedForSupplier(
     )
     .eq('project_id', projectId)
 
-  const candidateItems = (itemRows || []).filter((row) => {
-    return getSupplierIdFromRelation(
-      row.articles as { supplier_id: string | null } | { supplier_id: string | null }[] | null,
-    ) === supplierId
-  })
+  if (itemRowsError) {
+    throw new Error(itemRowsError.message)
+  }
+
+  const { data: orderItemRows, error: orderItemRowsError } = await supabase
+    .from('supplier_order_items')
+    .select('invoice_item_id')
+    .eq('supplier_order_id', orderId)
+    .not('invoice_item_id', 'is', null)
+
+  if (orderItemRowsError) {
+    throw new Error(orderItemRowsError.message)
+  }
+
+  const invoiceItemIdsFromOrder = new Set<string>(
+    (orderItemRows || [])
+      .map((row) => (typeof row.invoice_item_id === 'string' ? row.invoice_item_id : null))
+      .filter((value): value is string => Boolean(value)),
+  )
+
+  const candidateIds = collectSupplierOrderCandidateInvoiceItemIds(
+    (itemRows || []).map((row) => ({
+      id: String(row.id),
+      supplierId: getSupplierIdFromRelation(
+        row.articles as { supplier_id: string | null } | { supplier_id: string | null }[] | null,
+      ),
+    })),
+    supplierId,
+    invoiceItemIdsFromOrder,
+  )
+  const candidateItems = (itemRows || []).filter((row) => candidateIds.has(String(row.id)))
 
   for (const item of candidateItems) {
     const quantity = Math.max(0, toNumber(item.quantity))
@@ -155,63 +179,49 @@ async function markProjectItemsOrderedForSupplier(
       deliveryStatus = 'partially_delivered'
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('invoice_items')
       .update({
         quantity_ordered: ordered,
         delivery_status: deliveryStatus,
       })
       .eq('id', item.id)
+
+    if (updateError) {
+      throw new Error(updateError.message)
+    }
   }
 
-  const { data: refreshedRows } = await supabase
+  const { data: refreshedRows, error: refreshedRowsError } = await supabase
     .from('invoice_items')
     .select('delivery_status, quantity, quantity_ordered, quantity_delivered')
     .eq('project_id', projectId)
+
+  if (refreshedRowsError) {
+    throw new Error(refreshedRowsError.message)
+  }
 
   const rows = refreshedRows || []
   if (rows.length === 0) {
     return
   }
 
-  const allDelivered = rows.every((item) => {
-    return item.delivery_status === 'delivered' && toNumber(item.quantity_delivered) >= toNumber(item.quantity)
-  })
+  const deliveryState = deriveProjectDeliveryStatus(rows)
 
-  const partiallyDelivered = rows.some((item) => {
-    return (
-      item.delivery_status === 'partially_delivered' ||
-      (toNumber(item.quantity_delivered) > 0 &&
-        toNumber(item.quantity_delivered) < toNumber(item.quantity))
-    )
-  })
-
-  const allOrdered = rows.every((item) => {
-    const orderedQuantity = Math.max(toNumber(item.quantity_ordered), toNumber(item.quantity_delivered))
-    const quantity = toNumber(item.quantity)
-    if (quantity > 0 && orderedQuantity >= quantity) {
-      return true
-    }
-
-    return item.delivery_status !== 'not_ordered'
-  })
-
-  const projectDeliveryStatus = allDelivered
-    ? 'fully_delivered'
-    : partiallyDelivered
-      ? 'partially_delivered'
-      : allOrdered
-        ? 'fully_ordered'
-        : 'partially_ordered'
-
-  await supabase
+  const { error: projectUpdateError } = await supabase
     .from('projects')
     .update({
-      delivery_status: projectDeliveryStatus,
-      all_items_delivered: allDelivered,
-      ready_for_assembly_date: allDelivered ? new Date().toISOString().split('T')[0] : null,
+      delivery_status: deliveryState.status,
+      all_items_delivered: deliveryState.allDelivered,
+      ready_for_assembly_date: deliveryState.allDelivered
+        ? new Date().toISOString().split('T')[0]
+        : null,
     })
     .eq('id', projectId)
+
+  if (projectUpdateError) {
+    throw new Error(projectUpdateError.message)
+  }
 }
 
 async function resolveCompanyName(
@@ -309,6 +319,7 @@ export async function POST(
         suppliers (id, name, email, order_email),
         projects (id, order_number, customer_name, installation_date),
         supplier_order_items (
+          invoice_item_id,
           position_number,
           description,
           quantity,
@@ -441,7 +452,7 @@ export async function POST(
       })
     }
 
-    await markProjectItemsOrderedForSupplier(supabase, row.project_id, row.supplier_id)
+    await markProjectItemsOrderedForSupplier(supabase, row.id, row.project_id, row.supplier_id)
 
     const { error: logError } = await supabase.from('supplier_order_dispatch_logs').insert({
       supplier_order_id: id,

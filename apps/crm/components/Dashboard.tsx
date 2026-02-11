@@ -194,7 +194,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </h3>
           </div>
           <Link
-            href="/projects?filter=material_risk"
+            href="/orders?queue=brennt"
             className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider text-red-600 transition-colors hover:text-red-700"
           >
             Risiko-Details <ArrowRight className="h-3.5 w-3.5" />
@@ -230,7 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           </Link>
 
           <Link
-            href="/projects?filter=material_risk"
+            href="/orders?queue=brennt"
             className="rounded-xl border border-purple-200 bg-purple-50/70 px-4 py-3 transition-colors hover:bg-purple-100/70"
           >
             <div className="flex items-center justify-between">

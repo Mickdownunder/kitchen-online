@@ -13,12 +13,17 @@ jest.mock('@/app/api/portal/publish-document/render', () => ({
 jest.mock('@/app/api/portal/publish-document/persist', () => ({
   persistDocument: jest.fn(),
 }))
+jest.mock('@/app/api/portal/publish-document/guards', () => ({
+  validatePublishPayload: jest.fn(),
+}))
 
 import { renderDocumentPdf } from '@/app/api/portal/publish-document/render'
 import { persistDocument } from '@/app/api/portal/publish-document/persist'
+import { validatePublishPayload } from '@/app/api/portal/publish-document/guards'
 
 const mockRender = renderDocumentPdf as jest.MockedFunction<typeof renderDocumentPdf>
 const mockPersist = persistDocument as jest.MockedFunction<typeof persistDocument>
+const mockValidate = validatePublishPayload as jest.MockedFunction<typeof validatePublishPayload>
 
 const minimalPayload: PublishRequest = {
   documentType: 'order',
@@ -47,6 +52,8 @@ const minimalAuth: AuthorizationContext = {
 beforeEach(() => {
   mockRender.mockReset()
   mockPersist.mockReset()
+  mockValidate.mockReset()
+  mockValidate.mockResolvedValue(null)
 })
 
 describe('publishDocument usecase', () => {
@@ -61,6 +68,21 @@ describe('publishDocument usecase', () => {
     expect(mockPersist).toHaveBeenCalledWith(minimalPayload, minimalRendered, minimalAuth)
     expect(result).toBe(response)
     expect(result.status).toBe(200)
+  })
+
+  it('returns validation response and skips render/persist', async () => {
+    const validationResponse = NextResponse.json(
+      { success: false, error: 'delivery_note_not_customer' },
+      { status: 400 },
+    )
+    mockValidate.mockResolvedValue(validationResponse)
+
+    const result = await publishDocument(minimalPayload, minimalAuth)
+
+    expect(result).toBe(validationResponse)
+    expect(result.status).toBe(400)
+    expect(mockRender).not.toHaveBeenCalled()
+    expect(mockPersist).not.toHaveBeenCalled()
   })
 
   it('returns error response when persist returns error response', async () => {

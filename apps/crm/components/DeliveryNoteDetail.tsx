@@ -100,20 +100,16 @@ export default function DeliveryNoteDetail({
       const goodsReceiptItems = deliveryNote.items
         .filter(item => item.matchedProjectItemId)
         .map(item => ({
-          id: '', // Will be set by service
-          goodsReceiptId: '',
           projectItemId: item.matchedProjectItemId!,
           deliveryNoteItemId: item.id,
           quantityReceived: item.quantityReceived,
           quantityExpected: item.quantityOrdered,
           status: 'received' as const,
-          createdAt: new Date().toISOString(),
         }))
 
       const receiptResult = await createGoodsReceipt({
         projectId: deliveryNote.matchedProjectId,
         deliveryNoteId: deliveryNote.id,
-        userId: deliveryNote.userId,
         receiptDate: new Date().toISOString(),
         receiptType:
           goodsReceiptItems.length === deliveryNote.items.length ? 'complete' : 'partial',

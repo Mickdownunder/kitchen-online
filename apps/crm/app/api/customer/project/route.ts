@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireCustomerSession } from '@/lib/auth/requireCustomerSession'
+import { CUSTOMER_PORTAL_DOCUMENT_TYPES } from '@/lib/portal/documentVisibility'
 
 /**
  * GET /api/customer/project
@@ -183,15 +184,7 @@ export async function GET(request: NextRequest) {
         .from('documents')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', project_id)
-        .in('type', [
-          'PLANE',
-          'INSTALLATIONSPLANE',
-          'KAUFVERTRAG',
-          'RECHNUNGEN',
-          'LIEFERSCHEINE',
-          'AUSMESSBERICHT',
-          'KUNDEN_DOKUMENT',
-        ]),
+        .in('type', Array.from(CUSTOMER_PORTAL_DOCUMENT_TYPES)),
       
       // Offene Tickets zählen
       supabase

@@ -49,6 +49,18 @@ interface SupplierInvoiceItemRow {
     | null
 }
 
+const SUPPLIER_ORDER_MIGRATION_HINT =
+  'Bestellmodul-Datenbanktabellen fehlen. Bitte Migrationen ausführen: ' +
+  '20260210233000_supplier_order_workflow.sql und 20260211004000_supplier_order_ab_documents.sql ' +
+  '(z.B. mit `pnpm --filter @kitchen/db migrate`).'
+
+interface PostgrestErrorLike {
+  code?: string
+  message?: string
+  details?: string
+  hint?: string
+}
+
 export interface SupplierOrderItemInput {
   invoiceItemId?: string
   articleId?: string
@@ -83,6 +95,9 @@ export interface CreateSupplierOrderInput {
   abConfirmedDeliveryDate?: string
   abDeviations?: SupplierOrderDeviation[]
   abReceivedAt?: string
+  abDocumentUrl?: string
+  abDocumentName?: string
+  abDocumentMimeType?: string
   supplierDeliveryNoteId?: string
   goodsReceiptId?: string
   notes?: string
@@ -107,6 +122,9 @@ export interface UpdateSupplierOrderInput {
   abConfirmedDeliveryDate?: string
   abDeviations?: SupplierOrderDeviation[]
   abReceivedAt?: string
+  abDocumentUrl?: string
+  abDocumentName?: string
+  abDocumentMimeType?: string
   supplierDeliveryNoteId?: string
   goodsReceiptId?: string
   notes?: string
@@ -132,6 +150,37 @@ export interface SyncSupplierOrderBucketInput {
 function toInternalError(error: unknown): ServiceResult<never> {
   const message = error instanceof Error ? error.message : 'Unbekannter Fehler'
   return fail('INTERNAL', message, error)
+}
+
+function isSupplierOrderSchemaMissing(error: unknown): boolean {
+  const err = (error || {}) as PostgrestErrorLike
+  const code = String(err.code || '').toUpperCase()
+  const blob = [err.message, err.details, err.hint].filter(Boolean).join(' ').toLowerCase()
+
+  if (code === '42P01' || code === 'PGRST204' || code === 'PGRST205') {
+    return true
+  }
+
+  return (
+    blob.includes('supplier_orders') ||
+    blob.includes('supplier_order_items') ||
+    blob.includes('supplier_order_dispatch_logs') ||
+    blob.includes('schema cache') ||
+    blob.includes('does not exist')
+  )
+}
+
+function toSupplierOrdersError(error: unknown, operation: string): ServiceResult<never> {
+  if (isSupplierOrderSchemaMissing(error)) {
+    logger.warn(`${operation}: supplier order schema missing`, {
+      component: 'supplierOrders',
+      hint: SUPPLIER_ORDER_MIGRATION_HINT,
+      code: ((error || {}) as PostgrestErrorLike).code || null,
+    })
+    return fail('VALIDATION', SUPPLIER_ORDER_MIGRATION_HINT, error)
+  }
+
+  return toInternalError(error)
 }
 
 async function getAuthenticatedUserId(): Promise<ServiceResult<string>> {
@@ -179,6 +228,20 @@ function normalizeAbDeviations(value: unknown): SupplierOrderDeviation[] {
       note: entry.note ? String(entry.note) : undefined,
     }))
     .filter((entry) => entry.field.length > 0)
+}
+
+function serializeAbDeviations(value: SupplierOrderDeviation[] | undefined): Json[] {
+  return (value || []).map((entry) => {
+    const jsonEntry: { [key: string]: Json | undefined } = {
+      field: entry.field,
+      itemId: entry.itemId ?? null,
+      expected: entry.expected ?? null,
+      actual: entry.actual ?? null,
+      note: entry.note ?? null,
+    }
+
+    return jsonEntry
+  })
 }
 
 function mapSupplierOrderItem(row: Row<'supplier_order_items'>): SupplierOrderItem {
@@ -252,6 +315,9 @@ function mapSupplierOrder(row: SupplierOrderRow): SupplierOrder {
     abConfirmedDeliveryDate: row.ab_confirmed_delivery_date || undefined,
     abDeviations: normalizeAbDeviations(row.ab_deviations),
     abReceivedAt: row.ab_received_at || undefined,
+    abDocumentUrl: row.ab_document_url || undefined,
+    abDocumentName: row.ab_document_name || undefined,
+    abDocumentMimeType: row.ab_document_mime_type || undefined,
     supplierDeliveryNoteId: row.supplier_delivery_note_id || undefined,
     goodsReceiptId: row.goods_receipt_id || undefined,
     notes: row.notes || undefined,
@@ -286,7 +352,7 @@ async function upsertSupplierOrderItems(
     .eq('supplier_order_id', orderId)
 
   if (deleteError) {
-    return toInternalError(deleteError)
+    return toSupplierOrdersError(deleteError, 'upsertSupplierOrderItems.delete')
   }
 
   if (items.length === 0) {
@@ -310,7 +376,7 @@ async function upsertSupplierOrderItems(
 
   const { error: insertError } = await supabase.from('supplier_order_items').insert(payload)
   if (insertError) {
-    return toInternalError(insertError)
+    return toSupplierOrdersError(insertError, 'upsertSupplierOrderItems.insert')
   }
 
   return ok(undefined)
@@ -392,8 +458,7 @@ export async function getSupplierOrders(projectId?: string): Promise<ServiceResu
 
   const { data, error } = await query
   if (error) {
-    logger.error('Error fetching supplier orders', { component: 'supplierOrders' }, error as Error)
-    return toInternalError(error)
+    return toSupplierOrdersError(error, 'getSupplierOrders')
   }
 
   return ok(((data || []) as SupplierOrderRow[]).map(mapSupplierOrder))
@@ -421,7 +486,7 @@ export async function getSupplierOrder(id: string): Promise<ServiceResult<Suppli
     .maybeSingle()
 
   if (error) {
-    return toInternalError(error)
+    return toSupplierOrdersError(error, 'getSupplierOrder')
   }
 
   if (!data) {
@@ -460,8 +525,11 @@ export async function createSupplierOrder(
     template_snapshot: (input.templateSnapshot || null) as Json | null,
     ab_number: input.abNumber || null,
     ab_confirmed_delivery_date: input.abConfirmedDeliveryDate || null,
-    ab_deviations: (input.abDeviations || []) as Json,
+    ab_deviations: serializeAbDeviations(input.abDeviations),
     ab_received_at: input.abReceivedAt || null,
+    ab_document_url: input.abDocumentUrl || null,
+    ab_document_name: input.abDocumentName || null,
+    ab_document_mime_type: input.abDocumentMimeType || null,
     supplier_delivery_note_id: input.supplierDeliveryNoteId || null,
     goods_receipt_id: input.goodsReceiptId || null,
     notes: input.notes || null,
@@ -474,8 +542,7 @@ export async function createSupplierOrder(
     .single()
 
   if (error) {
-    logger.error('Error creating supplier order', { component: 'supplierOrders' }, error as Error)
-    return toInternalError(error)
+    return toSupplierOrdersError(error, 'createSupplierOrder')
   }
 
   if (input.items && input.items.length > 0) {
@@ -517,8 +584,15 @@ export async function updateSupplierOrder(
   if (updates.abConfirmedDeliveryDate !== undefined) {
     updateData.ab_confirmed_delivery_date = updates.abConfirmedDeliveryDate
   }
-  if (updates.abDeviations !== undefined) updateData.ab_deviations = updates.abDeviations
+  if (updates.abDeviations !== undefined) {
+    updateData.ab_deviations = serializeAbDeviations(updates.abDeviations)
+  }
   if (updates.abReceivedAt !== undefined) updateData.ab_received_at = updates.abReceivedAt
+  if (updates.abDocumentUrl !== undefined) updateData.ab_document_url = updates.abDocumentUrl
+  if (updates.abDocumentName !== undefined) updateData.ab_document_name = updates.abDocumentName
+  if (updates.abDocumentMimeType !== undefined) {
+    updateData.ab_document_mime_type = updates.abDocumentMimeType
+  }
   if (updates.supplierDeliveryNoteId !== undefined) {
     updateData.supplier_delivery_note_id = updates.supplierDeliveryNoteId
   }
@@ -533,7 +607,7 @@ export async function updateSupplierOrder(
       .eq('user_id', userResult.data)
 
     if (error) {
-      return toInternalError(error)
+      return toSupplierOrdersError(error, 'updateSupplierOrder')
     }
   }
 
@@ -589,7 +663,7 @@ export async function linkSupplierDeliveryNoteToOrder(
     .eq('user_id', userResult.data)
 
   if (noteError) {
-    return toInternalError(noteError)
+    return toSupplierOrdersError(noteError, 'linkSupplierDeliveryNoteToOrder')
   }
 
   return updateSupplierOrder(orderId, {
@@ -663,7 +737,7 @@ export async function syncSupplierOrderBucketFromProject(
     .maybeSingle()
 
   if (existingOrderError) {
-    return toInternalError(existingOrderError)
+    return toSupplierOrdersError(existingOrderError, 'syncSupplierOrderBucketFromProject')
   }
 
   if (existingOrder?.id) {

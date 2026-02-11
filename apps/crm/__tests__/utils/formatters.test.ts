@@ -11,6 +11,13 @@ import {
   formatWeekNumber,
 } from '@/lib/utils/formatters'
 
+function toLocalIsoDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 describe('formatCurrency', () => {
   it('formats number with German locale', () => {
     expect(formatCurrency(1234.56)).toBe('1.234,56')
@@ -90,20 +97,20 @@ describe('formatRelativeDate', () => {
   })
 
   it('returns "Heute" for today', () => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = toLocalIsoDate(new Date())
     expect(formatRelativeDate(today)).toBe('Heute')
   })
 
   it('returns "Gestern" for yesterday', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    expect(formatRelativeDate(yesterday.toISOString().split('T')[0])).toBe('Gestern')
+    expect(formatRelativeDate(toLocalIsoDate(yesterday))).toBe('Gestern')
   })
 
   it('returns "Morgen" for tomorrow', () => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    expect(formatRelativeDate(tomorrow.toISOString().split('T')[0])).toBe('Morgen')
+    expect(formatRelativeDate(toLocalIsoDate(tomorrow))).toBe('Morgen')
   })
 
   it('returns formatted date for other days', () => {
