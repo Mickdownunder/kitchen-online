@@ -56,8 +56,28 @@ export async function POST(
       p_permission_code: 'edit_projects',
     })
 
-    if (permissionError || !hasPermission) {
-      return apiErrors.forbidden({ component: 'api/supplier-orders/documents' })
+    if (permissionError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Berechtigungsprüfung fehlgeschlagen. Bitte Team-Rolle/Company-Mitgliedschaft prüfen oder Admin kontaktieren.',
+          code: 'PERMISSION_CHECK_FAILED',
+        },
+        { status: 500 },
+      )
+    }
+
+    if (!hasPermission) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Fehlende Berechtigung `edit_projects`. Bitte Benutzer in Teamverwaltung aktivieren und Rolle mit Projektbearbeitung zuweisen.',
+          code: 'FORBIDDEN',
+        },
+        { status: 403 },
+      )
     }
 
     const formData = await request.formData()
