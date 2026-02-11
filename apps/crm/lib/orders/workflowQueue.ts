@@ -161,7 +161,7 @@ export function deriveSupplierWorkflowQueue(
     return {
       queue: 'zu_bestellen',
       nextAction: snapshot.hasOrder
-        ? 'Bestellung prüfen und manuell senden.'
+        ? 'Bestellung prüfen, senden oder als extern bestellt markieren.'
         : 'Bestell-Bucket aus Positionen erzeugen und Bestellung senden.',
     }
   }

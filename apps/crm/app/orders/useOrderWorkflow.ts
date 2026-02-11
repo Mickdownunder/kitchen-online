@@ -11,6 +11,7 @@ import {
   toQueueParam,
   type SupplierWorkflowQueue,
 } from '@/lib/orders/workflowQueue'
+import { deriveSupplierOrderChannel, type SupplierOrderChannel } from '@/lib/orders/orderChannel'
 import { getSupplierOrders } from '@/lib/supabase/services'
 import { supabase } from '@/lib/supabase/client'
 import type { SupplierOrder, SupplierOrderItem, SupplierOrderStatus } from '@/types'
@@ -112,6 +113,7 @@ export interface OrderWorkflowRow {
   projectItems: WorkflowProjectItem[]
   unresolvedItems: WorkflowProjectItem[]
   orderItems: SupplierOrderItem[]
+  orderChannel: SupplierOrderChannel
 }
 
 const ORDERED_BY_STATUS = new Set(['ordered', 'partially_delivered', 'delivered', 'missing'])
@@ -514,6 +516,7 @@ export function useOrderWorkflow() {
             projectItems,
             unresolvedItems: [],
             orderItems: order?.items || [],
+            orderChannel: deriveSupplierOrderChannel(order),
           }
         })
         .filter((row): row is OrderWorkflowRow => Boolean(row))
@@ -545,6 +548,7 @@ export function useOrderWorkflow() {
             projectItems: [],
             unresolvedItems,
             orderItems: [],
+            orderChannel: 'pending',
           }
         },
       )

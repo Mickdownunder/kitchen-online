@@ -33,6 +33,15 @@ import {
   SUPPLIER_WORKFLOW_QUEUE_META,
   type SupplierWorkflowQueue,
 } from '@/lib/orders/workflowQueue'
+import {
+  SUPPLIER_ORDER_CHANNEL_META,
+  type SupplierOrderChannel,
+} from '@/lib/orders/orderChannel'
+import {
+  groupSelectedOrderItemsBySupplier,
+  mapProjectItemsToEditorItems,
+  type ProjectInvoiceItemForOrderEditor,
+} from '@/lib/orders/orderEditorUtils'
 import { useOrderWorkflow, type OrderWorkflowRow } from './useOrderWorkflow'
 
 type QueueStyle = {
@@ -43,6 +52,8 @@ type QueueStyle = {
 
 interface EditableOrderItem {
   localId: string
+  selected: boolean
+  supplierId: string
   invoiceItemId?: string
   articleId?: string
   description: string
@@ -60,6 +71,23 @@ interface GoodsReceiptDraftItem {
   unit: string
   remainingQuantity: number
   receiveQuantity: string
+}
+
+type SupplierDocumentKind = 'ab' | 'supplier_delivery_note'
+
+interface SupplierOrderAbAnalysisResult {
+  kind: 'ab'
+  abNumber?: string
+  confirmedDeliveryDate?: string
+  deviationSummary?: string
+  notes?: string
+}
+
+interface SupplierOrderDeliveryAnalysisResult {
+  kind: 'supplier_delivery_note'
+  deliveryNoteNumber?: string
+  deliveryDate?: string
+  notes?: string
 }
 
 const QUEUE_STYLES: Record<SupplierWorkflowQueue, QueueStyle> = {
@@ -143,9 +171,11 @@ function renderStep(label: string, done: boolean) {
   )
 }
 
-function createEmptyEditableItem(): EditableOrderItem {
+function createEmptyEditableItem(defaultSupplierId?: string): EditableOrderItem {
   return {
     localId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    selected: true,
+    supplierId: (defaultSupplierId || '').trim(),
     description: '',
     modelNumber: '',
     manufacturer: '',
@@ -160,6 +190,8 @@ function mapRowItemsToEditableItems(row: OrderWorkflowRow): EditableOrderItem[] 
   if (row.orderItems.length > 0) {
     return row.orderItems.map((item, index) => ({
       localId: `${item.id}-${index}`,
+      selected: true,
+      supplierId: row.supplierId || '',
       invoiceItemId: item.invoiceItemId,
       articleId: item.articleId,
       description: item.description,
@@ -175,6 +207,8 @@ function mapRowItemsToEditableItems(row: OrderWorkflowRow): EditableOrderItem[] 
   const source = row.kind === 'missing_supplier' ? row.unresolvedItems : row.projectItems
   return source.map((item, index) => ({
     localId: `${item.id}-${index}`,
+    selected: row.kind === 'supplier' ? true : Boolean(item.supplierId),
+    supplierId: item.supplierId || row.supplierId || '',
     invoiceItemId: item.id,
     articleId: item.articleId,
     description: item.description,
@@ -213,6 +247,28 @@ async function uploadSupplierOrderDocument(
   }
 }
 
+async function analyzeSupplierOrderDocument(
+  supplierOrderId: string,
+  kind: SupplierDocumentKind,
+  file: File,
+): Promise<SupplierOrderAbAnalysisResult | SupplierOrderDeliveryAnalysisResult> {
+  const formData = new FormData()
+  formData.set('kind', kind)
+  formData.set('file', file)
+
+  const response = await fetch(`/api/supplier-orders/${supplierOrderId}/document-analysis`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || payload?.success === false || !payload?.data?.kind) {
+    throw new Error(payload?.error || 'Dokument konnte nicht analysiert werden.')
+  }
+
+  return payload.data as SupplierOrderAbAnalysisResult | SupplierOrderDeliveryAnalysisResult
+}
+
 export default function OrdersClient() {
   const { projects, refreshProjects } = useApp()
   const {
@@ -232,6 +288,7 @@ export default function OrdersClient() {
   const projectLookup = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects])
 
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [channelFilter, setChannelFilter] = useState<'all' | SupplierOrderChannel>('all')
 
   const [editorRow, setEditorRow] = useState<OrderWorkflowRow | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -248,6 +305,7 @@ export default function OrdersClient() {
   const [abNotes, setAbNotes] = useState('')
   const [abFile, setAbFile] = useState<File | null>(null)
   const [abError, setAbError] = useState<string | null>(null)
+  const [abAiInfo, setAbAiInfo] = useState<string | null>(null)
 
   const [deliveryRow, setDeliveryRow] = useState<OrderWorkflowRow | null>(null)
   const [deliveryNoteNumber, setDeliveryNoteNumber] = useState('')
@@ -255,12 +313,24 @@ export default function OrdersClient() {
   const [deliveryNoteNotes, setDeliveryNoteNotes] = useState('')
   const [deliveryNoteFile, setDeliveryNoteFile] = useState<File | null>(null)
   const [deliveryError, setDeliveryError] = useState<string | null>(null)
+  const [deliveryAiInfo, setDeliveryAiInfo] = useState<string | null>(null)
 
   const [goodsReceiptRow, setGoodsReceiptRow] = useState<OrderWorkflowRow | null>(null)
   const [goodsReceiptItems, setGoodsReceiptItems] = useState<GoodsReceiptDraftItem[]>([])
   const [goodsReceiptError, setGoodsReceiptError] = useState<string | null>(null)
 
   const queueOrder = Object.keys(SUPPLIER_WORKFLOW_QUEUE_META) as SupplierWorkflowQueue[]
+  const channelFilteredRows = useMemo(() => {
+    if (channelFilter === 'all') {
+      return visibleRows
+    }
+    return visibleRows.filter((row) => row.orderChannel === channelFilter)
+  }, [visibleRows, channelFilter])
+  const supplierLockedInEditor = editorRow?.kind === 'supplier'
+  const selectedEditorItemsCount = editorItems.filter((item) => item.selected).length
+  const selectedWithoutSupplierCount = editorItems.filter(
+    (item) => item.selected && item.supplierId.trim().length === 0,
+  ).length
 
   const runAndRefresh = async (fn: () => Promise<void>) => {
     await fn()
@@ -322,7 +392,7 @@ export default function OrdersClient() {
 
     setEditorOrderId(null)
     const initialItems = mapRowItemsToEditableItems(row)
-    setEditorItems(initialItems.length > 0 ? initialItems : [createEmptyEditableItem()])
+    setEditorItems(initialItems.length > 0 ? initialItems : [createEmptyEditableItem(row.supplierId)])
     setEditorOpen(true)
   }
 
@@ -332,9 +402,15 @@ export default function OrdersClient() {
     setEditorRow(null)
   }
 
-  const loadItemsFromProjectSupplier = async () => {
-    if (!editorProjectId || !editorSupplierId) {
-      setEditorError('Bitte Auftrag und Lieferant auswählen.')
+  const updateEditorItem = (localId: string, updates: Partial<EditableOrderItem>) => {
+    setEditorItems((prev) =>
+      prev.map((entry) => (entry.localId === localId ? { ...entry, ...updates } : entry)),
+    )
+  }
+
+  const loadItemsFromProject = async () => {
+    if (!editorProjectId) {
+      setEditorError('Bitte zuerst einen Auftrag auswählen.')
       return
     }
 
@@ -359,68 +435,77 @@ export default function OrdersClient() {
       return
     }
 
-    const filtered = (data || []).filter((entry) => {
-      const relation = entry.articles as { supplier_id: string | null } | { supplier_id: string | null }[] | null
-      const supplierId = Array.isArray(relation) ? relation[0]?.supplier_id : relation?.supplier_id
-      return supplierId === editorSupplierId
-    })
-
-    if (filtered.length === 0) {
-      setEditorError('Keine Positionen mit diesem Lieferanten im Auftrag gefunden.')
+    const rows = (data || []) as ProjectInvoiceItemForOrderEditor[]
+    if (rows.length === 0) {
+      setEditorError('Keine Positionen im Auftrag gefunden.')
       return
     }
 
-    const mapped: EditableOrderItem[] = filtered.map((item, index) => ({
-      localId: `${item.id}-${index}`,
-      invoiceItemId: item.id,
-      articleId: item.article_id || undefined,
-      description: item.description || '',
-      modelNumber: item.model_number || '',
-      manufacturer: item.manufacturer || '',
-      quantity: String(Math.max(1, toNumber(item.quantity))),
-      unit: item.unit || 'Stk',
-      expectedDeliveryDate: '',
-      notes: '',
-    }))
+    const preferredSupplierId = editorSupplierId || undefined
+    const mapped: EditableOrderItem[] = mapProjectItemsToEditorItems(rows, preferredSupplierId).map(
+      (item, index) => ({
+        localId: `${item.invoiceItemId}-${index}`,
+        selected: item.selected,
+        supplierId: item.supplierId,
+        invoiceItemId: item.invoiceItemId,
+        articleId: item.articleId,
+        description: item.description,
+        modelNumber: item.modelNumber,
+        manufacturer: item.manufacturer,
+        quantity: item.quantity,
+        unit: item.unit,
+        expectedDeliveryDate: '',
+        notes: '',
+      }),
+    )
 
-    setEditorItems(mapped)
+    setEditorItems(mapped.length > 0 ? mapped : [createEmptyEditableItem(editorSupplierId)])
     setEditorError(null)
   }
 
   const saveEditor = async () => {
     const normalizedProjectId = editorProjectId.trim()
     const normalizedSupplierId = editorSupplierId.trim()
+    const supplierLocked = editorRow?.kind === 'supplier'
 
-    if (!normalizedProjectId || !normalizedSupplierId) {
-      setEditorError('Auftrag und Lieferant sind erforderlich.')
+    if (!normalizedProjectId) {
+      setEditorError('Auftrag ist erforderlich.')
       return
     }
 
-    const cleanedItems = editorItems
-      .map((item, index) => ({
+    if ((editorOrderId || supplierLocked) && !normalizedSupplierId) {
+      setEditorError('Lieferant ist erforderlich.')
+      return
+    }
+
+    const grouped = groupSelectedOrderItemsBySupplier(editorItems)
+    if (grouped.selectedCount === 0) {
+      setEditorError('Bitte mindestens eine Position zum Bestellen auswählen.')
+      return
+    }
+
+    if (grouped.missingSupplierCount > 0) {
+      setEditorError(
+        `${grouped.missingSupplierCount} ausgewählte Position(en) haben keinen Lieferanten. Bitte zuordnen.`,
+      )
+      return
+    }
+
+    const toPayloadItems = (items: ReturnType<typeof groupSelectedOrderItemsBySupplier>['groups'][string]) =>
+      items.map((item, index) => ({
         ...item,
         positionNumber: index + 1,
-        quantityValue: Math.max(0, toNumber(item.quantity)),
       }))
-      .filter((item) => item.description.trim().length > 0 && item.quantityValue > 0)
 
-    if (cleanedItems.length === 0) {
-      setEditorError('Mindestens eine Position mit Menge > 0 ist erforderlich.')
-      return
+    let groupedEntries = Object.entries(grouped.groups)
+    if (supplierLocked && normalizedSupplierId) {
+      groupedEntries = groupedEntries.filter(([supplierId]) => supplierId === normalizedSupplierId)
     }
 
-    const payloadItems = cleanedItems.map((item) => ({
-      invoiceItemId: item.invoiceItemId,
-      articleId: item.articleId,
-      positionNumber: item.positionNumber,
-      description: item.description.trim(),
-      modelNumber: item.modelNumber.trim() || undefined,
-      manufacturer: item.manufacturer.trim() || undefined,
-      quantity: item.quantityValue,
-      unit: item.unit.trim() || 'Stk',
-      expectedDeliveryDate: item.expectedDeliveryDate || undefined,
-      notes: item.notes.trim() || undefined,
-    }))
+    if (groupedEntries.length === 0) {
+      setEditorError('Keine gültigen Positionen mit Menge > 0 ausgewählt.')
+      return
+    }
 
     const busyId = `editor-save`
     setBusyKey(busyId)
@@ -429,6 +514,11 @@ export default function OrdersClient() {
     try {
       await runAndRefresh(async () => {
         if (editorOrderId) {
+          const payloadItems = toPayloadItems(grouped.groups[normalizedSupplierId] || [])
+          if (payloadItems.length === 0) {
+            throw new Error('Für diese Bestellung wurden keine gültigen Positionen ausgewählt.')
+          }
+
           const updateResult = await replaceSupplierOrderItems(editorOrderId, payloadItems)
           if (!updateResult.ok) {
             throw new Error(updateResult.message || 'Bestellung konnte nicht gespeichert werden.')
@@ -436,43 +526,59 @@ export default function OrdersClient() {
           return
         }
 
-        const existingRow = rows.find(
-          (row) =>
-            row.kind === 'supplier' &&
-            row.projectId === normalizedProjectId &&
-            row.supplierId === normalizedSupplierId &&
-            row.orderId,
-        )
-
-        if (existingRow?.orderId) {
-          const existingOrderResult = await getSupplierOrder(existingRow.orderId)
-          if (!existingOrderResult.ok) {
-            throw new Error(existingOrderResult.message || 'Bestehende Bestellung konnte nicht geladen werden.')
+        const upsertSupplierBucket = async (
+          supplierId: string,
+          items: ReturnType<typeof groupSelectedOrderItemsBySupplier>['groups'][string],
+        ) => {
+          const payloadItems = toPayloadItems(items)
+          if (payloadItems.length === 0) {
+            return
           }
 
-          const mergedItems = [...(existingOrderResult.data.items || []), ...payloadItems].map((item, index) => ({
-            ...item,
-            positionNumber: index + 1,
-          }))
+          const existingRow = rows.find(
+            (row) =>
+              row.kind === 'supplier' &&
+              row.projectId === normalizedProjectId &&
+              row.supplierId === supplierId &&
+              row.orderId,
+          )
 
-          const mergedResult = await replaceSupplierOrderItems(existingRow.orderId, mergedItems)
-          if (!mergedResult.ok) {
-            throw new Error(mergedResult.message || 'Bestellung konnte nicht gespeichert werden.')
+          if (existingRow?.orderId) {
+            const existingOrderResult = await getSupplierOrder(existingRow.orderId)
+            if (!existingOrderResult.ok) {
+              throw new Error(existingOrderResult.message || 'Bestehende Bestellung konnte nicht geladen werden.')
+            }
+
+            const mergedItems = [...(existingOrderResult.data.items || []), ...payloadItems].map(
+              (item, index) => ({
+                ...item,
+                positionNumber: index + 1,
+              }),
+            )
+
+            const mergedResult = await replaceSupplierOrderItems(existingRow.orderId, mergedItems)
+            if (!mergedResult.ok) {
+              throw new Error(mergedResult.message || 'Bestellung konnte nicht gespeichert werden.')
+            }
+            return
           }
-          return
+
+          const createResult = await createSupplierOrder({
+            projectId: normalizedProjectId,
+            supplierId,
+            status: 'draft',
+            createdByType: 'user',
+            installationReferenceDate: projectLookup.get(normalizedProjectId)?.installationDate,
+            items: payloadItems,
+          })
+
+          if (!createResult.ok) {
+            throw new Error(createResult.message || 'Bestellung konnte nicht erstellt werden.')
+          }
         }
 
-        const createResult = await createSupplierOrder({
-          projectId: normalizedProjectId,
-          supplierId: normalizedSupplierId,
-          status: 'draft',
-          createdByType: 'user',
-          installationReferenceDate: projectLookup.get(normalizedProjectId)?.installationDate,
-          items: payloadItems,
-        })
-
-        if (!createResult.ok) {
-          throw new Error(createResult.message || 'Bestellung konnte nicht erstellt werden.')
+        for (const [supplierId, items] of groupedEntries) {
+          await upsertSupplierBucket(supplierId, items)
         }
       })
 
@@ -535,6 +641,48 @@ export default function OrdersClient() {
     }
   }
 
+  const handleMarkAsExternallyOrdered = async (row: OrderWorkflowRow) => {
+    if (row.kind !== 'supplier') {
+      return
+    }
+
+    if (!window.confirm(`Als extern bestellt markieren für ${row.supplierName}?`)) {
+      return
+    }
+
+    const busyId = `mark:${row.key}`
+    setBusyKey(busyId)
+
+    try {
+      await runAndRefresh(async () => {
+        const orderId = await ensureOrderBucket(row)
+        if (!orderId) {
+          throw new Error('Bestellung konnte nicht vorbereitet werden.')
+        }
+
+        const stableIdempotencyKey = `manual-mark-${orderId}-${row.sentAt || 'initial'}`
+        const response = await fetch(`/api/supplier-orders/${orderId}/mark-ordered`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idempotencyKey: stableIdempotencyKey,
+          }),
+        })
+
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok || payload?.success === false) {
+          throw new Error(payload?.error || 'Externes Bestell-Flag konnte nicht gesetzt werden.')
+        }
+      })
+    } catch (markError) {
+      const message =
+        markError instanceof Error ? markError.message : 'Externes Bestell-Flag konnte nicht gesetzt werden.'
+      alert(message)
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   const openAbDialog = (row: OrderWorkflowRow) => {
     if (!row.orderId) {
       return
@@ -547,11 +695,43 @@ export default function OrdersClient() {
     setAbNotes('')
     setAbFile(null)
     setAbError(null)
+    setAbAiInfo(null)
   }
 
   const closeAbDialog = () => {
     setAbRow(null)
     setAbError(null)
+    setAbAiInfo(null)
+  }
+
+  const analyzeAbDocument = async () => {
+    if (!abRow?.orderId || !abFile) {
+      return
+    }
+
+    const busyId = `ab-ai:${abRow.key}`
+    setBusyKey(busyId)
+    setAbError(null)
+    setAbAiInfo(null)
+
+    try {
+      const analysis = await analyzeSupplierOrderDocument(abRow.orderId, 'ab', abFile)
+      if (analysis.kind !== 'ab') {
+        throw new Error('Falsche Analyse-Antwort für AB-Dokument.')
+      }
+
+      setAbNumber((prev) => analysis.abNumber || prev)
+      setAbConfirmedDate((prev) => analysis.confirmedDeliveryDate || prev)
+      setAbDeviation((prev) => analysis.deviationSummary || prev)
+      setAbNotes((prev) => (prev.trim().length > 0 ? prev : analysis.notes || prev))
+      setAbAiInfo('KI-Vorschlag übernommen. Bitte kurz prüfen und speichern.')
+    } catch (analysisError) {
+      const message =
+        analysisError instanceof Error ? analysisError.message : 'AB-Dokument konnte nicht analysiert werden.'
+      setAbError(message)
+    } finally {
+      setBusyKey(null)
+    }
   }
 
   const submitAbDialog = async () => {
@@ -611,11 +791,48 @@ export default function OrdersClient() {
     setDeliveryNoteNotes('')
     setDeliveryNoteFile(null)
     setDeliveryError(null)
+    setDeliveryAiInfo(null)
   }
 
   const closeDeliveryNoteDialog = () => {
     setDeliveryRow(null)
     setDeliveryError(null)
+    setDeliveryAiInfo(null)
+  }
+
+  const analyzeDeliveryNoteDocument = async () => {
+    if (!deliveryRow?.orderId || !deliveryNoteFile) {
+      return
+    }
+
+    const busyId = `delivery-ai:${deliveryRow.key}`
+    setBusyKey(busyId)
+    setDeliveryError(null)
+    setDeliveryAiInfo(null)
+
+    try {
+      const analysis = await analyzeSupplierOrderDocument(
+        deliveryRow.orderId,
+        'supplier_delivery_note',
+        deliveryNoteFile,
+      )
+      if (analysis.kind !== 'supplier_delivery_note') {
+        throw new Error('Falsche Analyse-Antwort für Lieferschein-Dokument.')
+      }
+
+      setDeliveryNoteNumber((prev) => analysis.deliveryNoteNumber || prev)
+      setDeliveryNoteDate((prev) => analysis.deliveryDate || prev)
+      setDeliveryNoteNotes((prev) => (prev.trim().length > 0 ? prev : analysis.notes || prev))
+      setDeliveryAiInfo('KI-Vorschlag übernommen. Bitte kurz prüfen und speichern.')
+    } catch (analysisError) {
+      const message =
+        analysisError instanceof Error
+          ? analysisError.message
+          : 'Lieferschein-Dokument konnte nicht analysiert werden.'
+      setDeliveryError(message)
+    } finally {
+      setBusyKey(null)
+    }
   }
 
   const submitDeliveryNoteDialog = async () => {
@@ -837,14 +1054,26 @@ export default function OrdersClient() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="relative max-w-xl">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Suche nach Auftrag, Kunde, Lieferant, Bestellnummer oder AB"
-            className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition-colors focus:border-slate-400"
-          />
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="relative max-w-xl flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Suche nach Auftrag, Kunde, Lieferant, Bestellnummer oder AB"
+              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition-colors focus:border-slate-400"
+            />
+          </div>
+          <select
+            value={channelFilter}
+            onChange={(event) => setChannelFilter(event.target.value as 'all' | SupplierOrderChannel)}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-slate-400 md:w-56"
+          >
+            <option value="all">Alle Bestellwege</option>
+            <option value="crm_mail">via CRM-Mail</option>
+            <option value="external">extern markiert</option>
+            <option value="pending">noch offen</option>
+          </select>
         </div>
 
         <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
@@ -888,7 +1117,7 @@ export default function OrdersClient() {
                 </tr>
               )}
 
-              {!loading && !error && visibleRows.length === 0 && (
+              {!loading && !error && channelFilteredRows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-sm font-semibold text-slate-600">
                     Keine Einträge in „{SUPPLIER_WORKFLOW_QUEUE_META[activeQueue].label}“.
@@ -898,9 +1127,10 @@ export default function OrdersClient() {
 
               {!loading &&
                 !error &&
-                visibleRows.map((row) => {
+                channelFilteredRows.map((row) => {
                   const style = QUEUE_STYLES[row.queue]
                   const QueueIcon = style.icon
+                  const channelMeta = SUPPLIER_ORDER_CHANNEL_META[row.orderChannel]
 
                   const orderSent =
                     Boolean(row.sentAt) ||
@@ -918,12 +1148,13 @@ export default function OrdersClient() {
                   const hasGoodsReceipt = Boolean(row.goodsReceiptId || row.bookedAt)
                   const isBusy = Boolean(
                     busyKey &&
-                      [
-                        `send:${row.key}`,
-                        `ab:${row.key}`,
-                        `delivery:${row.key}`,
-                        `we:${row.key}`,
-                        'editor-save',
+                          [
+                            `send:${row.key}`,
+                            `mark:${row.key}`,
+                            `ab:${row.key}`,
+                            `delivery:${row.key}`,
+                            `we:${row.key}`,
+                            'editor-save',
                       ].includes(busyKey),
                   )
 
@@ -944,6 +1175,13 @@ export default function OrdersClient() {
                         <p className="text-sm font-black text-slate-900">#{row.projectOrderNumber}</p>
                         <p className="text-sm text-slate-700">{row.customerName}</p>
                         <p className="mt-1 text-xs font-semibold text-slate-500">{row.supplierName}</p>
+                        <p className="mt-1">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${channelMeta.chipClass}`}
+                          >
+                            {channelMeta.label}
+                          </span>
+                        </p>
                         <p className="mt-1 text-[11px] text-slate-500">
                           Bestellnummer: {row.supplierOrderNumber || 'noch nicht erzeugt'}
                         </p>
@@ -1006,6 +1244,22 @@ export default function OrdersClient() {
                                 <Send className="h-3.5 w-3.5" />
                               )}
                               Senden
+                            </button>
+                          )}
+
+                          {row.kind === 'supplier' && row.openOrderItems > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleMarkAsExternallyOrdered(row)}
+                              disabled={isBusy}
+                              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {isBusy ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <ClipboardCheck className="h-3.5 w-3.5" />
+                              )}
+                              Bereits bestellt
                             </button>
                           )}
 
@@ -1083,11 +1337,11 @@ export default function OrdersClient() {
               </label>
 
               <label className="text-xs font-black uppercase tracking-widest text-slate-500">
-                Lieferant
+                {supplierLockedInEditor ? 'Lieferant' : 'Standard-Lieferant (optional)'}
                 <select
                   value={editorSupplierId}
                   onChange={(event) => setEditorSupplierId(event.target.value)}
-                  disabled={editorRow?.kind === 'supplier'}
+                  disabled={supplierLockedInEditor}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 disabled:bg-slate-50"
                 >
                   <option value="">Bitte wählen</option>
@@ -1100,15 +1354,18 @@ export default function OrdersClient() {
               </label>
             </div>
 
-            {!editorRow && (
+            {!editorOrderId && (
               <div className="mt-3">
                 <button
                   type="button"
-                  onClick={loadItemsFromProjectSupplier}
+                  onClick={loadItemsFromProject}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-50"
                 >
-                  Positionen aus Auftrag laden
+                  Alle Positionen aus Auftrag laden
                 </button>
+                <p className="mt-1 text-xs text-slate-500">
+                  Zeigt alle Auftragspositionen inkl. Marke/Modell. Pro Zeile Bestellhaken und Lieferant setzen.
+                </p>
               </div>
             )}
 
@@ -1116,7 +1373,10 @@ export default function OrdersClient() {
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Bestellen</th>
                     <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Beschreibung</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Marke / Modell</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Lieferant</th>
                     <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Menge</th>
                     <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Einheit</th>
                     <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Termin</th>
@@ -1126,48 +1386,63 @@ export default function OrdersClient() {
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {editorItems.map((item) => (
                     <tr key={item.localId}>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 align-top">
                         <input
-                          value={item.description}
-                          onChange={(event) =>
-                            setEditorItems((prev) =>
-                              prev.map((entry) =>
-                                entry.localId === item.localId
-                                  ? { ...entry, description: event.target.value }
-                                  : entry,
-                              ),
-                            )
-                          }
-                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          type="checkbox"
+                          checked={item.selected}
+                          onChange={(event) => updateEditorItem(item.localId, { selected: event.target.checked })}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
                         />
                       </td>
                       <td className="px-3 py-2">
                         <input
+                          value={item.description}
+                          onChange={(event) => updateEditorItem(item.localId, { description: event.target.value })}
+                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="space-y-1">
+                          <input
+                            value={item.manufacturer}
+                            onChange={(event) => updateEditorItem(item.localId, { manufacturer: event.target.value })}
+                            placeholder="Marke"
+                            className="w-32 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          />
+                          <input
+                            value={item.modelNumber}
+                            onChange={(event) => updateEditorItem(item.localId, { modelNumber: event.target.value })}
+                            placeholder="Modell"
+                            className="w-32 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={item.supplierId}
+                          onChange={(event) => updateEditorItem(item.localId, { supplierId: event.target.value })}
+                          disabled={supplierLockedInEditor}
+                          className="w-44 rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-400 disabled:bg-slate-50"
+                        >
+                          <option value="">Lieferant fehlt</option>
+                          {suppliers.map((supplier) => (
+                            <option key={supplier.id} value={supplier.id}>
+                              {supplier.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
                           value={item.quantity}
-                          onChange={(event) =>
-                            setEditorItems((prev) =>
-                              prev.map((entry) =>
-                                entry.localId === item.localId
-                                  ? { ...entry, quantity: event.target.value }
-                                  : entry,
-                              ),
-                            )
-                          }
+                          onChange={(event) => updateEditorItem(item.localId, { quantity: event.target.value })}
                           className="w-24 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                         />
                       </td>
                       <td className="px-3 py-2">
                         <input
                           value={item.unit}
-                          onChange={(event) =>
-                            setEditorItems((prev) =>
-                              prev.map((entry) =>
-                                entry.localId === item.localId
-                                  ? { ...entry, unit: event.target.value }
-                                  : entry,
-                              ),
-                            )
-                          }
+                          onChange={(event) => updateEditorItem(item.localId, { unit: event.target.value })}
                           className="w-20 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                         />
                       </td>
@@ -1176,13 +1451,7 @@ export default function OrdersClient() {
                           type="date"
                           value={item.expectedDeliveryDate}
                           onChange={(event) =>
-                            setEditorItems((prev) =>
-                              prev.map((entry) =>
-                                entry.localId === item.localId
-                                  ? { ...entry, expectedDeliveryDate: event.target.value }
-                                  : entry,
-                              ),
-                            )
+                            updateEditorItem(item.localId, { expectedDeliveryDate: event.target.value })
                           }
                           className="rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                         />
@@ -1209,12 +1478,18 @@ export default function OrdersClient() {
             <div className="mt-3">
               <button
                 type="button"
-                onClick={() => setEditorItems((prev) => [...prev, createEmptyEditableItem()])}
+                onClick={() => setEditorItems((prev) => [...prev, createEmptyEditableItem(editorSupplierId)])}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-50"
               >
                 Position hinzufügen
               </button>
             </div>
+
+            <p className="mt-3 text-xs text-slate-600">
+              Ausgewählt: {selectedEditorItemsCount}
+              {selectedWithoutSupplierCount > 0 &&
+                ` · ohne Lieferant: ${selectedWithoutSupplierCount} (bitte zuordnen oder abwählen)`}
+            </p>
 
             {editorError && <p className="mt-3 text-sm font-semibold text-red-700">{editorError}</p>}
 
@@ -1293,10 +1568,25 @@ export default function OrdersClient() {
               AB-Dokument (optional)
               <input
                 type="file"
-                onChange={(event) => setAbFile(event.target.files?.[0] || null)}
+                onChange={(event) => {
+                  setAbFile(event.target.files?.[0] || null)
+                  setAbAiInfo(null)
+                }}
                 className="mt-1 block w-full text-sm text-slate-700"
               />
             </label>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={analyzeAbDocument}
+                disabled={!abFile || busyKey === `ab-ai:${abRow.key}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busyKey === `ab-ai:${abRow.key}` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Mit KI aus Dokument auslesen
+              </button>
+            </div>
+            {abAiInfo && <p className="mt-2 text-xs font-semibold text-emerald-700">{abAiInfo}</p>}
 
             {abError && <p className="mt-3 text-sm font-semibold text-red-700">{abError}</p>}
 
@@ -1364,10 +1654,27 @@ export default function OrdersClient() {
               Lieferschein-Dokument (optional)
               <input
                 type="file"
-                onChange={(event) => setDeliveryNoteFile(event.target.files?.[0] || null)}
+                onChange={(event) => {
+                  setDeliveryNoteFile(event.target.files?.[0] || null)
+                  setDeliveryAiInfo(null)
+                }}
                 className="mt-1 block w-full text-sm text-slate-700"
               />
             </label>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={analyzeDeliveryNoteDocument}
+                disabled={!deliveryNoteFile || busyKey === `delivery-ai:${deliveryRow.key}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busyKey === `delivery-ai:${deliveryRow.key}` && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                )}
+                Mit KI aus Dokument auslesen
+              </button>
+            </div>
+            {deliveryAiInfo && <p className="mt-2 text-xs font-semibold text-emerald-700">{deliveryAiInfo}</p>}
 
             {deliveryError && <p className="mt-3 text-sm font-semibold text-red-700">{deliveryError}</p>}
 
