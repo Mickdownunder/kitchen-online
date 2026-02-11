@@ -135,6 +135,8 @@ describe('workflowQueue', () => {
   it('classifies near-term missing material as brennt', () => {
     const result = deriveSupplierWorkflowQueue(
       buildSnapshot({
+        orderStatus: 'draft',
+        sentAt: undefined,
         installationDate: '2026-02-11',
         openOrderItems: 1,
       }),
@@ -144,17 +146,18 @@ describe('workflowQueue', () => {
     expect(result.queue).toBe('brennt')
   })
 
-  it('classifies overdue AB delivery date as brennt', () => {
+  it('moves ordered rows with missing AB to ab_fehlt even when target is close', () => {
     const result = deriveSupplierWorkflowQueue(
       buildSnapshot({
-        abConfirmedDeliveryDate: '2026-02-08',
-        goodsReceiptId: undefined,
-        openDeliveryItems: 1,
+        installationDate: '2026-02-11',
+        abNumber: undefined,
+        abReceivedAt: undefined,
+        abConfirmedDeliveryDate: undefined,
       }),
       NOW,
     )
 
-    expect(result.queue).toBe('brennt')
+    expect(result.queue).toBe('ab_fehlt')
   })
 
   it('evaluates AB timing against goods receipt booking', () => {

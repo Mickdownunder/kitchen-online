@@ -56,9 +56,10 @@ export function OrderWorkflowRow({
   const readinessLabel = isPickupOrder ? 'Abholung' : 'Montage'
   const readinessDate = isPickupOrder ? row.deliveryDate : row.installationDate
   const isReadyOrDone = row.queue === 'montagebereit' || row.queue === 'erledigt'
-  const canEditPositions = row.queue === 'zu_bestellen' || row.queue === 'brennt'
-  const canSend = row.kind === 'supplier' && row.queue === 'zu_bestellen'
-  const canMarkAlreadyOrdered = row.kind === 'supplier' && row.queue === 'zu_bestellen'
+  const isOrderingQueue = row.queue === 'zu_bestellen' || row.queue === 'brennt'
+  const canEditPositions = isOrderingQueue
+  const canSend = row.kind === 'supplier' && isOrderingQueue
+  const canMarkAlreadyOrdered = row.kind === 'supplier' && isOrderingQueue
   const canCaptureAb = row.kind === 'supplier' && row.queue === 'ab_fehlt' && Boolean(row.orderId)
   const canOpenDeliveryNote =
     row.kind === 'supplier' &&

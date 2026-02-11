@@ -149,28 +149,23 @@ export function deriveSupplierWorkflowQueue(
   const targetClose = daysUntilTarget !== null && daysUntilTarget <= 2
   const orderingCritical = daysUntilTarget !== null && daysUntilTarget <= 7
 
-  const confirmedAbDate = toDateOnly(snapshot.abConfirmedDeliveryDate)
   const today = new Date(now)
   today.setHours(0, 0, 0, 0)
-  const abOverdue = Boolean(
-    confirmedAbDate &&
-      confirmedAbDate.getTime() < today.getTime() &&
-      !hasGoodsReceipt &&
-      snapshot.openDeliveryItems > 0,
-  )
 
-  if (
-    abOverdue ||
-    (targetClose && (snapshot.openOrderItems > 0 || snapshot.openDeliveryItems > 0)) ||
-    (orderingCritical && snapshot.openOrderItems > 0)
-  ) {
+  const needsOrdering =
+    !snapshot.hasOrder ||
+    !orderSent ||
+    snapshot.orderStatus === 'draft' ||
+    snapshot.orderStatus === 'pending_approval'
+
+  if (needsOrdering && (targetClose || (orderingCritical && snapshot.openOrderItems > 0))) {
     return {
       queue: 'brennt',
-      nextAction: 'Dringend: Bestellung/Wareneingang sofort mit Lieferant klären.',
+      nextAction: 'Dringend: Bestellung jetzt auslösen oder als bereits bestellt markieren.',
     }
   }
 
-  if (!snapshot.hasOrder || !orderSent || snapshot.orderStatus === 'draft' || snapshot.orderStatus === 'pending_approval') {
+  if (needsOrdering) {
     return {
       queue: 'zu_bestellen',
       nextAction: snapshot.hasOrder
