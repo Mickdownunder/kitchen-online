@@ -299,9 +299,13 @@ export function AbDialog({ open, row, onClose, onSaved }: AbDialogProps) {
               if (abFile) {
                 try {
                   await uploadSupplierOrderDocument(row.orderId!, 'ab', abFile)
-                } catch {
+                } catch (uploadError) {
+                  const message =
+                    uploadError instanceof Error
+                      ? uploadError.message
+                      : 'Dokument konnte nicht hochgeladen werden.'
                   uploadWarning =
-                    'AB wurde gespeichert, aber das Dokument konnte nicht hochgeladen werden. Bitte erneut versuchen.'
+                    `AB wurde gespeichert, aber das Dokument konnte nicht hochgeladen werden: ${message}`
                 }
               }
 

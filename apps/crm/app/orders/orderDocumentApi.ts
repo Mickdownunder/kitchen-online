@@ -20,7 +20,9 @@ export async function uploadSupplierOrderDocument(
 
   const payload = await response.json().catch(() => ({}))
   if (!response.ok || payload?.success === false || !payload?.data?.storagePath) {
-    throw new Error(payload?.error || 'Dokument konnte nicht hochgeladen werden.')
+    const errorMessage = payload?.error ? String(payload.error) : 'Dokument konnte nicht hochgeladen werden.'
+    const errorCode = payload?.code ? ` (${String(payload.code)})` : ''
+    throw new Error(`${errorMessage}${errorCode}`)
   }
 
   return {

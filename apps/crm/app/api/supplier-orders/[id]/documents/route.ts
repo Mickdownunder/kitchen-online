@@ -4,9 +4,31 @@ import { apiErrors } from '@/lib/utils/errorHandling'
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 const ALLOWED_KINDS = new Set(['ab', 'supplier_delivery_note'])
+const AB_DOCUMENT_MIGRATION_HINT =
+  'AB-Dokumentfelder fehlen. Bitte Migration 20260211004000_supplier_order_ab_documents.sql ausführen.'
+
+interface PostgrestErrorLike {
+  code?: string
+  message?: string
+  details?: string
+  hint?: string
+}
 
 function sanitizeFileName(fileName: string): string {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+function isAbDocumentColumnMissing(error: unknown): boolean {
+  const err = (error || {}) as PostgrestErrorLike
+  const code = String(err.code || '').toUpperCase()
+  const blob = [err.message, err.details, err.hint].filter(Boolean).join(' ').toLowerCase()
+  return (
+    code === '42703' ||
+    ((blob.includes('ab_document_url') ||
+      blob.includes('ab_document_name') ||
+      blob.includes('ab_document_mime_type')) &&
+      blob.includes('does not exist'))
+  )
 }
 
 export async function POST(
@@ -114,6 +136,12 @@ export async function POST(
 
       if (updateError) {
         await serviceClient.storage.from('documents').remove([storagePath])
+        if (isAbDocumentColumnMissing(updateError)) {
+          return NextResponse.json(
+            { success: false, error: AB_DOCUMENT_MIGRATION_HINT, code: 'VALIDATION_ERROR' },
+            { status: 400 },
+          )
+        }
         return apiErrors.internal(new Error(updateError.message), {
           component: 'api/supplier-orders/documents',
         })
