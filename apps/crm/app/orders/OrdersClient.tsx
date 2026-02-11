@@ -235,9 +235,13 @@ export default function OrdersClient() {
 
       {activeQueue === 'montagebereit' && (
         <p className="text-xs text-slate-500">
-          Montage im Auftrag öffnen, per E-Mail reservieren (mit Plänen) und bestätigte Reservierung dokumentieren.
+          Material ist bereit. Montage-Reservierung kann hier final geprüft oder bestätigt werden.
         </p>
       )}
+
+      <p className="text-xs text-slate-500">
+        Montage-Reservierung ist queue-unabhängig verfügbar und kann schon Monate vor Wareneingang angefragt werden.
+      </p>
 
       <OrderWorkflowTable
         rows={channelFilteredRows}

@@ -76,6 +76,12 @@ export function OrderWorkflowRow({
       : row.installationReservationStatus === 'requested'
         ? 'Bestätigung'
         : 'Montage reservieren'
+  const installationReservationButtonClass =
+    row.installationReservationStatus === 'confirmed'
+      ? 'border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+      : row.installationReservationStatus === 'requested'
+        ? 'border border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200'
+        : 'border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100'
 
   return (
     <tr
@@ -220,13 +226,13 @@ export function OrderWorkflowRow({
             </button>
           )}
 
-          {row.kind === 'supplier' && row.queue === 'montagebereit' && (
+          {row.kind === 'supplier' && (
             <button
               type="button"
               onClick={() => onOpenInstallationReservation(row)}
               disabled={isBusy}
-              aria-label={`Montage reservieren für ${row.customerName}`}
-              className={`${btnBase} border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-200`}
+              aria-label={`Montage-Reservierung öffnen für ${row.customerName}`}
+              className={`${btnBase} ${installationReservationButtonClass}`}
             >
               <CalendarClock className="h-3.5 w-3.5" />
               {installationReservationLabel}
