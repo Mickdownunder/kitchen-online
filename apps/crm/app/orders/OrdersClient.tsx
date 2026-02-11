@@ -79,6 +79,7 @@ interface GoodsReceiptDraftItem {
 }
 
 type SupplierDocumentKind = 'ab' | 'supplier_delivery_note'
+type EditorViewFilter = 'all' | 'selected' | 'missing_supplier'
 
 interface SupplierOrderAbAnalysisResult {
   kind: 'ab'
@@ -329,6 +330,7 @@ export default function OrdersClient() {
   const [editorProjectId, setEditorProjectId] = useState('')
   const [editorSupplierId, setEditorSupplierId] = useState('')
   const [editorItems, setEditorItems] = useState<EditableOrderItem[]>([])
+  const [editorViewFilter, setEditorViewFilter] = useState<EditorViewFilter>('all')
   const [editorError, setEditorError] = useState<string | null>(null)
 
   const [abRow, setAbRow] = useState<OrderWorkflowRow | null>(null)
@@ -368,6 +370,16 @@ export default function OrdersClient() {
   const selectedWithoutSupplierCount = editorItems.filter(
     (item) => item.selected && item.supplierId.trim().length === 0,
   ).length
+  const missingSupplierCount = editorItems.filter((item) => item.supplierId.trim().length === 0).length
+  const editorVisibleItems = useMemo(() => {
+    if (editorViewFilter === 'selected') {
+      return editorItems.filter((item) => item.selected)
+    }
+    if (editorViewFilter === 'missing_supplier') {
+      return editorItems.filter((item) => item.supplierId.trim().length === 0)
+    }
+    return editorItems
+  }, [editorItems, editorViewFilter])
 
   const runAndRefresh = async (fn: () => Promise<void>) => {
     await fn()
@@ -437,11 +449,25 @@ export default function OrdersClient() {
     setEditorOpen(false)
     setEditorError(null)
     setEditorRow(null)
+    setEditorViewFilter('all')
   }
 
   const updateEditorItem = (localId: string, updates: Partial<EditableOrderItem>) => {
     setEditorItems((prev) =>
       prev.map((entry) => (entry.localId === localId ? { ...entry, ...updates } : entry)),
+    )
+  }
+
+  const setEditorSelectionForAll = (selected: boolean) => {
+    setEditorItems((prev) => prev.map((entry) => ({ ...entry, selected })))
+  }
+
+  const setEditorSelectionForMissingSupplier = () => {
+    setEditorItems((prev) =>
+      prev.map((entry) => ({
+        ...entry,
+        selected: entry.supplierId.trim().length === 0 ? true : entry.selected,
+      })),
     )
   }
 
@@ -1439,7 +1465,7 @@ export default function OrdersClient() {
 
       {editorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-[95vw] rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl xl:max-w-[1600px]">
+          <div className="w-full max-w-[97vw] rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl xl:max-w-[1760px]">
             <h2 className="text-lg font-black text-slate-900">Bestellung bearbeiten</h2>
             <p className="mt-1 text-sm text-slate-600">Auftrag, Lieferant und Positionen direkt in Bestellungen pflegen.</p>
 
@@ -1494,108 +1520,176 @@ export default function OrdersClient() {
               </div>
             )}
 
-            <div className="mt-4 max-h-80 overflow-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[1080px] table-fixed divide-y divide-slate-200">
-                <thead className="bg-slate-50">
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-700">
+                  Positionen: {editorItems.length}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-700">
+                  Ausgewählt: {selectedEditorItemsCount}
+                </span>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+                    missingSupplierCount > 0
+                      ? 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700'
+                      : 'border-slate-200 bg-white text-slate-600'
+                  }`}
+                >
+                  Lieferant fehlt: {missingSupplierCount}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-600">
+                  Sichtbar: {editorVisibleItems.length}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditorSelectionForAll(true)}
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  Alle markieren
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorSelectionForAll(false)}
+                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  Alle abwählen
+                </button>
+                <button
+                  type="button"
+                  onClick={setEditorSelectionForMissingSupplier}
+                  className="rounded-md border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-fuchsia-700 transition-colors hover:bg-fuchsia-100"
+                >
+                  Fehlende Lieferanten markieren
+                </button>
+                <label className="ml-auto flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  Ansicht
+                  <select
+                    value={editorViewFilter}
+                    onChange={(event) => setEditorViewFilter(event.target.value as EditorViewFilter)}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option value="all">Alle</option>
+                    <option value="selected">Nur ausgewählt</option>
+                    <option value="missing_supplier">Nur Lieferant fehlt</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-4 max-h-[52vh] overflow-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[920px] table-fixed divide-y divide-slate-200 xl:min-w-0">
+                <thead className="sticky top-0 z-10 bg-slate-50">
                   <tr>
-                    <th className="w-[90px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Bestellen</th>
-                    <th className="w-[26%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Beschreibung</th>
-                    <th className="w-[16%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Marke / Modell</th>
-                    <th className="w-[20%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Lieferant</th>
-                    <th className="w-[9%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Menge</th>
-                    <th className="w-[9%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Einheit</th>
-                    <th className="w-[13%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Termin</th>
-                    <th className="w-[120px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500"></th>
+                    <th className="w-[86px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Bestellen</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Beschreibung</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Marke / Modell</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Lieferant</th>
+                    <th className="w-[82px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Menge</th>
+                    <th className="w-[92px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Einheit</th>
+                    <th className="w-[140px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Termin</th>
+                    <th className="w-[110px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
-                  {editorItems.map((item) => (
-                    <tr key={item.localId}>
-                      <td className="px-3 py-2 align-top">
-                        <input
-                          type="checkbox"
-                          checked={item.selected}
-                          onChange={(event) => updateEditorItem(item.localId, { selected: event.target.checked })}
-                          className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          value={item.description}
-                          onChange={(event) => updateEditorItem(item.localId, { description: event.target.value })}
-                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="space-y-1">
-                          <input
-                            value={item.manufacturer}
-                            onChange={(event) => updateEditorItem(item.localId, { manufacturer: event.target.value })}
-                            placeholder="Marke"
-                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
-                          />
-                          <input
-                            value={item.modelNumber}
-                            onChange={(event) => updateEditorItem(item.localId, { modelNumber: event.target.value })}
-                            placeholder="Modell"
-                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={item.supplierId}
-                          onChange={(event) => updateEditorItem(item.localId, { supplierId: event.target.value })}
-                          disabled={supplierLockedInEditor}
-                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-400 disabled:bg-slate-50"
-                        >
-                          <option value="">Lieferant fehlt</option>
-                          {suppliers.map((supplier) => (
-                            <option key={supplier.id} value={supplier.id}>
-                              {supplier.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          value={item.quantity}
-                          onChange={(event) => updateEditorItem(item.localId, { quantity: event.target.value })}
-                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          value={item.unit}
-                          onChange={(event) => updateEditorItem(item.localId, { unit: event.target.value })}
-                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="date"
-                          value={item.expectedDeliveryDate}
-                          onChange={(event) =>
-                            updateEditorItem(item.localId, { expectedDeliveryDate: event.target.value })
-                          }
-                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditorItems((prev) =>
-                              prev.length === 1 ? prev : prev.filter((entry) => entry.localId !== item.localId),
-                            )
-                          }
-                          className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50"
-                        >
-                          Entfernen
-                        </button>
+                  {editorVisibleItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-3 py-6 text-center text-sm text-slate-500">
+                        Keine Positionen für diesen Filter.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    editorVisibleItems.map((item) => (
+                      <tr key={item.localId}>
+                        <td className="px-3 py-2 align-top">
+                          <input
+                            type="checkbox"
+                            checked={item.selected}
+                            onChange={(event) => updateEditorItem(item.localId, { selected: event.target.checked })}
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            value={item.description}
+                            onChange={(event) => updateEditorItem(item.localId, { description: event.target.value })}
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="space-y-1">
+                            <input
+                              value={item.manufacturer}
+                              onChange={(event) =>
+                                updateEditorItem(item.localId, { manufacturer: event.target.value })
+                              }
+                              placeholder="Marke"
+                              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                            />
+                            <input
+                              value={item.modelNumber}
+                              onChange={(event) => updateEditorItem(item.localId, { modelNumber: event.target.value })}
+                              placeholder="Modell"
+                              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={item.supplierId}
+                            onChange={(event) => updateEditorItem(item.localId, { supplierId: event.target.value })}
+                            disabled={supplierLockedInEditor}
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-400 disabled:bg-slate-50"
+                          >
+                            <option value="">Lieferant fehlt</option>
+                            {suppliers.map((supplier) => (
+                              <option key={supplier.id} value={supplier.id}>
+                                {supplier.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            value={item.quantity}
+                            onChange={(event) => updateEditorItem(item.localId, { quantity: event.target.value })}
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            value={item.unit}
+                            onChange={(event) => updateEditorItem(item.localId, { unit: event.target.value })}
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="date"
+                            value={item.expectedDeliveryDate}
+                            onChange={(event) =>
+                              updateEditorItem(item.localId, { expectedDeliveryDate: event.target.value })
+                            }
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditorItems((prev) =>
+                                prev.length === 1 ? prev : prev.filter((entry) => entry.localId !== item.localId),
+                              )
+                            }
+                            className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50"
+                          >
+                            Entfernen
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1614,6 +1708,10 @@ export default function OrdersClient() {
               Ausgewählt: {selectedEditorItemsCount}
               {selectedWithoutSupplierCount > 0 &&
                 ` · ohne Lieferant: ${selectedWithoutSupplierCount} (bitte zuordnen oder abwählen)`}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Speichern legt je Lieferant einen Bestell-Entwurf an oder aktualisiert ihn. Danach per
+              „Senden“ (CRM-Mail) oder „Bereits bestellt“ final markieren.
             </p>
 
             {editorError && <p className="mt-3 text-sm font-semibold text-red-700">{editorError}</p>}
