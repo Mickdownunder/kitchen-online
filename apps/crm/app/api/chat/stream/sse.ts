@@ -70,9 +70,11 @@ async function streamAndCollect(
     }
 
     // Prefer raw parts so we get thoughtSignature from the same part as functionCall (Gemini 3)
-    const rawParts = (chunk as Record<string, unknown>).candidates?.[0]?.content?.parts as
-      | Array<Record<string, unknown>>
-      | undefined
+    const chunkRecord = chunk as unknown as Record<string, unknown>
+    const candidates = chunkRecord.candidates as Array<Record<string, unknown>> | undefined
+    const firstCandidate = candidates?.[0]
+    const content = firstCandidate?.content as Record<string, unknown> | undefined
+    const rawParts = content?.parts as Array<Record<string, unknown>> | undefined
     const sigsByIndex: (string | undefined)[] = []
     rawParts?.forEach((p) => {
       if (p?.functionCall) {
