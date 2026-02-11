@@ -313,6 +313,106 @@ export type Database = {
           },
         ]
       }
+      installation_reservations: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string
+          supplier_order_id: string | null
+          installer_company: string
+          installer_contact: string | null
+          installer_email: string
+          requested_installation_date: string | null
+          request_notes: string | null
+          plan_document_ids: string[]
+          request_email_subject: string | null
+          request_email_to: string | null
+          request_email_message: string | null
+          request_email_sent_at: string | null
+          confirmation_reference: string | null
+          confirmation_date: string | null
+          confirmation_notes: string | null
+          confirmation_document_url: string | null
+          confirmation_document_name: string | null
+          confirmation_document_mime_type: string | null
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id: string
+          supplier_order_id?: string | null
+          installer_company: string
+          installer_contact?: string | null
+          installer_email: string
+          requested_installation_date?: string | null
+          request_notes?: string | null
+          plan_document_ids?: string[]
+          request_email_subject?: string | null
+          request_email_to?: string | null
+          request_email_message?: string | null
+          request_email_sent_at?: string | null
+          confirmation_reference?: string | null
+          confirmation_date?: string | null
+          confirmation_notes?: string | null
+          confirmation_document_url?: string | null
+          confirmation_document_name?: string | null
+          confirmation_document_mime_type?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string
+          supplier_order_id?: string | null
+          installer_company?: string
+          installer_contact?: string | null
+          installer_email?: string
+          requested_installation_date?: string | null
+          request_notes?: string | null
+          plan_document_ids?: string[]
+          request_email_subject?: string | null
+          request_email_to?: string | null
+          request_email_message?: string | null
+          request_email_sent_at?: string | null
+          confirmation_reference?: string | null
+          confirmation_date?: string | null
+          confirmation_notes?: string | null
+          confirmation_document_url?: string | null
+          confirmation_document_name?: string | null
+          confirmation_document_mime_type?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installation_reservations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installation_reservations_supplier_order_id_fkey"
+            columns: ["supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installation_reservations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_orders: {
         Row: {
           id: string

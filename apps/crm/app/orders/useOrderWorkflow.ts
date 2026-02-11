@@ -16,7 +16,12 @@ import { deriveSupplierOrderChannel } from '@/lib/orders/orderChannel'
 import { getSupplierOrders } from '@/lib/supabase/services'
 import { supabase } from '@/lib/supabase/client'
 import type { SupplierOrder, SupplierOrderStatus } from '@/types'
-import type { OrderWorkflowRow, SupplierLookupOption, WorkflowProjectItem } from './types'
+import type {
+  InstallationReservationStatus,
+  OrderWorkflowRow,
+  SupplierLookupOption,
+  WorkflowProjectItem,
+} from './types'
 
 interface SupplierInvoiceBucketRow {
   id: string
@@ -50,6 +55,14 @@ interface SupplierOrderItemLinkRow {
         status: string
       }[]
     | null
+}
+
+interface InstallationReservationLookupRow {
+  project_id: string
+  status: string
+  installer_company: string | null
+  request_email_sent_at: string | null
+  confirmation_date: string | null
 }
 
 interface WorkflowBucketAccumulator {
@@ -151,6 +164,28 @@ function shouldReplaceOrder(existing: SupplierOrder | undefined, next: SupplierO
   return new Date(next.createdAt).getTime() > new Date(existing.createdAt).getTime()
 }
 
+function isInstallationReservationSchemaMissing(error: unknown): boolean {
+  const err = (error || {}) as { code?: string; message?: string; details?: string; hint?: string }
+  const code = String(err.code || '').toUpperCase()
+  const blob = [err.message, err.details, err.hint].filter(Boolean).join(' ').toLowerCase()
+
+  if (code === '42P01' || code === 'PGRST204' || code === 'PGRST205') {
+    return blob.includes('installation_reservations') || code === '42P01'
+  }
+
+  return blob.includes('installation_reservations') && blob.includes('does not exist')
+}
+
+function normalizeReservationStatus(value: string | null | undefined): InstallationReservationStatus | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  return ['draft', 'requested', 'confirmed', 'cancelled'].includes(value)
+    ? (value as InstallationReservationStatus)
+    : undefined
+}
+
 function mapInvoiceRowToProjectItem(row: SupplierInvoiceBucketRow, supplierId?: string): WorkflowProjectItem {
   const quantity = normalizeItemQuantity(row.quantity)
   const deliveredQuantity = Math.max(0, toNumber(row.quantity_delivered))
@@ -212,10 +247,11 @@ export function useOrderWorkflow() {
     setError(null)
 
     try {
-      const [ordersResult, invoiceRowsResult, itemLinksResult, suppliersResult] = await Promise.all([
-        getSupplierOrders(),
-        supabase
-          .from('invoice_items')
+      const [ordersResult, invoiceRowsResult, itemLinksResult, suppliersResult, reservationRowsResult] =
+        await Promise.all([
+          getSupplierOrders(),
+          supabase
+            .from('invoice_items')
           .select(
             `
             id,
@@ -232,17 +268,20 @@ export function useOrderWorkflow() {
             articles (supplier_id)
           `,
           ),
-        supabase
-          .from('supplier_order_items')
-          .select(
+          supabase
+            .from('supplier_order_items')
+            .select(
             `
             invoice_item_id,
             supplier_orders (status)
           `,
-          )
-          .not('invoice_item_id', 'is', null),
-        supabase.from('suppliers').select('id, name, email, order_email').order('name', { ascending: true }),
-      ])
+              )
+              .not('invoice_item_id', 'is', null),
+          supabase.from('suppliers').select('id, name, email, order_email').order('name', { ascending: true }),
+          supabase
+            .from('installation_reservations')
+            .select('project_id, status, installer_company, request_email_sent_at, confirmation_date'),
+        ])
 
       if (!ordersResult.ok) {
         throw new Error(ordersResult.message || 'Bestellungen konnten nicht geladen werden.')
@@ -258,6 +297,13 @@ export function useOrderWorkflow() {
 
       if (suppliersResult.error) {
         throw new Error(suppliersResult.error.message)
+      }
+
+      if (
+        reservationRowsResult.error &&
+        !isInstallationReservationSchemaMissing(reservationRowsResult.error)
+      ) {
+        throw new Error(reservationRowsResult.error.message)
       }
 
       const invoiceRows = (invoiceRowsResult.data || []) as SupplierInvoiceBucketRow[]
@@ -338,6 +384,16 @@ export function useOrderWorkflow() {
         ]),
       )
       setSuppliers((suppliersResult.data || []) as SupplierLookupOption[])
+
+      const reservationByProjectId = new Map<string, InstallationReservationLookupRow>()
+      if (!reservationRowsResult.error) {
+        ;((reservationRowsResult.data || []) as InstallationReservationLookupRow[]).forEach((row) => {
+          if (!row.project_id) {
+            return
+          }
+          reservationByProjectId.set(row.project_id, row)
+        })
+      }
 
       const projectLookup = new Map(projects.map((project) => [project.id, project]))
       const queueOrderLookup = Object.fromEntries(
@@ -431,6 +487,28 @@ export function useOrderWorkflow() {
             supplier?.name ||
             `Lieferant ${bucket.supplierId.slice(0, 6).toUpperCase()}`
 
+          const reservation = reservationByProjectId.get(bucket.projectId)
+          const installationReservationStatus = normalizeReservationStatus(reservation?.status)
+          const installationReservationRequestedAt = reservation?.request_email_sent_at || undefined
+          const installationReservationConfirmedDate = reservation?.confirmation_date || undefined
+          const installationReservationCompany = reservation?.installer_company || undefined
+
+          let nextAction = decision.nextAction
+          if (decision.queue === 'montagebereit') {
+            if (installationReservationStatus === 'confirmed') {
+              nextAction = installationReservationConfirmedDate
+                ? `Montage reserviert (${installationReservationConfirmedDate}) bei ${
+                    installationReservationCompany || 'Montagepartner'
+                  }.`
+                : `Montage reserviert bei ${installationReservationCompany || 'Montagepartner'}.`
+            } else if (installationReservationStatus === 'requested') {
+              nextAction =
+                'Montage ist angefragt. Bestätigung vom Montagepartner erfassen und Referenz speichern.'
+            } else {
+              nextAction = 'Montage per E-Mail reservieren und Pläne mitschicken.'
+            }
+          }
+
           return {
             key: bucket.key,
             kind: 'supplier',
@@ -458,12 +536,16 @@ export function useOrderWorkflow() {
             openDeliveryItems,
             queue: decision.queue,
             queueLabel: SUPPLIER_WORKFLOW_QUEUE_META[decision.queue].label,
-            nextAction: decision.nextAction,
+            nextAction,
             abTimingStatus: getAbTimingStatus(order?.abConfirmedDeliveryDate, order?.bookedAt),
             projectItems,
             unresolvedItems: [],
             orderItems: order?.items || [],
             orderChannel: deriveSupplierOrderChannel(order),
+            installationReservationStatus,
+            installationReservationRequestedAt,
+            installationReservationConfirmedDate,
+            installationReservationCompany,
           }
         })
         .filter((row): row is OrderWorkflowRow => Boolean(row))

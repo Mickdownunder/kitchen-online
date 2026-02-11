@@ -922,6 +922,34 @@ export interface SupplierOrder {
   dispatchLogs?: SupplierOrderDispatchLog[]
 }
 
+export type InstallationReservationStatus = 'draft' | 'requested' | 'confirmed' | 'cancelled'
+
+export interface InstallationReservation {
+  id: string
+  userId: string
+  projectId: string
+  supplierOrderId?: string
+  installerCompany: string
+  installerContact?: string
+  installerEmail: string
+  requestedInstallationDate?: string
+  requestNotes?: string
+  planDocumentIds: string[]
+  requestEmailSubject?: string
+  requestEmailTo?: string
+  requestEmailMessage?: string
+  requestEmailSentAt?: string
+  confirmationReference?: string
+  confirmationDate?: string
+  confirmationNotes?: string
+  confirmationDocumentUrl?: string
+  confirmationDocumentName?: string
+  confirmationDocumentMimeType?: string
+  status: InstallationReservationStatus
+  createdAt: string
+  updatedAt: string
+}
+
 // ============================================
 // KUNDEN-LIEFERSCHEIN SYSTEM (Customer Delivery Notes)
 // ============================================

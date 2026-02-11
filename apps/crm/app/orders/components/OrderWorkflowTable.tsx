@@ -22,6 +22,7 @@ interface OrderWorkflowTableProps {
   onOpenAb: (row: OrderWorkflowRow) => void
   onOpenDelivery: (row: OrderWorkflowRow) => void
   onOpenGoodsReceipt: (row: OrderWorkflowRow) => void
+  onOpenInstallationReservation: (row: OrderWorkflowRow) => void
 }
 
 const rowBusyKeys = (row: OrderWorkflowRow): string[] => [
@@ -49,6 +50,7 @@ export function OrderWorkflowTable({
   onOpenAb,
   onOpenDelivery,
   onOpenGoodsReceipt,
+  onOpenInstallationReservation,
 }: OrderWorkflowTableProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -136,6 +138,7 @@ export function OrderWorkflowTable({
                   onOpenAb={onOpenAb}
                   onOpenDelivery={onOpenDelivery}
                   onOpenGoodsReceipt={onOpenGoodsReceipt}
+                  onOpenInstallationReservation={onOpenInstallationReservation}
                 />
               ))}
           </tbody>

@@ -16,6 +16,7 @@ interface OrderWorkflowRowProps {
   onOpenAb: (row: WorkflowRow) => void
   onOpenDelivery: (row: WorkflowRow) => void
   onOpenGoodsReceipt: (row: WorkflowRow) => void
+  onOpenInstallationReservation: (row: WorkflowRow) => void
 }
 
 function renderStep(label: string, done: boolean) {
@@ -41,6 +42,7 @@ export function OrderWorkflowRow({
   onOpenAb,
   onOpenDelivery,
   onOpenGoodsReceipt,
+  onOpenInstallationReservation,
 }: OrderWorkflowRowProps) {
   const style = QUEUE_STYLES[row.queue]
   const QueueIcon = style.icon
@@ -68,6 +70,12 @@ export function OrderWorkflowRow({
 
   const btnBase = 'inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-60'
   const btnPrimary = 'ring-2 ring-slate-400 ring-offset-1'
+  const installationReservationLabel =
+    row.installationReservationStatus === 'confirmed'
+      ? 'Reservierung'
+      : row.installationReservationStatus === 'requested'
+        ? 'Bestätigung'
+        : 'Montage reservieren'
 
   return (
     <tr
@@ -125,6 +133,14 @@ export function OrderWorkflowRow({
               ? 'verspätet'
               : row.abTimingStatus === 'on_time'
                 ? 'pünktlich'
+                : 'offen'}
+          </p>
+          <p>
+            Montage-Reservierung:{' '}
+            {row.installationReservationStatus === 'confirmed'
+              ? `bestätigt (${formatDate(row.installationReservationConfirmedDate)})`
+              : row.installationReservationStatus === 'requested'
+                ? 'angefragt'
                 : 'offen'}
           </p>
         </div>
@@ -201,6 +217,19 @@ export function OrderWorkflowRow({
               className={`${btnBase} ${primaryAction === 'we' ? btnPrimary : ''} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
             >
               Wareneingang
+            </button>
+          )}
+
+          {row.kind === 'supplier' && row.queue === 'montagebereit' && (
+            <button
+              type="button"
+              onClick={() => onOpenInstallationReservation(row)}
+              disabled={isBusy}
+              aria-label={`Montage reservieren für ${row.customerName}`}
+              className={`${btnBase} border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-200`}
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              {installationReservationLabel}
             </button>
           )}
 

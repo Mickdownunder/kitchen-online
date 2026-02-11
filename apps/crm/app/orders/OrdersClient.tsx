@@ -17,6 +17,7 @@ import { AbDialog } from './components/AbDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { DeliveryNoteDialog } from './components/DeliveryNoteDialog'
 import { GoodsReceiptDialog } from './components/GoodsReceiptDialog'
+import { InstallationReservationDialog } from './components/InstallationReservationDialog'
 import { OrderEditorModal } from './components/OrderEditorModal'
 import { OrderWorkflowTable } from './components/OrderWorkflowTable'
 import { SendOrderConfirm } from './components/SendOrderConfirm'
@@ -50,6 +51,7 @@ export default function OrdersClient() {
   const [abRow, setAbRow] = useState<OrderWorkflowRow | null>(null)
   const [deliveryRow, setDeliveryRow] = useState<OrderWorkflowRow | null>(null)
   const [goodsReceiptRow, setGoodsReceiptRow] = useState<OrderWorkflowRow | null>(null)
+  const [reservationRow, setReservationRow] = useState<OrderWorkflowRow | null>(null)
 
   const channelFilteredRows = useMemo(() => {
     if (channelFilter === 'all') {
@@ -231,6 +233,12 @@ export default function OrdersClient() {
         </p>
       )}
 
+      {activeQueue === 'montagebereit' && (
+        <p className="text-xs text-slate-500">
+          Montage im Auftrag öffnen, per E-Mail reservieren (mit Plänen) und bestätigte Reservierung dokumentieren.
+        </p>
+      )}
+
       <OrderWorkflowTable
         rows={channelFilteredRows}
         loading={loading}
@@ -257,6 +265,7 @@ export default function OrdersClient() {
           }
           setGoodsReceiptRow(row)
         }}
+        onOpenInstallationReservation={setReservationRow}
       />
 
       <OrderEditorModal
@@ -322,6 +331,13 @@ export default function OrdersClient() {
         open={Boolean(goodsReceiptRow)}
         row={goodsReceiptRow}
         onClose={() => setGoodsReceiptRow(null)}
+        onSaved={refreshAll}
+      />
+
+      <InstallationReservationDialog
+        open={Boolean(reservationRow)}
+        row={reservationRow}
+        onClose={() => setReservationRow(null)}
         onSaved={refreshAll}
       />
     </div>

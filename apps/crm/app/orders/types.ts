@@ -3,6 +3,8 @@ import type { SupplierOrderItem, SupplierOrderStatus } from '@/types'
 import type { SupplierOrderChannel } from '@/lib/orders/orderChannel'
 import type { AbTimingStatus, SupplierWorkflowQueue } from '@/lib/orders/workflowQueue'
 
+export type InstallationReservationStatus = 'draft' | 'requested' | 'confirmed' | 'cancelled'
+
 export interface SupplierLookupOption {
   id: string
   name: string
@@ -56,6 +58,10 @@ export interface OrderWorkflowRow {
   unresolvedItems: WorkflowProjectItem[]
   orderItems: SupplierOrderItem[]
   orderChannel: SupplierOrderChannel
+  installationReservationStatus?: InstallationReservationStatus
+  installationReservationRequestedAt?: string
+  installationReservationConfirmedDate?: string
+  installationReservationCompany?: string
 }
 
 export interface EditableOrderItem {
