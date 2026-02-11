@@ -235,12 +235,12 @@ export default function OrdersClient() {
 
       {activeQueue === 'montagebereit' && (
         <p className="text-xs text-slate-500">
-          Material ist bereit. Montage-Reservierung kann hier final geprüft oder bestätigt werden.
+          Material ist bereit: Lieferaufträge sind montagebereit, Abholaufträge sind abholbereit.
         </p>
       )}
 
       <p className="text-xs text-slate-500">
-        Montage-Reservierung ist queue-unabhängig verfügbar und kann schon Monate vor Wareneingang angefragt werden.
+        Montage-Reservierung ist queue-unabhängig verfügbar, aber nur für Lieferaufträge mit Montage (nicht Abholer).
       </p>
 
       <OrderWorkflowTable

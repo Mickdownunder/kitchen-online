@@ -41,7 +41,7 @@ export const SUPPLIER_WORKFLOW_QUEUE_META: Record<
   ab_fehlt: { label: 'AB fehlt', urgency: 3 },
   lieferschein_da: { label: 'Lieferschein da', urgency: 4 },
   wareneingang_offen: { label: 'Wareneingang offen', urgency: 5 },
-  montagebereit: { label: 'Montagebereit', urgency: 6 },
+  montagebereit: { label: 'Montage-/Abholbereit', urgency: 6 },
 }
 
 export const SUPPLIER_WORKFLOW_QUEUE_ORDER: SupplierWorkflowQueue[] = [
@@ -198,6 +198,6 @@ export function deriveSupplierWorkflowQueue(
 
   return {
     queue: 'montagebereit',
-    nextAction: 'Keine Aktion: Material ist montagebereit.',
+    nextAction: 'Keine Aktion: Material ist montage- oder abholbereit.',
   }
 }

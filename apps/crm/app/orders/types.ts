@@ -32,6 +32,8 @@ export interface OrderWorkflowRow {
   projectId: string
   projectOrderNumber: string
   customerName: string
+  deliveryType?: 'delivery' | 'pickup'
+  deliveryDate?: string
   installationDate?: string
   daysUntilInstallation?: number
   supplierId?: string

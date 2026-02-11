@@ -465,8 +465,10 @@ export function useOrderWorkflow() {
             ).length
           }
 
-          const installationDate =
-            project?.installationDate || order?.projectInstallationDate || undefined
+          const deliveryType = project?.deliveryType || 'delivery'
+          const deliveryDate = project?.deliveryDate || undefined
+          const installationDate = project?.installationDate || order?.projectInstallationDate || undefined
+          const readinessTargetDate = deliveryType === 'pickup' ? deliveryDate || installationDate : installationDate
           const decision = deriveSupplierWorkflowQueue({
             hasOrder: Boolean(order),
             orderStatus: order?.status,
@@ -477,7 +479,7 @@ export function useOrderWorkflow() {
             supplierDeliveryNoteId: order?.supplierDeliveryNoteId,
             goodsReceiptId: order?.goodsReceiptId,
             bookedAt: order?.bookedAt,
-            installationDate,
+            installationDate: readinessTargetDate,
             openOrderItems,
             openDeliveryItems,
           })
@@ -495,17 +497,21 @@ export function useOrderWorkflow() {
 
           let nextAction = decision.nextAction
           if (decision.queue === 'montagebereit') {
-            if (installationReservationStatus === 'confirmed') {
-              nextAction = installationReservationConfirmedDate
-                ? `Montage reserviert (${installationReservationConfirmedDate}) bei ${
-                    installationReservationCompany || 'Montagepartner'
-                  }.`
-                : `Montage reserviert bei ${installationReservationCompany || 'Montagepartner'}.`
-            } else if (installationReservationStatus === 'requested') {
-              nextAction =
-                'Montage ist angefragt. Bestätigung vom Montagepartner erfassen und Referenz speichern.'
+            if (deliveryType === 'pickup') {
+              nextAction = 'Abholung mit Kunde abstimmen und Abholtermin bestätigen.'
             } else {
-              nextAction = 'Montage per E-Mail reservieren und Pläne mitschicken.'
+              if (installationReservationStatus === 'confirmed') {
+                nextAction = installationReservationConfirmedDate
+                  ? `Montage reserviert (${installationReservationConfirmedDate}) bei ${
+                      installationReservationCompany || 'Montagepartner'
+                    }.`
+                  : `Montage reserviert bei ${installationReservationCompany || 'Montagepartner'}.`
+              } else if (installationReservationStatus === 'requested') {
+                nextAction =
+                  'Montage ist angefragt. Bestätigung vom Montagepartner erfassen und Referenz speichern.'
+              } else {
+                nextAction = 'Montage per E-Mail reservieren und Pläne mitschicken.'
+              }
             }
           }
 
@@ -515,8 +521,10 @@ export function useOrderWorkflow() {
             projectId: bucket.projectId,
             projectOrderNumber: project?.orderNumber || order?.projectOrderNumber || '—',
             customerName: project?.customerName || order?.projectCustomerName || 'Unbekannt',
+            deliveryType,
+            deliveryDate,
             installationDate,
-            daysUntilInstallation: getDaysUntilInstallation(installationDate),
+            daysUntilInstallation: getDaysUntilInstallation(readinessTargetDate),
             supplierId: bucket.supplierId,
             supplierName,
             supplierOrderEmail:
@@ -563,8 +571,12 @@ export function useOrderWorkflow() {
             projectId,
             projectOrderNumber: project?.orderNumber || '—',
             customerName: project?.customerName || 'Unbekannt',
+            deliveryType: project?.deliveryType || 'delivery',
+            deliveryDate: project?.deliveryDate,
             installationDate: project?.installationDate,
-            daysUntilInstallation: getDaysUntilInstallation(project?.installationDate),
+            daysUntilInstallation: getDaysUntilInstallation(
+              project?.deliveryType === 'pickup' ? project?.deliveryDate : project?.installationDate,
+            ),
             supplierName: 'Lieferant fehlt',
             totalItems: unresolvedItems.length,
             openOrderItems: unresolvedItems.length,

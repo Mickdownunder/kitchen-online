@@ -52,6 +52,9 @@ export function OrderWorkflowRow({
   const hasAb = row.kind === 'missing_supplier' ? false : hasAB(row)
   const hasSupplierDeliveryNote = row.kind === 'missing_supplier' ? false : hasDeliveryNote(row)
   const hasGoodsReceiptBooked = row.kind === 'missing_supplier' ? false : hasGoodsReceipt(row)
+  const isPickupOrder = row.deliveryType === 'pickup'
+  const readinessLabel = isPickupOrder ? 'Abholung' : 'Montage'
+  const readinessDate = isPickupOrder ? row.deliveryDate : row.installationDate
 
   const primaryAction: 'send' | 'mark' | 'ab' | 'delivery' | 'we' | null =
     row.kind !== 'supplier'
@@ -117,7 +120,7 @@ export function OrderWorkflowRow({
           {renderStep('AB', hasAb)}
           {renderStep('Lieferschein', hasSupplierDeliveryNote)}
           {renderStep('Wareneingang', hasGoodsReceiptBooked)}
-          {renderStep('Montage', row.queue === 'montagebereit')}
+          {renderStep(readinessLabel, row.queue === 'montagebereit')}
         </div>
         <p className="mt-2 text-[11px] text-slate-600">
           Positionen: {row.totalItems} · offen Bestellung {row.openOrderItems} · offen WE {row.openDeliveryItems}
@@ -127,7 +130,7 @@ export function OrderWorkflowRow({
         <div className="space-y-1 text-xs text-slate-700">
           <p className="inline-flex items-center gap-1.5 font-semibold">
             <CalendarClock className="h-3.5 w-3.5 text-slate-500" />
-            Montage: {formatDate(row.installationDate)}
+            {readinessLabel}: {formatDate(readinessDate)}
             {typeof row.daysUntilInstallation === 'number' && (
               <span className="text-slate-500">({row.daysUntilInstallation} Tage)</span>
             )}
@@ -141,14 +144,16 @@ export function OrderWorkflowRow({
                 ? 'pünktlich'
                 : 'offen'}
           </p>
-          <p>
-            Montage-Reservierung:{' '}
-            {row.installationReservationStatus === 'confirmed'
-              ? `bestätigt (${formatDate(row.installationReservationConfirmedDate)})`
-              : row.installationReservationStatus === 'requested'
-                ? 'angefragt'
-                : 'offen'}
-          </p>
+          {!isPickupOrder && (
+            <p>
+              Montage-Reservierung:{' '}
+              {row.installationReservationStatus === 'confirmed'
+                ? `bestätigt (${formatDate(row.installationReservationConfirmedDate)})`
+                : row.installationReservationStatus === 'requested'
+                  ? 'angefragt'
+                  : 'offen'}
+            </p>
+          )}
         </div>
       </td>
       <td className="px-4 py-4 align-top">
@@ -226,7 +231,7 @@ export function OrderWorkflowRow({
             </button>
           )}
 
-          {row.kind === 'supplier' && (
+          {row.kind === 'supplier' && !isPickupOrder && (
             <button
               type="button"
               onClick={() => onOpenInstallationReservation(row)}
