@@ -171,6 +171,7 @@ export async function createArticle(
 
   const insert: ArticleInsert = {
     user_id: user.id,
+    supplier_id: article.supplierId ?? null,
     sku: article.sku,
     manufacturer: article.manufacturer,
     model_number: article.modelNumber,
@@ -198,6 +199,7 @@ export async function updateArticle(
   article: Partial<Article>,
 ): Promise<ServiceResult<Article>> {
   const update: ArticleUpdate = {
+    supplier_id: article.supplierId,
     sku: article.sku,
     manufacturer: article.manufacturer,
     model_number: article.modelNumber,
@@ -329,6 +331,7 @@ function mapArticleFromDB(row: ArticleRow): Article {
   return {
     id: row.id,
     userId: row.user_id ?? undefined,
+    supplierId: row.supplier_id ?? null,
     sku: row.sku || '',
     manufacturer: row.manufacturer ?? undefined,
     modelNumber: row.model_number ?? undefined,

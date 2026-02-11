@@ -23,6 +23,8 @@ import {
   findOrCreateArticleFromItem,
   getArticle,
   getArticles,
+  createArticle,
+  updateArticle,
 } from '@/lib/supabase/services/articles'
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>
@@ -34,6 +36,7 @@ const MOCK_USER = { id: 'user-1', email: 'admin@example.com' }
 const ARTICLE_ROW = {
   id: 'art-1',
   user_id: 'user-1',
+  supplier_id: 'sup-1',
   sku: 'SKU-001',
   manufacturer: 'Bosch',
   model_number: 'BSH-100',
@@ -118,6 +121,7 @@ describe('getArticles', () => {
       expect(result.data[0].defaultPurchasePrice).toBe(400)
       expect(result.data[0].defaultSalePrice).toBe(600)
       expect(result.data[0].taxRate).toBe(20)
+      expect(result.data[0].supplierId).toBe('sup-1')
     }
   })
 
@@ -128,6 +132,57 @@ describe('getArticles', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.code).toBe('INTERNAL')
+  })
+})
+
+// ─── createArticle / updateArticle ───────────────────────────────────
+
+describe('createArticle', () => {
+  it('persists and returns supplier relation', async () => {
+    mockGetCurrentUser.mockResolvedValue(MOCK_USER as ReturnType<typeof getCurrentUser> extends Promise<infer T> ? T : never)
+    mockQueryResult({
+      data: { ...ARTICLE_ROW, id: 'art-created', supplier_id: 'sup-2' },
+      error: null,
+    })
+
+    const result = await createArticle({
+      supplierId: 'sup-2',
+      sku: 'SKU-NEW',
+      manufacturer: 'Neff',
+      modelNumber: 'N90',
+      category: 'Appliance',
+      name: 'Backofen',
+      description: 'Backofen',
+      specifications: {},
+      defaultPurchasePrice: 100,
+      defaultSalePrice: 200,
+      taxRate: 20,
+      unit: 'Stk',
+      inStock: true,
+      stockQuantity: 1,
+      isActive: true,
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.supplierId).toBe('sup-2')
+    }
+  })
+})
+
+describe('updateArticle', () => {
+  it('returns mapped supplier relation on update', async () => {
+    mockQueryResult({
+      data: { ...ARTICLE_ROW, supplier_id: null },
+      error: null,
+    })
+
+    const result = await updateArticle('art-1', { supplierId: null })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.supplierId).toBeNull()
+    }
   })
 })
 

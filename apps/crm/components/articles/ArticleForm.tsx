@@ -1,13 +1,19 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import type { Article } from '@/types'
 import { usePriceInput } from '@/hooks/usePriceInput'
+import { supabase } from '@/lib/supabase/client'
 
 interface ArticleFormProps {
   article: Article | null
   onSave: (article: Article) => void
   onCancel: () => void
+}
+
+interface SupplierOption {
+  id: string
+  name: string
 }
 
 function ArticlePriceInput({
@@ -69,6 +75,41 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
 
   const [specKey, setSpecKey] = useState('')
   const [specValue, setSpecValue] = useState('')
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
+  const [suppliersLoading, setSuppliersLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+
+    const loadSuppliers = async () => {
+      setSuppliersLoading(true)
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name')
+        .order('name', { ascending: true })
+
+      if (!active) {
+        return
+      }
+
+      if (error) {
+        setSuppliers([])
+      } else {
+        setSuppliers(
+          (data || []).map((entry) => ({
+            id: String(entry.id),
+            name: String(entry.name || ''),
+          })),
+        )
+      }
+      setSuppliersLoading(false)
+    }
+
+    void loadSuppliers()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,6 +120,7 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
       : (_article?.name || 'Unbenannt')
     const newArticle: Article = {
       id: _article?.id || Date.now().toString(),
+      supplierId: formData.supplierId ?? null,
       sku: formData.sku!,
       manufacturer: formData.manufacturer,
       modelNumber: formData.modelNumber,
@@ -157,12 +199,29 @@ export const ArticleForm: React.FC<ArticleFormProps> = ({
       />
 
       <div className="grid grid-cols-2 gap-4">
-        <input
-          placeholder="Hersteller (z.B. Miele, Schüller)"
-          value={formData.manufacturer}
-          onChange={e => setFormData({ ...formData, manufacturer: e.target.value })}
+        <select
+          value={formData.supplierId || ''}
+          onChange={e => {
+            const supplierId = e.target.value || null
+            const supplierName =
+              suppliers.find((supplier) => supplier.id === supplierId)?.name || ''
+            setFormData({
+              ...formData,
+              supplierId,
+              manufacturer: supplierName || undefined,
+            })
+          }}
           className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-        />
+        >
+          <option value="">
+            {suppliersLoading ? 'Lieferanten werden geladen...' : 'Lieferant auswählen (optional)'}
+          </option>
+          {suppliers.map((supplier) => (
+            <option key={supplier.id} value={supplier.id}>
+              {supplier.name}
+            </option>
+          ))}
+        </select>
         <input
           placeholder="Modellnummer (z.B. G 7000)"
           value={formData.modelNumber}

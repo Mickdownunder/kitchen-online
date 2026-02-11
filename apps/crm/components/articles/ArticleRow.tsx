@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Edit2, Trash2, CheckCircle2, X } from 'lucide-react'
 import type { Article } from '@/types'
 import { usePriceInput } from '@/hooks/usePriceInput'
+import { supabase } from '@/lib/supabase/client'
 
 interface ArticleRowProps {
   article: Article
@@ -16,6 +17,11 @@ interface ArticleRowProps {
   onDelete: () => void
   onSave: (article: Article) => void
   onCancelEdit: () => void
+}
+
+interface SupplierOption {
+  id: string
+  name: string
 }
 
 // Highlight search term in text
@@ -89,6 +95,8 @@ export const ArticleRow = React.memo(function ArticleRow({
 }: ArticleRowProps) {
   // Lokaler State für die Bearbeitung - wird erst beim Speichern übertragen
   const [editData, setEditData] = useState<Article>(article)
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
+  const [suppliersLoading, setSuppliersLoading] = useState(false)
 
   // Reset editData wenn article sich ändert oder Bearbeitung beginnt
   useEffect(() => {
@@ -97,6 +105,43 @@ export const ArticleRow = React.memo(function ArticleRow({
     }, 0)
     return () => window.clearTimeout(timer)
   }, [article, isEditing])
+
+  useEffect(() => {
+    if (!isEditing) {
+      return
+    }
+
+    let active = true
+    const loadSuppliers = async () => {
+      setSuppliersLoading(true)
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name')
+        .order('name', { ascending: true })
+
+      if (!active) {
+        return
+      }
+
+      if (error) {
+        setSuppliers([])
+      } else {
+        setSuppliers(
+          (data || []).map((entry) => ({
+            id: String(entry.id),
+            name: String(entry.name || ''),
+          })),
+        )
+      }
+
+      setSuppliersLoading(false)
+    }
+
+    void loadSuppliers()
+    return () => {
+      active = false
+    }
+  }, [isEditing])
 
   const handleSave = () => {
     onSave(editData)
@@ -146,13 +191,29 @@ export const ArticleRow = React.memo(function ArticleRow({
           />
         </td>
         <td className="px-4 py-3">
-          <input
-            type="text"
-            value={editData.manufacturer || ''}
-            onChange={e => setEditData({ ...editData, manufacturer: e.target.value })}
+          <select
+            value={editData.supplierId || ''}
+            onChange={e => {
+              const supplierId = e.target.value || null
+              const supplierName = suppliers.find((supplier) => supplier.id === supplierId)?.name
+              setEditData({
+                ...editData,
+                supplierId,
+                manufacturer: supplierName || undefined,
+              })
+            }}
             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-amber-500"
             onClick={e => e.stopPropagation()}
-          />
+          >
+            <option value="">
+              {suppliersLoading ? 'Lieferanten werden geladen...' : 'Lieferant auswählen'}
+            </option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
         </td>
         <td className="px-4 py-3">
           <input
