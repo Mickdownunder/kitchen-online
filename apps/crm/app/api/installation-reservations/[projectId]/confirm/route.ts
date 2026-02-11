@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { deriveProjectDeliveryStatus } from '@/lib/orders/orderFulfillment'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import {
   INSTALLATION_RESERVATION_MIGRATION_HINT,
@@ -284,6 +285,40 @@ export async function POST(
       }
 
       savedReservation = data as InstallationReservationRow
+    }
+
+    const { data: materialRows, error: materialRowsError } = await supabase
+      .from('invoice_items')
+      .select('delivery_status, quantity, quantity_ordered, quantity_delivered, procurement_type')
+      .eq('project_id', projectId)
+
+    if (materialRowsError) {
+      return apiErrors.internal(new Error(materialRowsError.message), {
+        component: 'api/installation-reservations/confirm',
+      })
+    }
+
+    const deliveryState = deriveProjectDeliveryStatus((materialRows || []) as Array<{
+      delivery_status: string | null
+      quantity: unknown
+      quantity_ordered: unknown
+      quantity_delivered: unknown
+      procurement_type?: unknown
+    }>)
+    const { error: projectDeliveryError } = await supabase
+      .from('projects')
+      .update({
+        delivery_status: deliveryState.status,
+        all_items_delivered: deliveryState.allDelivered,
+        ready_for_assembly_date: deliveryState.allDelivered ? new Date().toISOString().slice(0, 10) : null,
+      })
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+
+    if (projectDeliveryError) {
+      return apiErrors.internal(new Error(projectDeliveryError.message), {
+        component: 'api/installation-reservations/confirm',
+      })
     }
 
     return NextResponse.json({

@@ -47,6 +47,11 @@ export const QUEUE_STYLES: Record<SupplierWorkflowQueue, QueueStyle> = {
     rowClass: 'bg-slate-50',
     icon: PackageCheck,
   },
+  reservierung_offen: {
+    chipClass: 'border-amber-200 bg-amber-50 text-amber-700',
+    rowClass: 'bg-amber-50/40',
+    icon: ClipboardCheck,
+  },
   montagebereit: {
     chipClass: 'border-slate-300 bg-slate-100 text-slate-700',
     rowClass: 'bg-slate-50',
@@ -129,14 +134,24 @@ export function createEmptyEditableItem(defaultSupplierId?: string): EditableOrd
     unit: 'Stk',
     expectedDeliveryDate: '',
     notes: '',
+    procurementType: 'external_order',
   }
 }
 
 export function mapRowItemsToEditableItems(row: OrderWorkflowRow): EditableOrderItem[] {
   if (row.orderItems.length > 0) {
+    const projectItemById = new Map(
+      [...row.projectItems, ...row.unresolvedItems].map((item) => [item.id, item]),
+    )
+
     return row.orderItems.map((item, index) => ({
+      procurementType:
+        (item.invoiceItemId ? projectItemById.get(item.invoiceItemId)?.procurementType : undefined) ||
+        'external_order',
       localId: `${item.id}-${index}`,
-      selected: true,
+      selected:
+        ((item.invoiceItemId ? projectItemById.get(item.invoiceItemId)?.procurementType : undefined) ||
+          'external_order') === 'external_order',
       supplierId: row.supplierId || '',
       invoiceItemId: item.invoiceItemId,
       articleId: item.articleId,
@@ -153,7 +168,12 @@ export function mapRowItemsToEditableItems(row: OrderWorkflowRow): EditableOrder
   const source = row.kind === 'missing_supplier' ? row.unresolvedItems : row.projectItems
   return source.map((item, index) => ({
     localId: `${item.id}-${index}`,
-    selected: row.kind === 'supplier' ? true : Boolean(item.supplierId),
+    selected:
+      item.procurementType === 'external_order'
+        ? row.kind === 'supplier'
+          ? true
+          : Boolean(item.supplierId)
+        : false,
     supplierId: item.supplierId || row.supplierId || '',
     invoiceItemId: item.id,
     articleId: item.articleId,
@@ -164,6 +184,7 @@ export function mapRowItemsToEditableItems(row: OrderWorkflowRow): EditableOrder
     unit: item.unit || 'Stk',
     expectedDeliveryDate: '',
     notes: '',
+    procurementType: item.procurementType || 'external_order',
   }))
 }
 

@@ -41,6 +41,7 @@ export function mapItemFromDB(row: Row<'invoice_items'>): InvoiceItem {
     actualDeliveryDate: row.actual_delivery_date ?? undefined,
     quantityOrdered: row.quantity_ordered ?? undefined,
     quantityDelivered: row.quantity_delivered ?? undefined,
+    procurementType: (row.procurement_type as InvoiceItem['procurementType']) ?? 'external_order',
     showInPortal: row.show_in_portal ?? false,
     serialNumber: row.serial_number ?? undefined,
     installationDate: row.installation_date ?? undefined,

@@ -68,6 +68,8 @@ interface SupplierOrderRouteRow {
   }> | null
 }
 
+type InvoiceItemProcurementType = 'external_order' | 'internal_stock' | 'reservation_only'
+
 interface SupplierRelation {
   id: string
   name: string
@@ -130,6 +132,7 @@ async function markProjectItemsOrderedForSupplier(
       quantity_ordered,
       quantity_delivered,
       delivery_status,
+      procurement_type,
       articles (supplier_id)
     `,
     )
@@ -161,6 +164,7 @@ async function markProjectItemsOrderedForSupplier(
       supplierId: getSupplierIdFromRelation(
         row.articles as { supplier_id: string | null } | { supplier_id: string | null }[] | null,
       ),
+      procurementType: row.procurement_type as InvoiceItemProcurementType | undefined,
     })),
     supplierId,
     invoiceItemIdsFromOrder,
@@ -168,6 +172,10 @@ async function markProjectItemsOrderedForSupplier(
   const candidateItems = (itemRows || []).filter((row) => candidateIds.has(String(row.id)))
 
   for (const item of candidateItems) {
+    if ((item.procurement_type as InvoiceItemProcurementType | null) !== 'external_order') {
+      continue
+    }
+
     const quantity = Math.max(0, toNumber(item.quantity))
     const delivered = Math.max(0, toNumber(item.quantity_delivered))
     const ordered = Math.max(toNumber(item.quantity_ordered), quantity, delivered)
@@ -194,7 +202,7 @@ async function markProjectItemsOrderedForSupplier(
 
   const { data: refreshedRows, error: refreshedRowsError } = await supabase
     .from('invoice_items')
-    .select('delivery_status, quantity, quantity_ordered, quantity_delivered')
+    .select('delivery_status, quantity, quantity_ordered, quantity_delivered, procurement_type')
     .eq('project_id', projectId)
 
   if (refreshedRowsError) {

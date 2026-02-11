@@ -2,6 +2,8 @@ interface SupplierRelation {
   supplier_id: string | null
 }
 
+export type InvoiceItemProcurementType = 'external_order' | 'internal_stock' | 'reservation_only'
+
 export type SupplierRelationValue = SupplierRelation | SupplierRelation[] | null
 
 export interface ProjectInvoiceItemForOrderEditor {
@@ -12,6 +14,7 @@ export interface ProjectInvoiceItemForOrderEditor {
   manufacturer: string | null
   quantity: number | string | null
   unit: string | null
+  procurement_type: string | null
   articles: SupplierRelationValue
 }
 
@@ -25,6 +28,7 @@ export interface LoadedOrderEditorItem {
   unit: string
   supplierId: string
   selected: boolean
+  procurementType: InvoiceItemProcurementType
 }
 
 export interface GroupableOrderEditorItem {
@@ -39,6 +43,7 @@ export interface GroupableOrderEditorItem {
   unit: string
   expectedDeliveryDate?: string
   notes?: string
+  procurementType?: InvoiceItemProcurementType
 }
 
 export interface GroupedOrderPayloadItem {
@@ -55,6 +60,8 @@ export interface GroupedOrderPayloadItem {
 
 export interface GroupSelectedOrderItemsResult {
   selectedCount: number
+  externalSelectedCount: number
+  nonExternalSelectedCount: number
   missingSupplierCount: number
   groups: Record<string, GroupedOrderPayloadItem[]>
 }
@@ -93,10 +100,14 @@ export function mapProjectItemsToEditorItems(
   return rows.map((row) => {
     const supplierId = getSupplierIdFromRelation(row.articles) || ''
     const quantityValue = Math.max(1, toNumber(row.quantity))
+    const procurementType =
+      row.procurement_type === 'internal_stock' || row.procurement_type === 'reservation_only'
+        ? row.procurement_type
+        : 'external_order'
 
-    const selected = normalizedPreferredSupplier
-      ? supplierId === normalizedPreferredSupplier
-      : Boolean(supplierId)
+    const selected =
+      procurementType === 'external_order' &&
+      (normalizedPreferredSupplier ? supplierId === normalizedPreferredSupplier : Boolean(supplierId))
 
     return {
       invoiceItemId: row.id,
@@ -108,6 +119,7 @@ export function mapProjectItemsToEditorItems(
       unit: row.unit || 'Stk',
       supplierId,
       selected,
+      procurementType,
     }
   })
 }
@@ -117,6 +129,8 @@ export function groupSelectedOrderItemsBySupplier(
 ): GroupSelectedOrderItemsResult {
   const groups: Record<string, GroupedOrderPayloadItem[]> = {}
   let selectedCount = 0
+  let externalSelectedCount = 0
+  let nonExternalSelectedCount = 0
   let missingSupplierCount = 0
 
   items.forEach((item) => {
@@ -125,6 +139,16 @@ export function groupSelectedOrderItemsBySupplier(
     }
 
     selectedCount += 1
+    const procurementType =
+      item.procurementType === 'internal_stock' || item.procurementType === 'reservation_only'
+        ? item.procurementType
+        : 'external_order'
+    if (procurementType !== 'external_order') {
+      nonExternalSelectedCount += 1
+      return
+    }
+
+    externalSelectedCount += 1
 
     const description = item.description.trim()
     const quantityValue = Math.max(0, toNumber(item.quantity))
@@ -157,6 +181,8 @@ export function groupSelectedOrderItemsBySupplier(
 
   return {
     selectedCount,
+    externalSelectedCount,
+    nonExternalSelectedCount,
     missingSupplierCount,
     groups,
   }

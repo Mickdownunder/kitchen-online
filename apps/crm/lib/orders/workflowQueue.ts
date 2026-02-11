@@ -5,10 +5,12 @@ export type SupplierWorkflowQueue =
   | 'brennt'
   | 'ab_fehlt'
   | 'wareneingang_offen'
+  | 'reservierung_offen'
   | 'montagebereit'
   | 'erledigt'
 
 export type AbTimingStatus = 'open' | 'on_time' | 'late'
+export type ReservationFlowStatus = 'draft' | 'requested' | 'confirmed' | 'cancelled'
 
 export interface SupplierWorkflowQueueSnapshot {
   hasOrder: boolean
@@ -23,6 +25,11 @@ export interface SupplierWorkflowQueueSnapshot {
   installationDate?: string
   openOrderItems: number
   openDeliveryItems: number
+  isProjectCompleted?: boolean
+  hasExternalOrderItems?: boolean
+  hasInternalStockItems?: boolean
+  hasReservationOnlyItems?: boolean
+  reservationStatus?: ReservationFlowStatus
 }
 
 export interface SupplierWorkflowQueueDecision {
@@ -38,8 +45,9 @@ export const SUPPLIER_WORKFLOW_QUEUE_META: Record<
   brennt: { label: 'Brennt', urgency: 2 },
   ab_fehlt: { label: 'Bestellbestätigung', urgency: 3 },
   wareneingang_offen: { label: 'Wareneingang', urgency: 4 },
-  montagebereit: { label: 'Montagebereit', urgency: 5 },
-  erledigt: { label: 'Erledigt', urgency: 6 },
+  reservierung_offen: { label: 'Reservierung', urgency: 5 },
+  montagebereit: { label: 'Montagebereit', urgency: 6 },
+  erledigt: { label: 'Erledigt', urgency: 7 },
 }
 
 export const SUPPLIER_WORKFLOW_QUEUE_ORDER: SupplierWorkflowQueue[] = [
@@ -47,6 +55,7 @@ export const SUPPLIER_WORKFLOW_QUEUE_ORDER: SupplierWorkflowQueue[] = [
   'brennt',
   'ab_fehlt',
   'wareneingang_offen',
+  'reservierung_offen',
   'montagebereit',
   'erledigt',
 ]
@@ -130,6 +139,43 @@ export function deriveSupplierWorkflowQueue(
   snapshot: SupplierWorkflowQueueSnapshot,
   now: Date = new Date(),
 ): SupplierWorkflowQueueDecision {
+  if (snapshot.isProjectCompleted) {
+    return {
+      queue: 'erledigt',
+      nextAction: 'Projekt abgeschlossen. Keine offene Bestellaktion mehr.',
+    }
+  }
+
+  const hasExternalOrderItems = snapshot.hasExternalOrderItems ?? true
+  const hasReservationOnlyItems = Boolean(snapshot.hasReservationOnlyItems)
+  const hasInternalStockItems = Boolean(snapshot.hasInternalStockItems)
+
+  const reservationDecision =
+    hasReservationOnlyItems && snapshot.reservationStatus !== 'confirmed'
+      ? {
+          queue: 'reservierung_offen' as const,
+          nextAction:
+            snapshot.reservationStatus === 'requested'
+              ? 'Reservierungsanfrage läuft. Bestätigung von Montagepartner erfassen.'
+              : snapshot.reservationStatus === 'cancelled'
+                ? 'Reservierung storniert. Neue Reservierung per E-Mail senden.'
+                : 'Montage-/Liefertermin per E-Mail reservieren und Pläne mitschicken.',
+        }
+      : null
+
+  if (!hasExternalOrderItems && (hasInternalStockItems || hasReservationOnlyItems)) {
+    if (reservationDecision) {
+      return reservationDecision
+    }
+
+    return {
+      queue: 'montagebereit',
+      nextAction: hasInternalStockItems
+        ? 'Lagerware ist verfügbar. Auftrag ist montagebereit.'
+        : 'Reservierung bestätigt. Auftrag ist montagebereit.',
+    }
+  }
+
   const hasDeliveryNote =
     Boolean(snapshot.supplierDeliveryNoteId) || snapshot.orderStatus === 'delivery_note_received'
   const hasGoodsReceipt =
@@ -149,14 +195,12 @@ export function deriveSupplierWorkflowQueue(
   const targetClose = daysUntilTarget !== null && daysUntilTarget <= 2
   const orderingCritical = daysUntilTarget !== null && daysUntilTarget <= 7
 
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-
   const needsOrdering =
-    !snapshot.hasOrder ||
-    !orderSent ||
-    snapshot.orderStatus === 'draft' ||
-    snapshot.orderStatus === 'pending_approval'
+    hasExternalOrderItems &&
+    (!snapshot.hasOrder ||
+      !orderSent ||
+      snapshot.orderStatus === 'draft' ||
+      snapshot.orderStatus === 'pending_approval')
 
   if (needsOrdering && (targetClose || (orderingCritical && snapshot.openOrderItems > 0))) {
     return {
@@ -190,16 +234,12 @@ export function deriveSupplierWorkflowQueue(
     }
   }
 
-  const targetDate = toDateOnly(snapshot.installationDate)
-  if (targetDate && targetDate.getTime() <= today.getTime()) {
-    return {
-      queue: 'erledigt',
-      nextAction: 'Automatisch erledigt nach erreichtem Montage-/Abholtag.',
-    }
+  if (reservationDecision) {
+    return reservationDecision
   }
 
   return {
     queue: 'montagebereit',
-    nextAction: 'Bereit für Montage/Abholung.',
+    nextAction: 'Material vollständig verfügbar. Bereit für Montage/Abholung.',
   }
 }

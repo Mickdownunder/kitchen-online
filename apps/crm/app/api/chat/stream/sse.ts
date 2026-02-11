@@ -52,6 +52,12 @@ function normalizeHistory(
   return mapped.slice(start)
 }
 
+/** Extract thoughtSignature from a raw part (Gemini 3 may send camelCase or snake_case). */
+function thoughtSignatureFromPart(part: Record<string, unknown>): string | undefined {
+  const v = part?.thoughtSignature ?? part?.thought_signature
+  return typeof v === 'string' && v.length > 0 ? v : undefined
+}
+
 async function streamAndCollect(
   asyncGen: AsyncGenerator<GenerateContentResponse>,
   send: (data: Record<string, unknown>) => void,
@@ -63,17 +69,32 @@ async function streamAndCollect(
       send({ type: 'token', text: chunk.text })
     }
 
+    // Prefer raw parts so we get thoughtSignature from the same part as functionCall (Gemini 3)
+    const rawParts = (chunk as Record<string, unknown>).candidates?.[0]?.content?.parts as
+      | Array<Record<string, unknown>>
+      | undefined
+    const sigsByIndex: (string | undefined)[] = []
+    rawParts?.forEach((p) => {
+      if (p?.functionCall) {
+        sigsByIndex.push(thoughtSignatureFromPart(p))
+      }
+    })
+
     if (chunk.functionCalls?.length) {
       for (let i = 0; i < chunk.functionCalls.length; i += 1) {
         const functionCall = chunk.functionCalls[i]
-        const raw = functionCall as typeof functionCall & { thoughtSignature?: string }
+        const raw = functionCall as typeof functionCall & { thoughtSignature?: string; thought_signature?: string }
+        const fromPart = sigsByIndex[i]
         collectedFunctionCalls.push({
           id:
             functionCall.id ||
             `fc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: functionCall.name || 'unknown',
           args: (functionCall.args || {}) as Record<string, unknown>,
-          thoughtSignature: raw.thoughtSignature,
+          thoughtSignature:
+            raw.thoughtSignature ??
+            raw.thought_signature ??
+            fromPart,
         })
       }
     }
@@ -124,15 +145,20 @@ async function executeFunctionCalls(
       })
     }
 
-    // Gemini 3: must send model's functionCall part with thoughtSignature, then our response
+    // Gemini 3: functionCall part must include thought_signature or API returns 400.
+    // Set signature as sibling and inside functionCall so it is not dropped by SDK serialization.
+    const signature =
+      functionCall.thoughtSignature ?? THOUGHT_SIGNATURE_SKIP
     parts.push({
       functionCall: {
         id: functionCall.id,
         name: functionCall.name,
         args: functionCall.args,
+        thought_signature: signature,
+        thoughtSignature: signature,
       },
-      thoughtSignature:
-        functionCall.thoughtSignature ?? THOUGHT_SIGNATURE_SKIP,
+      thoughtSignature: signature,
+      thought_signature: signature,
     })
     parts.push(
       createPartFromFunctionResponse(functionCall.id, functionCall.name, {

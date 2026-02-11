@@ -39,6 +39,7 @@ interface SupplierInvoiceItemRow {
   quantity: number | string
   unit: string
   expected_delivery_date: string | null
+  procurement_type: string | null
   articles:
     | {
         supplier_id: string | null
@@ -707,6 +708,7 @@ export async function syncSupplierOrderBucketFromProject(
       quantity,
       unit,
       expected_delivery_date,
+      procurement_type,
       articles (supplier_id)
     `,
     )
@@ -717,7 +719,10 @@ export async function syncSupplierOrderBucketFromProject(
   }
 
   const supplierRows = ((invoiceRows || []) as SupplierInvoiceItemRow[]).filter((row) => {
-    return getSupplierIdFromRelation(row.articles) === input.supplierId
+    return (
+      getSupplierIdFromRelation(row.articles) === input.supplierId &&
+      (row.procurement_type || 'external_order') === 'external_order'
+    )
   })
 
   const aggregatedItems = aggregateSupplierItems(supplierRows)

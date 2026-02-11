@@ -18,6 +18,8 @@ interface SupplierOrderMarkRouteRow {
   idempotency_key: string | null
 }
 
+type InvoiceItemProcurementType = 'external_order' | 'internal_stock' | 'reservation_only'
+
 function toNumber(value: unknown): number {
   return toFiniteNumber(value)
 }
@@ -58,6 +60,7 @@ async function markProjectItemsOrderedForSupplier(
       quantity_ordered,
       quantity_delivered,
       delivery_status,
+      procurement_type,
       articles (supplier_id)
     `,
     )
@@ -84,6 +87,11 @@ async function markProjectItemsOrderedForSupplier(
   )
 
   const candidateItems = (itemRows || []).filter((item) => {
+    const procurementType = (item.procurement_type as InvoiceItemProcurementType | null) || 'external_order'
+    if (procurementType !== 'external_order') {
+      return false
+    }
+
     const itemId = String(item.id)
     if (explicitOrderItemIds.has(itemId)) {
       return true
@@ -122,7 +130,7 @@ async function markProjectItemsOrderedForSupplier(
 
   const { data: refreshedRows, error: refreshedRowsError } = await supabase
     .from('invoice_items')
-    .select('delivery_status, quantity, quantity_ordered, quantity_delivered')
+    .select('delivery_status, quantity, quantity_ordered, quantity_delivered, procurement_type')
     .eq('project_id', projectId)
 
   if (refreshedRowsError) {

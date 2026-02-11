@@ -15,6 +15,7 @@ describe('orderEditorUtils', () => {
           manufacturer: 'Bosch',
           quantity: 2,
           unit: 'Stk',
+          procurement_type: null,
           articles: { supplier_id: 'supplier-a' },
         },
         {
@@ -25,6 +26,7 @@ describe('orderEditorUtils', () => {
           manufacturer: 'Blanco',
           quantity: 1,
           unit: 'Stk',
+          procurement_type: null,
           articles: null,
         },
       ]
@@ -48,6 +50,7 @@ describe('orderEditorUtils', () => {
           manufacturer: null,
           quantity: 1,
           unit: null,
+          procurement_type: null,
           articles: { supplier_id: 'supplier-a' },
         },
         {
@@ -58,6 +61,7 @@ describe('orderEditorUtils', () => {
           manufacturer: null,
           quantity: 1,
           unit: null,
+          procurement_type: null,
           articles: { supplier_id: 'supplier-b' },
         },
       ]
@@ -66,6 +70,26 @@ describe('orderEditorUtils', () => {
 
       expect(result[0]?.selected).toBe(true)
       expect(result[1]?.selected).toBe(false)
+    })
+
+    it('does not preselect reservation-only rows for ordering', () => {
+      const rows = [
+        {
+          id: 'item-1',
+          article_id: null,
+          description: 'Montage',
+          model_number: null,
+          manufacturer: null,
+          quantity: 1,
+          unit: null,
+          procurement_type: 'reservation_only',
+          articles: { supplier_id: 'supplier-a' },
+        },
+      ]
+
+      const result = mapProjectItemsToEditorItems(rows)
+      expect(result[0]?.selected).toBe(false)
+      expect(result[0]?.procurementType).toBe('reservation_only')
     })
   })
 
@@ -84,6 +108,7 @@ describe('orderEditorUtils', () => {
           unit: 'Stk',
           expectedDeliveryDate: '2026-03-01',
           notes: 'Bitte montag',
+          procurementType: 'external_order',
         },
         {
           selected: true,
@@ -94,6 +119,7 @@ describe('orderEditorUtils', () => {
           manufacturer: 'Blanco',
           quantity: '1',
           unit: 'Stk',
+          procurementType: 'external_order',
         },
         {
           selected: false,
@@ -104,6 +130,7 @@ describe('orderEditorUtils', () => {
           manufacturer: 'Siemens',
           quantity: '1',
           unit: 'Stk',
+          procurementType: 'external_order',
         },
       ])
 
@@ -113,6 +140,26 @@ describe('orderEditorUtils', () => {
       expect(result.groups['supplier-a']).toHaveLength(1)
       expect(result.groups['supplier-a']?.[0]?.description).toBe('Backofen')
       expect(result.groups['supplier-a']?.[0]?.quantity).toBe(2)
+    })
+
+    it('does not include internal stock in supplier order payload groups', () => {
+      const result = groupSelectedOrderItemsBySupplier([
+        {
+          selected: true,
+          supplierId: 'supplier-a',
+          invoiceItemId: 'item-1',
+          description: 'Montageleistung',
+          modelNumber: '',
+          manufacturer: '',
+          quantity: '1',
+          unit: 'Stk',
+          procurementType: 'reservation_only',
+        },
+      ])
+
+      expect(result.selectedCount).toBe(1)
+      expect(result.externalSelectedCount).toBe(0)
+      expect(Object.keys(result.groups)).toHaveLength(0)
     })
   })
 })

@@ -4,16 +4,20 @@ export type ProjectDeliveryStatus =
   | 'fully_ordered'
   | 'partially_ordered'
 
+export type InvoiceItemProcurementType = 'external_order' | 'internal_stock' | 'reservation_only'
+
 export interface ProjectDeliveryProgressRow {
   delivery_status: string | null
   quantity: unknown
   quantity_ordered: unknown
   quantity_delivered: unknown
+  procurement_type?: unknown
 }
 
 export interface SupplierOrderInvoiceCandidateRow {
   id: string
   supplierId: string | null
+  procurementType?: unknown
 }
 
 export function toFiniteNumber(value: unknown): number {
@@ -29,6 +33,13 @@ export function toFiniteNumber(value: unknown): number {
   return 0
 }
 
+export function normalizeProcurementType(value: unknown): InvoiceItemProcurementType {
+  if (value === 'internal_stock' || value === 'reservation_only') {
+    return value
+  }
+  return 'external_order'
+}
+
 export function collectSupplierOrderCandidateInvoiceItemIds(
   rows: SupplierOrderInvoiceCandidateRow[],
   supplierId: string,
@@ -38,7 +49,8 @@ export function collectSupplierOrderCandidateInvoiceItemIds(
   const explicitIds = new Set<string>(explicitInvoiceItemIds)
 
   rows.forEach((row) => {
-    if (explicitIds.has(row.id) || row.supplierId === supplierId) {
+    const isExternalOrder = normalizeProcurementType(row.procurementType) === 'external_order'
+    if (isExternalOrder && (explicitIds.has(row.id) || row.supplierId === supplierId)) {
       candidates.add(row.id)
     }
   })
@@ -50,14 +62,25 @@ export function deriveProjectDeliveryStatus(rows: ProjectDeliveryProgressRow[]):
   status: ProjectDeliveryStatus
   allDelivered: boolean
 } {
-  const allDelivered = rows.every((item) => {
+  const relevantRows = rows.filter(
+    (item) => normalizeProcurementType(item.procurement_type) !== 'reservation_only',
+  )
+
+  if (relevantRows.length === 0) {
+    return {
+      status: 'fully_delivered',
+      allDelivered: true,
+    }
+  }
+
+  const allDelivered = relevantRows.every((item) => {
     return (
       item.delivery_status === 'delivered' &&
       toFiniteNumber(item.quantity_delivered) >= toFiniteNumber(item.quantity)
     )
   })
 
-  const partiallyDelivered = rows.some((item) => {
+  const partiallyDelivered = relevantRows.some((item) => {
     return (
       item.delivery_status === 'partially_delivered' ||
       (toFiniteNumber(item.quantity_delivered) > 0 &&
@@ -65,7 +88,7 @@ export function deriveProjectDeliveryStatus(rows: ProjectDeliveryProgressRow[]):
     )
   })
 
-  const allOrdered = rows.every((item) => {
+  const allOrdered = relevantRows.every((item) => {
     const orderedQuantity = Math.max(
       toFiniteNumber(item.quantity_ordered),
       toFiniteNumber(item.quantity_delivered),

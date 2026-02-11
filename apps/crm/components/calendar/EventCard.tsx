@@ -36,6 +36,17 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onClick, compact })
         className={`min-h-[28px] rounded border-l-2 px-2 py-2 text-[11px] ${event.bgColor} ${event.borderColor} ${event.color} cursor-grab truncate active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
       >
         <span className="truncate font-medium">{event.customer}</span>
+        {event.materialReadyLabel && (
+          <span
+            className={`mt-0.5 inline-flex rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${
+              event.materialReady
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-amber-200 bg-amber-50 text-amber-700'
+            }`}
+          >
+            {event.materialReadyLabel}
+          </span>
+        )}
         {event.assignedUserName && (
           <span className="mt-0.5 block truncate text-[10px] opacity-80">{event.assignedUserName}</span>
         )}
@@ -63,6 +74,17 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onClick, compact })
         {event.time && <span className="ml-auto text-[10px] opacity-60">{event.time}</span>}
       </div>
       <div className="truncate font-bold">{event.customer}</div>
+      {event.materialReadyLabel && (
+        <div
+          className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+            event.materialReady
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-amber-200 bg-amber-50 text-amber-700'
+          }`}
+        >
+          {event.materialReadyLabel}
+        </div>
+      )}
       {event.assignedUserName && (
         <div className="mt-0.5 truncate text-[10px] opacity-80">{event.assignedUserName}</div>
       )}

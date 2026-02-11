@@ -1658,6 +1658,7 @@ export type Database = {
           net_total: number
           position: number
           price_per_unit: number
+          procurement_type: string
           project_id: string | null
           purchase_price_per_unit: number | null
           quantity: number
@@ -1692,6 +1693,7 @@ export type Database = {
           net_total: number
           position: number
           price_per_unit: number
+          procurement_type?: string
           project_id?: string | null
           purchase_price_per_unit?: number | null
           quantity: number
@@ -1726,6 +1728,7 @@ export type Database = {
           net_total?: number
           position?: number
           price_per_unit?: number
+          procurement_type?: string
           project_id?: string | null
           purchase_price_per_unit?: number | null
           quantity?: number

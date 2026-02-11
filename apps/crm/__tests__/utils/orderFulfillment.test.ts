@@ -8,9 +8,9 @@ describe('orderFulfillment', () => {
   it('collects supplier candidates including explicit order-linked invoice items', () => {
     const candidates = collectSupplierOrderCandidateInvoiceItemIds(
       [
-        { id: 'a', supplierId: 'supplier-1' },
-        { id: 'b', supplierId: null },
-        { id: 'c', supplierId: 'supplier-2' },
+        { id: 'a', supplierId: 'supplier-1', procurementType: 'external_order' },
+        { id: 'b', supplierId: null, procurementType: 'external_order' },
+        { id: 'c', supplierId: 'supplier-2', procurementType: 'external_order' },
       ],
       'supplier-1',
       ['b'],
@@ -53,5 +53,33 @@ describe('orderFulfillment', () => {
 
     expect(result.status).toBe('fully_delivered')
     expect(result.allDelivered).toBe(true)
+  })
+
+  it('ignores reservation_only items for project delivery progress', () => {
+    const result = deriveProjectDeliveryStatus([
+      {
+        delivery_status: 'not_ordered',
+        quantity: 1,
+        quantity_ordered: 0,
+        quantity_delivered: 0,
+        procurement_type: 'reservation_only',
+      },
+    ])
+
+    expect(result.status).toBe('fully_delivered')
+    expect(result.allDelivered).toBe(true)
+  })
+
+  it('skips non-external items for supplier ordering candidates', () => {
+    const candidates = collectSupplierOrderCandidateInvoiceItemIds(
+      [
+        { id: 'external', supplierId: 'supplier-1', procurementType: 'external_order' },
+        { id: 'stock', supplierId: 'supplier-1', procurementType: 'internal_stock' },
+      ],
+      'supplier-1',
+      ['stock'],
+    )
+
+    expect(Array.from(candidates)).toEqual(['external'])
   })
 })

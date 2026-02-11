@@ -79,6 +79,7 @@ function buildItemRow(context: ItemBuildContext): ItemInsert {
       item.purchasePricePerUnit != null && item.purchasePricePerUnit > 0
         ? roundTo2Decimals(item.purchasePricePerUnit)
         : null,
+    procurement_type: item.procurementType || 'external_order',
     tax_rate: String(taxRate),
     net_total: roundTo2Decimals(netTotal),
     tax_amount: roundTo2Decimals(taxAmount),

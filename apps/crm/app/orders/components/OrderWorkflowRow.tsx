@@ -48,27 +48,46 @@ export function OrderWorkflowRow({
   const QueueIcon = style.icon
   const channelMeta = SUPPLIER_ORDER_CHANNEL_META[row.orderChannel]
 
-  const orderSent = row.kind === 'missing_supplier' ? false : isOrderSent(row)
-  const hasAb = row.kind === 'missing_supplier' ? false : hasAB(row)
-  const hasSupplierDeliveryNote = row.kind === 'missing_supplier' ? false : hasDeliveryNote(row)
-  const hasGoodsReceiptBooked = row.kind === 'missing_supplier' ? false : hasGoodsReceipt(row)
+  const hasExternalProcurement = row.externalOrderItems > 0
+  const hasReservationOnlyItems = row.reservationOnlyItems > 0
+  const orderSent =
+    row.kind === 'missing_supplier' ? false : hasExternalProcurement ? isOrderSent(row) : true
+  const hasAb = row.kind === 'missing_supplier' ? false : hasExternalProcurement ? hasAB(row) : true
+  const hasSupplierDeliveryNote =
+    row.kind === 'missing_supplier' ? false : hasExternalProcurement ? hasDeliveryNote(row) : true
+  const hasGoodsReceiptBooked =
+    row.kind === 'missing_supplier' ? false : hasExternalProcurement ? hasGoodsReceipt(row) : true
+  const reservationDone =
+    row.installationReservationStatus === 'confirmed' || row.installationReservationStatus === 'requested'
+  const firstStepLabel = hasExternalProcurement
+    ? 'Bestellung'
+    : hasReservationOnlyItems
+      ? 'Reservierung'
+      : 'Lagerware'
+  const firstStepDone = hasExternalProcurement ? orderSent : hasReservationOnlyItems ? reservationDone : true
   const isPickupOrder = row.deliveryType === 'pickup'
   const readinessLabel = isPickupOrder ? 'Abholung' : 'Montage'
   const readinessDate = isPickupOrder ? row.deliveryDate : row.installationDate
   const isReadyOrDone = row.queue === 'montagebereit' || row.queue === 'erledigt'
-  const isOrderingQueue = row.queue === 'zu_bestellen' || row.queue === 'brennt'
+  const canTriggerOrderDispatch = row.queue === 'zu_bestellen' || row.queue === 'brennt'
+  const isOrderingQueue =
+    row.queue === 'zu_bestellen' || row.queue === 'brennt' || row.queue === 'reservierung_offen'
   const canEditPositions = isOrderingQueue
-  const canSend = row.kind === 'supplier' && isOrderingQueue
-  const canMarkAlreadyOrdered = row.kind === 'supplier' && isOrderingQueue
-  const canCaptureAb = row.kind === 'supplier' && row.queue === 'ab_fehlt' && Boolean(row.orderId)
+  const canSend = row.kind === 'supplier' && hasExternalProcurement && canTriggerOrderDispatch
+  const canMarkAlreadyOrdered =
+    row.kind === 'supplier' && hasExternalProcurement && canTriggerOrderDispatch
+  const canCaptureAb =
+    row.kind === 'supplier' && hasExternalProcurement && row.queue === 'ab_fehlt' && Boolean(row.orderId)
   const canOpenDeliveryNote =
     row.kind === 'supplier' &&
+    hasExternalProcurement &&
     row.queue === 'wareneingang_offen' &&
     Boolean(row.orderId) &&
     hasAb &&
     !hasSupplierDeliveryNote
   const canBookGoodsReceipt =
     row.kind === 'supplier' &&
+    hasExternalProcurement &&
     row.queue === 'wareneingang_offen' &&
     Boolean(row.orderId) &&
     hasSupplierDeliveryNote &&
@@ -86,7 +105,10 @@ export function OrderWorkflowRow({
         : 'Montage reservieren'
 
   return (
-    <tr className={row.queue === 'brennt' ? style.rowClass : undefined} data-queue={row.queue}>
+    <tr
+      className={row.queue === 'brennt' || row.queue === 'reservierung_offen' ? style.rowClass : undefined}
+      data-queue={row.queue}
+    >
       <td className="px-4 py-4 align-top">
         <span
           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${style.chipClass}`}
@@ -119,14 +141,18 @@ export function OrderWorkflowRow({
       </td>
       <td className="px-4 py-4 align-top">
         <div className="flex flex-wrap gap-1.5">
-          {renderStep('Bestellung', orderSent)}
+          {renderStep(firstStepLabel, firstStepDone)}
           {renderStep('AB', hasAb)}
           {renderStep('Lieferschein', hasSupplierDeliveryNote)}
           {renderStep('Wareneingang', hasGoodsReceiptBooked)}
           {renderStep(readinessLabel, isReadyOrDone)}
         </div>
         <p className="mt-2 text-[11px] text-slate-600">
-          Positionen: {row.totalItems} · offen Bestellung {row.openOrderItems} · offen WE {row.openDeliveryItems}
+          Positionen: {row.totalItems} · extern {row.externalOrderItems} · Lager {row.internalStockItems} ·
+          Reservierung {row.reservationOnlyItems}
+        </p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Offen extern: Bestellung {row.openOrderItems} · WE {row.openDeliveryItems}
         </p>
       </td>
       <td className="px-4 py-4 align-top">
@@ -138,14 +164,16 @@ export function OrderWorkflowRow({
               <span className="text-slate-500">({row.daysUntilInstallation} Tage)</span>
             )}
           </p>
-          <p>AB-Termin: {formatDate(row.abConfirmedDeliveryDate)}</p>
+          <p>AB-Termin: {hasExternalProcurement ? formatDate(row.abConfirmedDeliveryDate) : 'nicht erforderlich'}</p>
           <p>
             AB vs. WE:{' '}
-            {row.abTimingStatus === 'late'
-              ? 'verspätet'
-              : row.abTimingStatus === 'on_time'
-                ? 'pünktlich'
-                : 'offen'}
+            {hasExternalProcurement
+              ? row.abTimingStatus === 'late'
+                ? 'verspätet'
+                : row.abTimingStatus === 'on_time'
+                  ? 'pünktlich'
+                  : 'offen'
+              : 'nicht erforderlich'}
           </p>
           {!isPickupOrder && (
             <>

@@ -21,6 +21,8 @@ export type CalendarEvent = {
   date: string
   assignedUserId?: string
   assignedUserName?: string
+  materialReady?: boolean
+  materialReadyLabel?: string
 }
 
 /** Farben pro Termin-Typ – eindeutig, damit man lernt: Farbe = Typ */
@@ -148,6 +150,12 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
 
       const projectEvents = filteredProjects.flatMap(p => {
         const events: CalendarEvent[] = []
+        const materialReady =
+          Boolean(p.readyForAssemblyDate) ||
+          p.deliveryStatus === 'ready_for_assembly' ||
+          Boolean(p.allItemsDelivered)
+        const materialReadyLabel = materialReady ? 'Montagebereit' : 'Material offen'
+
         if (p.measurementDate === dateStr) {
           events.push({
             id: `project-${p.id}-measurement`,
@@ -161,6 +169,8 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
             bgColor: 'bg-indigo-100',
             borderColor: 'border-indigo-500',
             icon: <Ruler className="h-3 w-3" />,
+            materialReady,
+            materialReadyLabel,
           })
         }
         if (p.installationDate === dateStr) {
@@ -176,6 +186,8 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
             bgColor: 'bg-amber-100',
             borderColor: 'border-amber-500',
             icon: <Truck className="h-3 w-3" />,
+            materialReady,
+            materialReadyLabel,
           })
         }
         if (p.deliveryDate === dateStr) {
@@ -192,6 +204,8 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
             bgColor: isLieferung ? 'bg-teal-100' : 'bg-orange-100',
             borderColor: isLieferung ? 'border-teal-500' : 'border-orange-500',
             icon: <Package className="h-3 w-3" />,
+            materialReady,
+            materialReadyLabel,
           })
         }
         return events
@@ -208,6 +222,11 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
           const assignedUserId = a.assignedUserId
           const assignedUserName = assignedUserId && teamMap ? teamMap[assignedUserId] : undefined
           const typeColor = TYPE_COLORS[a.type] || DEFAULT_TYPE_COLOR
+          const materialReady =
+            Boolean(associatedProject?.readyForAssemblyDate) ||
+            associatedProject?.deliveryStatus === 'ready_for_assembly' ||
+            Boolean(associatedProject?.allItemsDelivered)
+          const materialReadyLabel = materialReady ? 'Montagebereit' : 'Material offen'
 
           return {
             id: `appointment-${a.id}`,
@@ -224,6 +243,8 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
             bgColor: typeColor.bgColor,
             borderColor: typeColor.borderColor,
             icon: <ChefHat className="h-3 w-3" />,
+            materialReady,
+            materialReadyLabel,
           }
         })
 

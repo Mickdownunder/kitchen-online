@@ -36,6 +36,7 @@ describe('workflowQueue', () => {
       'brennt',
       'ab_fehlt',
       'wareneingang_offen',
+      'reservierung_offen',
       'montagebereit',
       'erledigt',
     ])
@@ -117,7 +118,7 @@ describe('workflowQueue', () => {
     expect(result.queue).toBe('montagebereit')
   })
 
-  it('classifies montagebereit rows with reached target date as erledigt', () => {
+  it('keeps montagebereit rows visible until project is explicitly completed', () => {
     const result = deriveSupplierWorkflowQueue(
       buildSnapshot({
         supplierDeliveryNoteId: 'dn-1',
@@ -129,7 +130,7 @@ describe('workflowQueue', () => {
       NOW,
     )
 
-    expect(result.queue).toBe('erledigt')
+    expect(result.queue).toBe('montagebereit')
   })
 
   it('classifies near-term missing material as brennt', () => {
@@ -164,5 +165,41 @@ describe('workflowQueue', () => {
     expect(getAbTimingStatus('2026-02-10', '2026-02-10T12:00:00.000Z')).toBe('on_time')
     expect(getAbTimingStatus('2026-02-10', '2026-02-11T12:00:00.000Z')).toBe('late')
     expect(getAbTimingStatus('2026-02-10', undefined)).toBe('open')
+  })
+
+  it('routes reservation-only positions into reservierung_offen until confirmed', () => {
+    const result = deriveSupplierWorkflowQueue(
+      buildSnapshot({
+        hasOrder: false,
+        orderStatus: undefined,
+        sentAt: undefined,
+        hasExternalOrderItems: false,
+        hasReservationOnlyItems: true,
+        reservationStatus: 'requested',
+        openOrderItems: 0,
+        openDeliveryItems: 0,
+      }),
+      NOW,
+    )
+
+    expect(result.queue).toBe('reservierung_offen')
+  })
+
+  it('routes reservation-only positions to montagebereit when confirmed', () => {
+    const result = deriveSupplierWorkflowQueue(
+      buildSnapshot({
+        hasOrder: false,
+        orderStatus: undefined,
+        sentAt: undefined,
+        hasExternalOrderItems: false,
+        hasReservationOnlyItems: true,
+        reservationStatus: 'confirmed',
+        openOrderItems: 0,
+        openDeliveryItems: 0,
+      }),
+      NOW,
+    )
+
+    expect(result.queue).toBe('montagebereit')
   })
 })

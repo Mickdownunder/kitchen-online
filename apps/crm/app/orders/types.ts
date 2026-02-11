@@ -1,5 +1,5 @@
 import type React from 'react'
-import type { SupplierOrderItem, SupplierOrderStatus } from '@/types'
+import type { InvoiceItemProcurementType, SupplierOrderItem, SupplierOrderStatus } from '@/types'
 import type { SupplierOrderChannel } from '@/lib/orders/orderChannel'
 import type { AbTimingStatus, SupplierWorkflowQueue } from '@/lib/orders/workflowQueue'
 
@@ -24,6 +24,7 @@ export interface WorkflowProjectItem {
   quantityOrdered: number
   quantityDelivered: number
   deliveryStatus: string
+  procurementType: InvoiceItemProcurementType
 }
 
 export interface OrderWorkflowRow {
@@ -52,6 +53,9 @@ export interface OrderWorkflowRow {
   totalItems: number
   openOrderItems: number
   openDeliveryItems: number
+  externalOrderItems: number
+  internalStockItems: number
+  reservationOnlyItems: number
   queue: SupplierWorkflowQueue
   queueLabel: string
   nextAction: string
@@ -79,6 +83,7 @@ export interface EditableOrderItem {
   unit: string
   expectedDeliveryDate: string
   notes: string
+  procurementType: InvoiceItemProcurementType
 }
 
 export interface GoodsReceiptDraftItem {

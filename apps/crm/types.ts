@@ -241,6 +241,8 @@ export interface Article {
   isActive: boolean
 }
 
+export type InvoiceItemProcurementType = 'external_order' | 'internal_stock' | 'reservation_only'
+
 // Enhanced Invoice Item with Article Reference
 export interface InvoiceItem {
   id: string
@@ -280,6 +282,7 @@ export interface InvoiceItem {
   actualDeliveryDate?: string
   quantityOrdered?: number
   quantityDelivered?: number
+  procurementType?: InvoiceItemProcurementType
 
   // Warranty / Appliance (für Kundenportal)
   showInPortal?: boolean // Im Kundenportal als Gerät anzeigen

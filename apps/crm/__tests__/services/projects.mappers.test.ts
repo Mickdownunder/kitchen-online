@@ -26,6 +26,7 @@ function makeInvoiceItemRow(overrides: Partial<Row<'invoice_items'>> = {}): Row<
     actual_delivery_date: null,
     quantity_ordered: null,
     quantity_delivered: null,
+    procurement_type: 'external_order',
     show_in_portal: false,
     serial_number: null,
     installation_date: null,

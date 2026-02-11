@@ -13,6 +13,7 @@ import {
   mapProjectItemsToEditorItems,
   type ProjectInvoiceItemForOrderEditor,
 } from '@/lib/orders/orderEditorUtils'
+import { deriveProjectDeliveryStatus } from '@/lib/orders/orderFulfillment'
 import type { CustomerProject } from '@/types'
 import { createEmptyEditableItem, mapRowItemsToEditableItems } from '../orderUtils'
 import type { EditableOrderItem, EditorViewFilter, OrderWorkflowRow, SupplierLookupOption } from '../types'
@@ -29,6 +30,20 @@ interface OrderEditorModalProps {
   onClose: () => void
   onSaved: () => Promise<void>
   onMarkExternallyOrdered: (row: OrderWorkflowRow) => Promise<boolean>
+}
+
+type InvoiceItemProcurementType = 'external_order' | 'internal_stock' | 'reservation_only'
+
+function normalizeProcurementType(value: string | undefined): InvoiceItemProcurementType {
+  if (value === 'internal_stock' || value === 'reservation_only') {
+    return value
+  }
+  return 'external_order'
+}
+
+function isInternalStockSupplierName(value: string | undefined): boolean {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === 'baleah eigen' || normalized === 'lagerware' || normalized === 'lager'
 }
 
 export function OrderEditorModal({
@@ -117,7 +132,12 @@ export function OrderEditorModal({
   }, [open, row])
 
   const selectedItemsCount = items.filter((item) => item.selected).length
-  const selectedWithoutSupplierCount = items.filter((item) => item.selected && item.supplierId.trim().length === 0).length
+  const selectedWithoutSupplierCount = items.filter(
+    (item) =>
+      item.selected &&
+      item.procurementType === 'external_order' &&
+      item.supplierId.trim().length === 0,
+  ).length
   const missingSupplierCount = items.filter((item) => item.supplierId.trim().length === 0).length
 
   const visibleItems = useMemo(() => {
@@ -207,6 +227,7 @@ export function OrderEditorModal({
                         manufacturer,
                         quantity,
                         unit,
+                        procurement_type,
                         articles (supplier_id)
                       `,
                       )
@@ -237,6 +258,7 @@ export function OrderEditorModal({
                         unit: item.unit,
                         expectedDeliveryDate: '',
                         notes: '',
+                        procurementType: item.procurementType,
                       }),
                     )
 
@@ -277,7 +299,14 @@ export function OrderEditorModal({
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setItems((prev) => prev.map((entry) => ({ ...entry, selected: true })))}
+                  onClick={() =>
+                    setItems((prev) =>
+                      prev.map((entry) => ({
+                        ...entry,
+                        selected: entry.procurementType === 'external_order',
+                      })),
+                    )
+                  }
                   className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-100"
                 >
                   Alle markieren
@@ -295,7 +324,10 @@ export function OrderEditorModal({
                     setItems((prev) =>
                       prev.map((entry) => ({
                         ...entry,
-                        selected: entry.supplierId.trim().length === 0 ? true : entry.selected,
+                        selected:
+                          entry.procurementType === 'external_order' && entry.supplierId.trim().length === 0
+                            ? true
+                            : entry.selected,
                       })),
                     )
                   }
@@ -334,6 +366,9 @@ export function OrderEditorModal({
                     <th scope="col" className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">
                       Lieferant
                     </th>
+                    <th scope="col" className="w-[170px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      Beschaffung
+                    </th>
                     <th scope="col" className="w-[82px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">
                       Menge
                     </th>
@@ -349,7 +384,7 @@ export function OrderEditorModal({
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {visibleItems.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-3 py-6 text-center text-sm text-slate-500">
+                      <td colSpan={9} className="px-3 py-6 text-center text-sm text-slate-500">
                         Keine Positionen für diesen Filter.
                       </td>
                     </tr>
@@ -360,6 +395,7 @@ export function OrderEditorModal({
                           <input
                             type="checkbox"
                             checked={item.selected}
+                            disabled={item.procurementType !== 'external_order'}
                             onChange={(event) =>
                               setItems((prev) =>
                                 prev.map((entry) =>
@@ -369,7 +405,7 @@ export function OrderEditorModal({
                                 ),
                               )
                             }
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 disabled:opacity-50"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -426,7 +462,28 @@ export function OrderEditorModal({
                               setItems((prev) =>
                                 prev.map((entry) =>
                                   entry.localId === item.localId
-                                    ? { ...entry, supplierId: event.target.value }
+                                    ? {
+                                        ...entry,
+                                        supplierId: event.target.value,
+                                        procurementType: (() => {
+                                          const supplier = suppliers.find((s) => s.id === event.target.value)
+                                          if (
+                                            supplier &&
+                                            isInternalStockSupplierName(supplier.name) &&
+                                            entry.procurementType === 'external_order'
+                                          ) {
+                                            return 'internal_stock'
+                                          }
+                                          return entry.procurementType
+                                        })(),
+                                        selected: (() => {
+                                          const supplier = suppliers.find((s) => s.id === event.target.value)
+                                          if (supplier && isInternalStockSupplierName(supplier.name)) {
+                                            return false
+                                          }
+                                          return entry.selected
+                                        })(),
+                                      }
                                     : entry,
                                 ),
                               )
@@ -440,6 +497,32 @@ export function OrderEditorModal({
                                 {supplier.name}
                               </option>
                             ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={item.procurementType}
+                            onChange={(event) =>
+                              setItems((prev) =>
+                                prev.map((entry) =>
+                                  entry.localId === item.localId
+                                    ? {
+                                        ...entry,
+                                        procurementType: normalizeProcurementType(event.target.value),
+                                        selected:
+                                          normalizeProcurementType(event.target.value) === 'external_order'
+                                            ? entry.selected
+                                            : false,
+                                      }
+                                    : entry,
+                                ),
+                              )
+                            }
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-400"
+                          >
+                            <option value="external_order">Extern bestellen</option>
+                            <option value="internal_stock">Lagerware</option>
+                            <option value="reservation_only">Nur reservieren</option>
                           </select>
                         </td>
                         <td className="px-3 py-2">
@@ -520,14 +603,13 @@ export function OrderEditorModal({
                 ` · ohne Lieferant: ${selectedWithoutSupplierCount} (bitte zuordnen oder abwählen)`}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Speichern legt je Lieferant einen Bestell-Entwurf an oder aktualisiert ihn. Danach per „Senden“
-              (CRM-Mail) oder „Bereits bestellt“ final markieren.
+              Extern bestellen: Position markieren und senden. Lagerware/Reservierung laufen ohne AB/Lieferschein/WE.
             </p>
 
             {error && <p className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
 
             <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-              {row?.kind === 'supplier' && (
+              {row?.kind === 'supplier' && row.externalOrderItems > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowMarkConfirm(true)}
@@ -563,11 +645,6 @@ export function OrderEditorModal({
                   }
 
                   const grouped = groupSelectedOrderItemsBySupplier(items)
-                  if (grouped.selectedCount === 0) {
-                    setError('Bitte mindestens eine Position zum Bestellen auswählen.')
-                    return
-                  }
-
                   if (grouped.missingSupplierCount > 0) {
                     setError(
                       `${grouped.missingSupplierCount} ausgewählte Position(en) haben keinen Lieferanten. Bitte zuordnen.`,
@@ -588,8 +665,26 @@ export function OrderEditorModal({
                     groupedEntries = groupedEntries.filter(([entrySupplierId]) => entrySupplierId === normalizedSupplierId)
                   }
 
-                  if (groupedEntries.length === 0) {
-                    setError('Keine gültigen Positionen mit Menge > 0 ausgewählt.')
+                  const invoiceItemsById = new Map<
+                    string,
+                    {
+                      procurementType: InvoiceItemProcurementType
+                      quantity: number
+                    }
+                  >()
+                  items.forEach((item) => {
+                    const invoiceItemId = (item.invoiceItemId || '').trim()
+                    if (!invoiceItemId) {
+                      return
+                    }
+                    invoiceItemsById.set(invoiceItemId, {
+                      procurementType: normalizeProcurementType(item.procurementType),
+                      quantity: Math.max(0, Number.parseFloat(item.quantity || '0') || 0),
+                    })
+                  })
+
+                  if (grouped.externalSelectedCount === 0 && invoiceItemsById.size === 0) {
+                    setError('Bitte mindestens eine Position auswählen oder Beschaffung ändern.')
                     return
                   }
 
@@ -598,12 +693,64 @@ export function OrderEditorModal({
                   try {
                     setSaving(true)
 
-                    if (orderId) {
-                      const payloadItems = toPayloadItems(grouped.groups[normalizedSupplierId] || [])
-                      if (payloadItems.length === 0) {
-                        throw new Error('Für diese Bestellung wurden keine gültigen Positionen ausgewählt.')
+                    for (const [invoiceItemId, data] of invoiceItemsById.entries()) {
+                      const updatePayload: Record<string, unknown> = {
+                        procurement_type: data.procurementType,
                       }
 
+                      if (data.procurementType === 'internal_stock') {
+                        const fulfilledQuantity = data.quantity > 0 ? data.quantity : 1
+                        updatePayload.delivery_status = 'delivered'
+                        updatePayload.quantity_ordered = fulfilledQuantity
+                        updatePayload.quantity_delivered = fulfilledQuantity
+                        updatePayload.actual_delivery_date = new Date().toISOString().slice(0, 10)
+                      }
+
+                      const { error: invoiceUpdateError } = await supabase
+                        .from('invoice_items')
+                        .update(updatePayload)
+                        .eq('id', invoiceItemId)
+                        .eq('project_id', normalizedProjectId)
+
+                      if (invoiceUpdateError) {
+                        throw new Error(invoiceUpdateError.message)
+                      }
+                    }
+
+                    const { data: refreshedMaterialRows, error: refreshedMaterialRowsError } = await supabase
+                      .from('invoice_items')
+                      .select('delivery_status, quantity, quantity_ordered, quantity_delivered, procurement_type')
+                      .eq('project_id', normalizedProjectId)
+
+                    if (refreshedMaterialRowsError) {
+                      throw new Error(refreshedMaterialRowsError.message)
+                    }
+
+                    const deliveryState = deriveProjectDeliveryStatus((refreshedMaterialRows || []) as Array<{
+                      delivery_status: string | null
+                      quantity: unknown
+                      quantity_ordered: unknown
+                      quantity_delivered: unknown
+                      procurement_type?: unknown
+                    }>)
+
+                    const { error: projectDeliveryUpdateError } = await supabase
+                      .from('projects')
+                      .update({
+                        delivery_status: deliveryState.status,
+                        all_items_delivered: deliveryState.allDelivered,
+                        ready_for_assembly_date: deliveryState.allDelivered
+                          ? new Date().toISOString().slice(0, 10)
+                          : null,
+                      })
+                      .eq('id', normalizedProjectId)
+
+                    if (projectDeliveryUpdateError) {
+                      throw new Error(projectDeliveryUpdateError.message)
+                    }
+
+                    if (orderId) {
+                      const payloadItems = toPayloadItems(grouped.groups[normalizedSupplierId] || [])
                       const updateResult = await replaceSupplierOrderItems(orderId, payloadItems)
                       if (!updateResult.ok) {
                         throw new Error(updateResult.message || 'Bestellung konnte nicht gespeichert werden.')
@@ -688,7 +835,7 @@ export function OrderEditorModal({
         )}
       </ModalShell>
 
-      {row?.kind === 'supplier' && (
+      {row?.kind === 'supplier' && row.externalOrderItems > 0 && (
         <ConfirmDialog
           open={showMarkConfirm}
           onClose={() => setShowMarkConfirm(false)}

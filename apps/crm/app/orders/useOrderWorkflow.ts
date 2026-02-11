@@ -15,7 +15,8 @@ import {
 import { deriveSupplierOrderChannel } from '@/lib/orders/orderChannel'
 import { getSupplierOrders } from '@/lib/supabase/services'
 import { supabase } from '@/lib/supabase/client'
-import type { SupplierOrder, SupplierOrderStatus } from '@/types'
+import type { InvoiceItemProcurementType, SupplierOrder, SupplierOrderStatus } from '@/types'
+import { ProjectStatus } from '@/types'
 import type {
   InstallationReservationStatus,
   OrderWorkflowRow,
@@ -35,6 +36,7 @@ interface SupplierInvoiceBucketRow {
   quantity_ordered: number | null
   quantity_delivered: number | null
   delivery_status: string | null
+  procurement_type: string | null
   articles:
     | {
         supplier_id: string | null
@@ -70,9 +72,6 @@ interface WorkflowBucketAccumulator {
   projectId: string
   supplierId: string
   projectItems: WorkflowProjectItem[]
-  totalItems: number
-  openOrderItems: number
-  openDeliveryItems: number
   order?: SupplierOrder
 }
 
@@ -85,6 +84,7 @@ const SENT_OR_LATER_STATUSES = new Set<SupplierOrderStatus>([
   'goods_receipt_booked',
   'ready_for_installation',
 ])
+const INTERNAL_STOCK_SUPPLIER_NAMES = new Set(['baleah eigen', 'lagerware', 'lager'])
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number') {
@@ -186,6 +186,84 @@ function normalizeReservationStatus(value: string | null | undefined): Installat
     : undefined
 }
 
+function normalizeProcurementType(value: string | null | undefined): InvoiceItemProcurementType {
+  if (value === 'internal_stock' || value === 'reservation_only') {
+    return value
+  }
+  return 'external_order'
+}
+
+function isInternalStockSupplierName(name: string | undefined): boolean {
+  return INTERNAL_STOCK_SUPPLIER_NAMES.has((name || '').trim().toLowerCase())
+}
+
+function normalizeProjectItemsForSupplier(
+  items: WorkflowProjectItem[],
+  supplierName: string | undefined,
+): WorkflowProjectItem[] {
+  if (!isInternalStockSupplierName(supplierName)) {
+    return items
+  }
+
+  return items.map((item) => {
+    if (item.procurementType !== 'external_order') {
+      return item
+    }
+
+    return {
+      ...item,
+      procurementType: 'internal_stock',
+      quantityOrdered: Math.max(item.quantityOrdered, item.quantity),
+      quantityDelivered: Math.max(item.quantityDelivered, item.quantity),
+      deliveryStatus: 'delivered',
+    }
+  })
+}
+
+function summarizeProcurement(items: WorkflowProjectItem[]): {
+  totalItems: number
+  openOrderItems: number
+  openDeliveryItems: number
+  externalOrderItems: number
+  internalStockItems: number
+  reservationOnlyItems: number
+} {
+  let openOrderItems = 0
+  let openDeliveryItems = 0
+  let externalOrderItems = 0
+  let internalStockItems = 0
+  let reservationOnlyItems = 0
+
+  items.forEach((item) => {
+    if (item.procurementType === 'internal_stock') {
+      internalStockItems += 1
+      return
+    }
+
+    if (item.procurementType === 'reservation_only') {
+      reservationOnlyItems += 1
+      return
+    }
+
+    externalOrderItems += 1
+    if (item.quantityOrdered < item.quantity) {
+      openOrderItems += 1
+    }
+    if (item.quantityDelivered < item.quantity) {
+      openDeliveryItems += 1
+    }
+  })
+
+  return {
+    totalItems: items.length,
+    openOrderItems,
+    openDeliveryItems,
+    externalOrderItems,
+    internalStockItems,
+    reservationOnlyItems,
+  }
+}
+
 function mapInvoiceRowToProjectItem(row: SupplierInvoiceBucketRow, supplierId?: string): WorkflowProjectItem {
   const quantity = normalizeItemQuantity(row.quantity)
   const deliveredQuantity = Math.max(0, toNumber(row.quantity_delivered))
@@ -206,6 +284,7 @@ function mapInvoiceRowToProjectItem(row: SupplierInvoiceBucketRow, supplierId?: 
     quantityOrdered: orderedQuantity,
     quantityDelivered: deliveredQuantity,
     deliveryStatus: row.delivery_status || 'not_ordered',
+    procurementType: normalizeProcurementType(row.procurement_type),
   }
 }
 
@@ -265,6 +344,7 @@ export function useOrderWorkflow() {
             quantity_ordered,
             quantity_delivered,
             delivery_status,
+            procurement_type,
             articles (supplier_id)
           `,
           ),
@@ -328,9 +408,6 @@ export function useOrderWorkflow() {
             projectId,
             supplierId,
             projectItems: [],
-            totalItems: 0,
-            openOrderItems: 0,
-            openDeliveryItems: 0,
           })
         }
 
@@ -348,15 +425,6 @@ export function useOrderWorkflow() {
           const bucket = ensureBucket(projectId, supplierId)
           const item = mapInvoiceRowToProjectItem(invoiceRow, supplierId)
           bucket.projectItems.push(item)
-          bucket.totalItems += 1
-
-          if (item.quantityOrdered < item.quantity) {
-            bucket.openOrderItems += 1
-          }
-
-          if (item.quantityDelivered < item.quantity) {
-            bucket.openDeliveryItems += 1
-          }
 
           continue
         }
@@ -410,16 +478,13 @@ export function useOrderWorkflow() {
             return null
           }
 
-          let totalItems = bucket.totalItems
-          let openOrderItems = bucket.openOrderItems
-          let openDeliveryItems = bucket.openDeliveryItems
           let projectItems = bucket.projectItems
 
           const orderSentOrLater = Boolean(
             order?.sentAt || (order?.status && SENT_OR_LATER_STATUSES.has(order.status)),
           )
 
-          if (totalItems === 0 && order?.items?.length) {
+          if (projectItems.length === 0 && order?.items?.length) {
             projectItems = order.items.map((item, index) => {
               if (item.invoiceItemId) {
                 const invoiceRow = invoiceItemById.get(item.invoiceItemId)
@@ -455,45 +520,55 @@ export function useOrderWorkflow() {
                 quantityOrdered: orderSentOrLater ? fallbackQuantity : 0,
                 quantityDelivered: 0,
                 deliveryStatus: orderSentOrLater ? 'ordered' : 'not_ordered',
+                procurementType: 'external_order',
               }
             })
-
-            totalItems = projectItems.length
-            openOrderItems = projectItems.filter((item) => item.quantityOrdered < item.quantity).length
-            openDeliveryItems = projectItems.filter(
-              (item) => item.quantityDelivered < item.quantity,
-            ).length
           }
 
           const deliveryType = project?.deliveryType || 'delivery'
           const deliveryDate = project?.deliveryDate || undefined
           const installationDate = project?.installationDate || order?.projectInstallationDate || undefined
           const readinessTargetDate = deliveryType === 'pickup' ? deliveryDate || installationDate : installationDate
-          const decision = deriveSupplierWorkflowQueue({
-            hasOrder: Boolean(order),
-            orderStatus: order?.status,
-            sentAt: order?.sentAt,
-            abNumber: order?.abNumber,
-            abReceivedAt: order?.abReceivedAt,
-            abConfirmedDeliveryDate: order?.abConfirmedDeliveryDate,
-            supplierDeliveryNoteId: order?.supplierDeliveryNoteId,
-            goodsReceiptId: order?.goodsReceiptId,
-            bookedAt: order?.bookedAt,
-            installationDate: readinessTargetDate,
-            openOrderItems,
-            openDeliveryItems,
-          })
-
           const supplierName =
             order?.supplierName ||
             supplier?.name ||
             `Lieferant ${bucket.supplierId.slice(0, 6).toUpperCase()}`
-
+          const normalizedProjectItems = normalizeProjectItemsForSupplier(projectItems, supplierName)
+          const {
+            totalItems,
+            openOrderItems,
+            openDeliveryItems,
+            externalOrderItems,
+            internalStockItems,
+            reservationOnlyItems,
+          } = summarizeProcurement(normalizedProjectItems)
+          const isProjectCompleted = Boolean(
+            project?.completionDate || project?.status === ProjectStatus.COMPLETED,
+          )
           const reservation = reservationByProjectId.get(bucket.projectId)
           const installationReservationStatus = normalizeReservationStatus(reservation?.status)
           const installationReservationRequestedAt = reservation?.request_email_sent_at || undefined
           const installationReservationConfirmedDate = reservation?.confirmation_date || undefined
           const installationReservationCompany = reservation?.installer_company || undefined
+          const decision = deriveSupplierWorkflowQueue({
+            hasOrder: externalOrderItems > 0 ? Boolean(order) : false,
+            orderStatus: externalOrderItems > 0 ? order?.status : undefined,
+            sentAt: externalOrderItems > 0 ? order?.sentAt : undefined,
+            abNumber: externalOrderItems > 0 ? order?.abNumber : undefined,
+            abReceivedAt: externalOrderItems > 0 ? order?.abReceivedAt : undefined,
+            abConfirmedDeliveryDate: externalOrderItems > 0 ? order?.abConfirmedDeliveryDate : undefined,
+            supplierDeliveryNoteId: externalOrderItems > 0 ? order?.supplierDeliveryNoteId : undefined,
+            goodsReceiptId: externalOrderItems > 0 ? order?.goodsReceiptId : undefined,
+            bookedAt: externalOrderItems > 0 ? order?.bookedAt : undefined,
+            installationDate: readinessTargetDate,
+            openOrderItems,
+            openDeliveryItems,
+            hasExternalOrderItems: externalOrderItems > 0,
+            hasInternalStockItems: internalStockItems > 0,
+            hasReservationOnlyItems: reservationOnlyItems > 0 && deliveryType !== 'pickup',
+            reservationStatus: installationReservationStatus,
+            isProjectCompleted,
+          })
 
           let nextAction = decision.nextAction
           if (decision.queue === 'montagebereit') {
@@ -542,14 +617,17 @@ export function useOrderWorkflow() {
             totalItems,
             openOrderItems,
             openDeliveryItems,
+            externalOrderItems,
+            internalStockItems,
+            reservationOnlyItems,
             queue: decision.queue,
             queueLabel: SUPPLIER_WORKFLOW_QUEUE_META[decision.queue].label,
             nextAction,
             abTimingStatus: getAbTimingStatus(order?.abConfirmedDeliveryDate, order?.bookedAt),
-            projectItems,
+            projectItems: normalizedProjectItems,
             unresolvedItems: [],
             orderItems: order?.items || [],
-            orderChannel: deriveSupplierOrderChannel(order),
+            orderChannel: externalOrderItems > 0 ? deriveSupplierOrderChannel(order) : 'pending',
             installationReservationStatus,
             installationReservationRequestedAt,
             installationReservationConfirmedDate,
@@ -561,9 +639,13 @@ export function useOrderWorkflow() {
       const missingSupplierRows = Array.from(missingSupplierByProject.entries()).map(
         ([projectId, unresolvedItems]): OrderWorkflowRow => {
           const project = projectLookup.get(projectId)
-          const openDeliveryItems = unresolvedItems.filter(
-            (item) => item.quantityDelivered < item.quantity,
-          ).length
+          const {
+            openDeliveryItems,
+            openOrderItems,
+            externalOrderItems,
+            internalStockItems,
+            reservationOnlyItems,
+          } = summarizeProcurement(unresolvedItems)
 
           return {
             key: `${projectId}:missing-supplier`,
@@ -579,8 +661,11 @@ export function useOrderWorkflow() {
             ),
             supplierName: 'Lieferant fehlt',
             totalItems: unresolvedItems.length,
-            openOrderItems: unresolvedItems.length,
+            openOrderItems,
             openDeliveryItems,
+            externalOrderItems,
+            internalStockItems,
+            reservationOnlyItems,
             queue: 'zu_bestellen',
             queueLabel: SUPPLIER_WORKFLOW_QUEUE_META.zu_bestellen.label,
             nextAction:

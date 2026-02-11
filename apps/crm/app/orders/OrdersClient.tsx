@@ -171,7 +171,7 @@ export default function OrdersClient() {
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Bestellungen</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Klarer Ablauf: Zu bestellen, Bestellbestätigung, Wareneingang, Montagebereit, erledigt.
+            Klarer Ablauf: Bestellung, Reservierung, Wareneingang und Montagebereitschaft.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -234,7 +234,13 @@ export default function OrdersClient() {
 
       {activeQueue === 'montagebereit' && (
         <p className="text-xs text-slate-500">
-          Material ist vollständig verfügbar. Nach erreichtem Montage-/Abholtag verschiebt sich der Eintrag automatisch nach „Erledigt“.
+          Material ist vollständig verfügbar. Der Eintrag bleibt sichtbar, bis das Projekt abgeschlossen ist.
+        </p>
+      )}
+
+      {activeQueue === 'reservierung_offen' && (
+        <p className="text-xs text-slate-500">
+          Diese Positionen werden nicht bestellt. Bitte Montage-/Liefertermin per E-Mail reservieren und bestätigen.
         </p>
       )}
 
