@@ -2,6 +2,7 @@ import {
   deriveSupplierWorkflowQueue,
   fromQueueParam,
   getAbTimingStatus,
+  SUPPLIER_WORKFLOW_QUEUE_ORDER,
   toQueueParam,
   type SupplierWorkflowQueueSnapshot,
 } from '@/lib/orders/workflowQueue'
@@ -29,9 +30,24 @@ function buildSnapshot(
 }
 
 describe('workflowQueue', () => {
-  it('maps queue params', () => {
-    expect(toQueueParam('zu_bestellen')).toBe('zu-bestellen')
-    expect(fromQueueParam('zu-bestellen')).toBe('zu_bestellen')
+  it('keeps explicit queue order stable', () => {
+    expect(SUPPLIER_WORKFLOW_QUEUE_ORDER).toEqual([
+      'lieferant_fehlt',
+      'brennt',
+      'zu_bestellen',
+      'ab_fehlt',
+      'lieferschein_da',
+      'wareneingang_offen',
+      'montagebereit',
+    ])
+  })
+
+  it('maps queue params as roundtrip', () => {
+    SUPPLIER_WORKFLOW_QUEUE_ORDER.forEach((queue) => {
+      const param = toQueueParam(queue)
+      expect(fromQueueParam(param)).toBe(queue)
+    })
+
     expect(fromQueueParam('lieferant-fehlt')).toBe('lieferant_fehlt')
     expect(fromQueueParam('unknown')).toBeNull()
   })

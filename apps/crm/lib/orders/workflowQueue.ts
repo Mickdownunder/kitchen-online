@@ -44,6 +44,16 @@ export const SUPPLIER_WORKFLOW_QUEUE_META: Record<
   montagebereit: { label: 'Montagebereit', urgency: 6 },
 }
 
+export const SUPPLIER_WORKFLOW_QUEUE_ORDER: SupplierWorkflowQueue[] = [
+  'lieferant_fehlt',
+  'brennt',
+  'zu_bestellen',
+  'ab_fehlt',
+  'lieferschein_da',
+  'wareneingang_offen',
+  'montagebereit',
+]
+
 const SENT_OR_LATER_STATUSES = new Set<SupplierOrderStatus>([
   'sent',
   'ab_received',
@@ -90,8 +100,7 @@ export function fromQueueParam(value: string | null): SupplierWorkflowQueue | nu
   }
 
   const normalized = value.toLowerCase().trim().replace(/-/g, '_')
-  const candidates = Object.keys(SUPPLIER_WORKFLOW_QUEUE_META) as SupplierWorkflowQueue[]
-  return candidates.includes(normalized as SupplierWorkflowQueue)
+  return SUPPLIER_WORKFLOW_QUEUE_ORDER.includes(normalized as SupplierWorkflowQueue)
     ? (normalized as SupplierWorkflowQueue)
     : null
 }

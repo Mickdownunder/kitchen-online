@@ -7,14 +7,16 @@ import {
   deriveSupplierWorkflowQueue,
   fromQueueParam,
   getAbTimingStatus,
+  SUPPLIER_WORKFLOW_QUEUE_ORDER,
   SUPPLIER_WORKFLOW_QUEUE_META,
   toQueueParam,
   type SupplierWorkflowQueue,
 } from '@/lib/orders/workflowQueue'
-import { deriveSupplierOrderChannel, type SupplierOrderChannel } from '@/lib/orders/orderChannel'
+import { deriveSupplierOrderChannel } from '@/lib/orders/orderChannel'
 import { getSupplierOrders } from '@/lib/supabase/services'
 import { supabase } from '@/lib/supabase/client'
-import type { SupplierOrder, SupplierOrderItem, SupplierOrderStatus } from '@/types'
+import type { SupplierOrder, SupplierOrderStatus } from '@/types'
+import type { OrderWorkflowRow, SupplierLookupOption, WorkflowProjectItem } from './types'
 
 interface SupplierInvoiceBucketRow {
   id: string
@@ -50,27 +52,6 @@ interface SupplierOrderItemLinkRow {
     | null
 }
 
-interface SupplierLookupRow {
-  id: string
-  name: string
-  email: string | null
-  order_email: string | null
-}
-
-interface WorkflowProjectItem {
-  id: string
-  articleId?: string
-  supplierId?: string
-  description: string
-  modelNumber?: string
-  manufacturer?: string
-  unit: string
-  quantity: number
-  quantityOrdered: number
-  quantityDelivered: number
-  deliveryStatus: string
-}
-
 interface WorkflowBucketAccumulator {
   key: string
   projectId: string
@@ -80,40 +61,6 @@ interface WorkflowBucketAccumulator {
   openOrderItems: number
   openDeliveryItems: number
   order?: SupplierOrder
-}
-
-export interface OrderWorkflowRow {
-  key: string
-  kind: 'supplier' | 'missing_supplier'
-  projectId: string
-  projectOrderNumber: string
-  customerName: string
-  installationDate?: string
-  daysUntilInstallation?: number
-  supplierId?: string
-  supplierName: string
-  supplierOrderEmail?: string
-  orderId?: string
-  supplierOrderNumber?: string
-  orderStatus?: SupplierOrderStatus
-  sentAt?: string
-  abNumber?: string
-  abReceivedAt?: string
-  abConfirmedDeliveryDate?: string
-  supplierDeliveryNoteId?: string
-  goodsReceiptId?: string
-  bookedAt?: string
-  totalItems: number
-  openOrderItems: number
-  openDeliveryItems: number
-  queue: SupplierWorkflowQueue
-  queueLabel: string
-  nextAction: string
-  abTimingStatus: ReturnType<typeof getAbTimingStatus>
-  projectItems: WorkflowProjectItem[]
-  unresolvedItems: WorkflowProjectItem[]
-  orderItems: SupplierOrderItem[]
-  orderChannel: SupplierOrderChannel
 }
 
 const ORDERED_BY_STATUS = new Set(['ordered', 'partially_delivered', 'delivered', 'missing'])
@@ -238,7 +185,7 @@ export function useOrderWorkflow() {
   const [activeQueue, setActiveQueue] = useState<SupplierWorkflowQueue>(initialQueueFromUrl)
   const [search, setSearch] = useState(initialSearchFromUrl)
   const [rows, setRows] = useState<OrderWorkflowRow[]>([])
-  const [suppliers, setSuppliers] = useState<SupplierLookupRow[]>([])
+  const [suppliers, setSuppliers] = useState<SupplierLookupOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -385,16 +332,16 @@ export function useOrderWorkflow() {
       }
 
       const supplierLookup = new Map(
-        ((suppliersResult.data || []) as SupplierLookupRow[]).map((supplier) => [supplier.id, supplier]),
+        ((suppliersResult.data || []) as SupplierLookupOption[]).map((supplier) => [
+          supplier.id,
+          supplier,
+        ]),
       )
-      setSuppliers((suppliersResult.data || []) as SupplierLookupRow[])
+      setSuppliers((suppliersResult.data || []) as SupplierLookupOption[])
 
       const projectLookup = new Map(projects.map((project) => [project.id, project]))
       const queueOrderLookup = Object.fromEntries(
-        (Object.keys(SUPPLIER_WORKFLOW_QUEUE_META) as SupplierWorkflowQueue[]).map((queue) => [
-          queue,
-          SUPPLIER_WORKFLOW_QUEUE_META[queue].urgency,
-        ]),
+        SUPPLIER_WORKFLOW_QUEUE_ORDER.map((queue, index) => [queue, index]),
       ) as Record<SupplierWorkflowQueue, number>
 
       const supplierRows = Array.from(buckets.values())
@@ -585,15 +532,9 @@ export function useOrderWorkflow() {
   }, [refresh])
 
   const queueCounts = useMemo(() => {
-    const counts: Record<SupplierWorkflowQueue, number> = {
-      lieferant_fehlt: 0,
-      brennt: 0,
-      zu_bestellen: 0,
-      ab_fehlt: 0,
-      lieferschein_da: 0,
-      wareneingang_offen: 0,
-      montagebereit: 0,
-    }
+    const counts = Object.fromEntries(
+      SUPPLIER_WORKFLOW_QUEUE_ORDER.map((queue) => [queue, 0]),
+    ) as Record<SupplierWorkflowQueue, number>
 
     rows.forEach((row) => {
       counts[row.queue] += 1

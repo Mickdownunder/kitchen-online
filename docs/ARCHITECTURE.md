@@ -49,6 +49,7 @@
 | `lib/utils/` | errorHandling, formatters, priceCalculations, logger |
 | `lib/middleware/` | rateLimit, validateRequest |
 | `app/api/` | API-Routen (CRM, Customer, Webhooks, Cron) |
+| `app/orders/` | Bestell-Workflow (Queue-Ansicht, modulare Dialoge für Editor, AB, Lieferschein, Wareneingang) |
 
 ## Abhängigkeiten
 

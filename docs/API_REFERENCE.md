@@ -37,6 +37,10 @@
 | `/api/calendar/team` | GET | Team-Termine |
 | `/api/delivery-notes/upload` | POST | Lieferschein hochladen |
 | `/api/delivery-notes/analyze` | POST | Lieferschein analysieren |
+| `/api/supplier-orders/[id]/send` | POST | Lieferantenbestellung per CRM-Mail versenden |
+| `/api/supplier-orders/[id]/mark-ordered` | POST | Lieferantenbestellung als extern bestellt markieren |
+| `/api/supplier-orders/[id]/documents` | POST | AB/Lieferschein-Dokument zur Bestellung hochladen |
+| `/api/supplier-orders/[id]/document-analysis` | POST | AB/Lieferschein-Dokument mit KI analysieren |
 | `/api/chat` | POST | AI-Chat |
 | `/api/chat/stream` | POST | AI-Chat (Stream) |
 | `/api/email/send` | POST | E-Mail senden |

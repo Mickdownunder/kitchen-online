@@ -155,6 +155,7 @@ kitchen-online/
 | `/customers` | Kunden | Kundendatenbank |
 | `/invoices` | Rechnungen | Rechnungsliste, Filter, PDF |
 | `/deliveries` | Lieferungen | Lieferscheine, Upload, Analyse |
+| `/orders` | Bestellungen | Lieferanten-Workflow mit Queues, Bestell-Editor, AB/Lieferschein/Wareneingang |
 | `/calendar` | Kalender | Termine (Planung, Aufmaß, Lieferung, Montage), Drag & Drop |
 | `/tickets` | Tickets | Support-Tickets, Nachrichten |
 | `/complaints` | Reklamationen | Kanban, Status-Workflow |

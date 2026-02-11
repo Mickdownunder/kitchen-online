@@ -33,6 +33,9 @@
 | Dokument | Inhalt |
 |----------|--------|
 | [../apps/crm/docs/BOOKING_WEBHOOK_SETUP.md](../apps/crm/docs/BOOKING_WEBHOOK_SETUP.md) | Cal.com Webhook: Setup, Troubleshooting |
+| [ORDERS_REFACTOR_AND_FIX_PLAN.md](./ORDERS_REFACTOR_AND_FIX_PLAN.md) | Bestellungen: Fehlerbehebung & Refactoring (Phasen 1–4) |
+| [ORDERS_UI_WORKFLOW_REPORT.md](./ORDERS_UI_WORKFLOW_REPORT.md) | Bestellungen: Flow-Check & UI-/Workflow-/Optik-Bewertung (nur Bericht) |
+| [ORDERS_REFACTOR_IMPLEMENTATION_REPORT.md](./ORDERS_REFACTOR_IMPLEMENTATION_REPORT.md) | Bestellungen: Umsetzungsbericht zum Refactor-Plan |
 
 ---
 
