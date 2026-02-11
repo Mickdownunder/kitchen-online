@@ -38,6 +38,11 @@ import {
   type SupplierOrderChannel,
 } from '@/lib/orders/orderChannel'
 import {
+  confidenceBand,
+  normalizeConfidence,
+  shouldAutoApplyField,
+} from '@/lib/orders/documentAnalysisConfidence'
+import {
   groupSelectedOrderItemsBySupplier,
   mapProjectItemsToEditorItems,
   type ProjectInvoiceItemForOrderEditor,
@@ -78,16 +83,29 @@ type SupplierDocumentKind = 'ab' | 'supplier_delivery_note'
 interface SupplierOrderAbAnalysisResult {
   kind: 'ab'
   abNumber?: string
+  abNumberConfidence?: number
   confirmedDeliveryDate?: string
+  confirmedDeliveryDateConfidence?: number
   deviationSummary?: string
+  deviationSummaryConfidence?: number
   notes?: string
+  notesConfidence?: number
+  overallConfidence?: number
+  warnings?: string[]
 }
 
 interface SupplierOrderDeliveryAnalysisResult {
   kind: 'supplier_delivery_note'
   deliveryNoteNumber?: string
+  deliveryNoteNumberConfidence?: number
   deliveryDate?: string
+  deliveryDateConfidence?: number
+  supplierNameFromDocument?: string
+  supplierNameConfidence?: number
   notes?: string
+  notesConfidence?: number
+  overallConfidence?: number
+  warnings?: string[]
 }
 
 const QUEUE_STYLES: Record<SupplierWorkflowQueue, QueueStyle> = {
@@ -155,6 +173,21 @@ function toNumber(value: unknown): number {
   }
 
   return 0
+}
+
+function formatConfidence(value: number | undefined): string {
+  return `${Math.round(normalizeConfidence(value) * 100)}%`
+}
+
+function confidenceClass(value: number | undefined): string {
+  const band = confidenceBand(normalizeConfidence(value))
+  if (band === 'high') {
+    return 'text-emerald-700'
+  }
+  if (band === 'medium') {
+    return 'text-amber-700'
+  }
+  return 'text-red-700'
 }
 
 function renderStep(label: string, done: boolean) {
@@ -306,6 +339,8 @@ export default function OrdersClient() {
   const [abFile, setAbFile] = useState<File | null>(null)
   const [abError, setAbError] = useState<string | null>(null)
   const [abAiInfo, setAbAiInfo] = useState<string | null>(null)
+  const [abAiConfidence, setAbAiConfidence] = useState<number>(0)
+  const [abAiWarnings, setAbAiWarnings] = useState<string[]>([])
 
   const [deliveryRow, setDeliveryRow] = useState<OrderWorkflowRow | null>(null)
   const [deliveryNoteNumber, setDeliveryNoteNumber] = useState('')
@@ -314,6 +349,8 @@ export default function OrdersClient() {
   const [deliveryNoteFile, setDeliveryNoteFile] = useState<File | null>(null)
   const [deliveryError, setDeliveryError] = useState<string | null>(null)
   const [deliveryAiInfo, setDeliveryAiInfo] = useState<string | null>(null)
+  const [deliveryAiConfidence, setDeliveryAiConfidence] = useState<number>(0)
+  const [deliveryAiWarnings, setDeliveryAiWarnings] = useState<string[]>([])
 
   const [goodsReceiptRow, setGoodsReceiptRow] = useState<OrderWorkflowRow | null>(null)
   const [goodsReceiptItems, setGoodsReceiptItems] = useState<GoodsReceiptDraftItem[]>([])
@@ -696,12 +733,16 @@ export default function OrdersClient() {
     setAbFile(null)
     setAbError(null)
     setAbAiInfo(null)
+    setAbAiConfidence(0)
+    setAbAiWarnings([])
   }
 
   const closeAbDialog = () => {
     setAbRow(null)
     setAbError(null)
     setAbAiInfo(null)
+    setAbAiConfidence(0)
+    setAbAiWarnings([])
   }
 
   const analyzeAbDocument = async () => {
@@ -713,6 +754,8 @@ export default function OrdersClient() {
     setBusyKey(busyId)
     setAbError(null)
     setAbAiInfo(null)
+    setAbAiConfidence(0)
+    setAbAiWarnings([])
 
     try {
       const analysis = await analyzeSupplierOrderDocument(abRow.orderId, 'ab', abFile)
@@ -720,11 +763,52 @@ export default function OrdersClient() {
         throw new Error('Falsche Analyse-Antwort für AB-Dokument.')
       }
 
-      setAbNumber((prev) => analysis.abNumber || prev)
-      setAbConfirmedDate((prev) => analysis.confirmedDeliveryDate || prev)
-      setAbDeviation((prev) => analysis.deviationSummary || prev)
-      setAbNotes((prev) => (prev.trim().length > 0 ? prev : analysis.notes || prev))
-      setAbAiInfo('KI-Vorschlag übernommen. Bitte kurz prüfen und speichern.')
+      const reviewHints: string[] = []
+      let appliedCount = 0
+
+      if (analysis.abNumber) {
+        if (shouldAutoApplyField(analysis.abNumberConfidence ?? 0, 0.55) || abNumber.trim().length === 0) {
+          setAbNumber(analysis.abNumber)
+          appliedCount += 1
+        } else {
+          reviewHints.push('AB-Nummer: niedrige Sicherheit')
+        }
+      }
+
+      if (analysis.confirmedDeliveryDate) {
+        if (
+          shouldAutoApplyField(analysis.confirmedDeliveryDateConfidence ?? 0, 0.55) ||
+          abConfirmedDate.trim().length === 0
+        ) {
+          setAbConfirmedDate(analysis.confirmedDeliveryDate)
+          appliedCount += 1
+        } else {
+          reviewHints.push('Liefertermin: niedrige Sicherheit')
+        }
+      }
+
+      if (analysis.deviationSummary) {
+        if (shouldAutoApplyField(analysis.deviationSummaryConfidence ?? 0, 0.5) || abDeviation.trim().length === 0) {
+          setAbDeviation(analysis.deviationSummary)
+          appliedCount += 1
+        } else {
+          reviewHints.push('Abweichungen: niedrige Sicherheit')
+        }
+      }
+
+      if (analysis.notes) {
+        if (shouldAutoApplyField(analysis.notesConfidence ?? 0, 0.45) || abNotes.trim().length === 0) {
+          setAbNotes(analysis.notes)
+          appliedCount += 1
+        }
+      }
+
+      const combinedWarnings = [...(analysis.warnings || []), ...reviewHints]
+      setAbAiWarnings(combinedWarnings)
+      setAbAiConfidence(normalizeConfidence(analysis.overallConfidence))
+      setAbAiInfo(
+        `KI-Analyse ${formatConfidence(analysis.overallConfidence)} · ${appliedCount} Feld(er) automatisch übernommen.`,
+      )
     } catch (analysisError) {
       const message =
         analysisError instanceof Error ? analysisError.message : 'AB-Dokument konnte nicht analysiert werden.'
@@ -792,12 +876,16 @@ export default function OrdersClient() {
     setDeliveryNoteFile(null)
     setDeliveryError(null)
     setDeliveryAiInfo(null)
+    setDeliveryAiConfidence(0)
+    setDeliveryAiWarnings([])
   }
 
   const closeDeliveryNoteDialog = () => {
     setDeliveryRow(null)
     setDeliveryError(null)
     setDeliveryAiInfo(null)
+    setDeliveryAiConfidence(0)
+    setDeliveryAiWarnings([])
   }
 
   const analyzeDeliveryNoteDocument = async () => {
@@ -809,6 +897,8 @@ export default function OrdersClient() {
     setBusyKey(busyId)
     setDeliveryError(null)
     setDeliveryAiInfo(null)
+    setDeliveryAiConfidence(0)
+    setDeliveryAiWarnings([])
 
     try {
       const analysis = await analyzeSupplierOrderDocument(
@@ -820,10 +910,43 @@ export default function OrdersClient() {
         throw new Error('Falsche Analyse-Antwort für Lieferschein-Dokument.')
       }
 
-      setDeliveryNoteNumber((prev) => analysis.deliveryNoteNumber || prev)
-      setDeliveryNoteDate((prev) => analysis.deliveryDate || prev)
-      setDeliveryNoteNotes((prev) => (prev.trim().length > 0 ? prev : analysis.notes || prev))
-      setDeliveryAiInfo('KI-Vorschlag übernommen. Bitte kurz prüfen und speichern.')
+      const reviewHints: string[] = []
+      let appliedCount = 0
+
+      if (analysis.deliveryNoteNumber) {
+        if (
+          shouldAutoApplyField(analysis.deliveryNoteNumberConfidence ?? 0, 0.55) ||
+          deliveryNoteNumber.trim().length === 0
+        ) {
+          setDeliveryNoteNumber(analysis.deliveryNoteNumber)
+          appliedCount += 1
+        } else {
+          reviewHints.push('Lieferscheinnummer: niedrige Sicherheit')
+        }
+      }
+
+      if (analysis.deliveryDate) {
+        if (shouldAutoApplyField(analysis.deliveryDateConfidence ?? 0, 0.55) || deliveryNoteDate.trim().length === 0) {
+          setDeliveryNoteDate(analysis.deliveryDate)
+          appliedCount += 1
+        } else {
+          reviewHints.push('Lieferscheindatum: niedrige Sicherheit')
+        }
+      }
+
+      if (analysis.notes) {
+        if (shouldAutoApplyField(analysis.notesConfidence ?? 0, 0.45) || deliveryNoteNotes.trim().length === 0) {
+          setDeliveryNoteNotes(analysis.notes)
+          appliedCount += 1
+        }
+      }
+
+      const combinedWarnings = [...(analysis.warnings || []), ...reviewHints]
+      setDeliveryAiWarnings(combinedWarnings)
+      setDeliveryAiConfidence(normalizeConfidence(analysis.overallConfidence))
+      setDeliveryAiInfo(
+        `KI-Analyse ${formatConfidence(analysis.overallConfidence)} · ${appliedCount} Feld(er) automatisch übernommen.`,
+      )
     } catch (analysisError) {
       const message =
         analysisError instanceof Error
@@ -1571,6 +1694,8 @@ export default function OrdersClient() {
                 onChange={(event) => {
                   setAbFile(event.target.files?.[0] || null)
                   setAbAiInfo(null)
+                  setAbAiConfidence(0)
+                  setAbAiWarnings([])
                 }}
                 className="mt-1 block w-full text-sm text-slate-700"
               />
@@ -1586,7 +1711,19 @@ export default function OrdersClient() {
                 Mit KI aus Dokument auslesen
               </button>
             </div>
-            {abAiInfo && <p className="mt-2 text-xs font-semibold text-emerald-700">{abAiInfo}</p>}
+            {abAiInfo && (
+              <p className={`mt-2 text-xs font-semibold ${confidenceClass(abAiConfidence)}`}>{abAiInfo}</p>
+            )}
+            {abAiWarnings.length > 0 && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2">
+                <p className="text-[11px] font-black uppercase tracking-wider text-amber-800">KI-Prüfhinweise</p>
+                <ul className="mt-1 space-y-1 text-xs text-amber-900">
+                  {abAiWarnings.map((warning, index) => (
+                    <li key={`${warning}-${index}`}>- {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {abError && <p className="mt-3 text-sm font-semibold text-red-700">{abError}</p>}
 
@@ -1657,6 +1794,8 @@ export default function OrdersClient() {
                 onChange={(event) => {
                   setDeliveryNoteFile(event.target.files?.[0] || null)
                   setDeliveryAiInfo(null)
+                  setDeliveryAiConfidence(0)
+                  setDeliveryAiWarnings([])
                 }}
                 className="mt-1 block w-full text-sm text-slate-700"
               />
@@ -1674,7 +1813,21 @@ export default function OrdersClient() {
                 Mit KI aus Dokument auslesen
               </button>
             </div>
-            {deliveryAiInfo && <p className="mt-2 text-xs font-semibold text-emerald-700">{deliveryAiInfo}</p>}
+            {deliveryAiInfo && (
+              <p className={`mt-2 text-xs font-semibold ${confidenceClass(deliveryAiConfidence)}`}>
+                {deliveryAiInfo}
+              </p>
+            )}
+            {deliveryAiWarnings.length > 0 && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2">
+                <p className="text-[11px] font-black uppercase tracking-wider text-amber-800">KI-Prüfhinweise</p>
+                <ul className="mt-1 space-y-1 text-xs text-amber-900">
+                  {deliveryAiWarnings.map((warning, index) => (
+                    <li key={`${warning}-${index}`}>- {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {deliveryError && <p className="mt-3 text-sm font-semibold text-red-700">{deliveryError}</p>}
 
