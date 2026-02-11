@@ -640,12 +640,49 @@ export function useOrderWorkflow() {
         ([projectId, unresolvedItems]): OrderWorkflowRow => {
           const project = projectLookup.get(projectId)
           const {
+            totalItems,
             openDeliveryItems,
             openOrderItems,
             externalOrderItems,
             internalStockItems,
             reservationOnlyItems,
           } = summarizeProcurement(unresolvedItems)
+          const deliveryType = project?.deliveryType || 'delivery'
+          const deliveryDate = project?.deliveryDate
+          const installationDate = project?.installationDate
+          const readinessTargetDate = deliveryType === 'pickup' ? deliveryDate : installationDate
+          const reservation = reservationByProjectId.get(projectId)
+          const installationReservationStatus = normalizeReservationStatus(reservation?.status)
+          const installationReservationRequestedAt = reservation?.request_email_sent_at || undefined
+          const installationReservationConfirmedDate = reservation?.confirmation_date || undefined
+          const installationReservationCompany = reservation?.installer_company || undefined
+          const isProjectCompleted = Boolean(
+            project?.completionDate || project?.status === ProjectStatus.COMPLETED,
+          )
+          const decision = deriveSupplierWorkflowQueue({
+            hasOrder: false,
+            installationDate: readinessTargetDate,
+            openOrderItems,
+            openDeliveryItems,
+            hasExternalOrderItems: externalOrderItems > 0,
+            hasInternalStockItems: internalStockItems > 0,
+            hasReservationOnlyItems: reservationOnlyItems > 0 && deliveryType !== 'pickup',
+            reservationStatus: installationReservationStatus,
+            isProjectCompleted,
+          })
+
+          let nextAction = decision.nextAction
+          if (decision.queue === 'montagebereit') {
+            if (deliveryType === 'pickup') {
+              nextAction = 'Abholung mit Kunde abstimmen und Abholtermin bestätigen.'
+            } else if (installationReservationStatus === 'confirmed') {
+              nextAction = installationReservationConfirmedDate
+                ? `Montage reserviert (${installationReservationConfirmedDate}) bei ${
+                    installationReservationCompany || 'Montagepartner'
+                  }.`
+                : `Montage reserviert bei ${installationReservationCompany || 'Montagepartner'}.`
+            }
+          }
 
           return {
             key: `${projectId}:missing-supplier`,
@@ -653,28 +690,31 @@ export function useOrderWorkflow() {
             projectId,
             projectOrderNumber: project?.orderNumber || '—',
             customerName: project?.customerName || 'Unbekannt',
-            deliveryType: project?.deliveryType || 'delivery',
-            deliveryDate: project?.deliveryDate,
-            installationDate: project?.installationDate,
+            deliveryType,
+            deliveryDate,
+            installationDate,
             daysUntilInstallation: getDaysUntilInstallation(
-              project?.deliveryType === 'pickup' ? project?.deliveryDate : project?.installationDate,
+              readinessTargetDate,
             ),
             supplierName: 'Lieferant fehlt',
-            totalItems: unresolvedItems.length,
+            totalItems,
             openOrderItems,
             openDeliveryItems,
             externalOrderItems,
             internalStockItems,
             reservationOnlyItems,
-            queue: 'zu_bestellen',
-            queueLabel: SUPPLIER_WORKFLOW_QUEUE_META.zu_bestellen.label,
-            nextAction:
-              'Lieferant zuordnen, dann Bestellung senden oder als extern bestellt markieren.',
+            queue: decision.queue,
+            queueLabel: SUPPLIER_WORKFLOW_QUEUE_META[decision.queue].label,
+            nextAction,
             abTimingStatus: 'open',
             projectItems: [],
             unresolvedItems,
             orderItems: [],
             orderChannel: 'pending',
+            installationReservationStatus,
+            installationReservationRequestedAt,
+            installationReservationConfirmedDate,
+            installationReservationCompany,
           }
         },
       )

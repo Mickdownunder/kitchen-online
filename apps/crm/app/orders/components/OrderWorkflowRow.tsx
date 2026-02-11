@@ -103,6 +103,9 @@ export function OrderWorkflowRow({
       : row.installationReservationStatus === 'requested'
         ? 'Bestätigung'
         : 'Montage reservieren'
+  const canOpenInstallationReservationAction =
+    !isPickupOrder &&
+    (row.kind === 'supplier' || (row.kind === 'missing_supplier' && row.reservationOnlyItems > 0))
 
   return (
     <tr
@@ -185,7 +188,7 @@ export function OrderWorkflowRow({
                     ? 'angefragt'
                     : 'offen'}
               </p>
-              {row.kind === 'supplier' && (
+              {canOpenInstallationReservationAction && (
                 <button
                   type="button"
                   onClick={() => onOpenInstallationReservation(row)}
