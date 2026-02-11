@@ -164,7 +164,7 @@ export default function OrdersClient() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6 md:p-8">
+    <div className="w-full space-y-6 p-6 md:p-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Bestellungen</h1>

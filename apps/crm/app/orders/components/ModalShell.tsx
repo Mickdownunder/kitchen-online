@@ -109,7 +109,7 @@ export function ModalShell({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl ${maxWidthClassName}`}
+        className={`w-full max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl ${maxWidthClassName}`}
       >
         <h2 id={titleId} className="text-lg font-black text-slate-900">
           {title}
