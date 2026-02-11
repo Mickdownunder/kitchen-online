@@ -32,13 +32,12 @@ function buildSnapshot(
 describe('workflowQueue', () => {
   it('keeps explicit queue order stable', () => {
     expect(SUPPLIER_WORKFLOW_QUEUE_ORDER).toEqual([
-      'lieferant_fehlt',
-      'brennt',
       'zu_bestellen',
+      'brennt',
       'ab_fehlt',
-      'lieferschein_da',
       'wareneingang_offen',
       'montagebereit',
+      'erledigt',
     ])
   })
 
@@ -48,7 +47,8 @@ describe('workflowQueue', () => {
       expect(fromQueueParam(param)).toBe(queue)
     })
 
-    expect(fromQueueParam('lieferant-fehlt')).toBe('lieferant_fehlt')
+    expect(fromQueueParam('lieferant-fehlt')).toBe('zu_bestellen')
+    expect(fromQueueParam('lieferschein-da')).toBe('wareneingang_offen')
     expect(fromQueueParam('unknown')).toBeNull()
   })
 
@@ -78,7 +78,7 @@ describe('workflowQueue', () => {
     expect(result.queue).toBe('ab_fehlt')
   })
 
-  it('classifies delivery note without goods receipt as lieferschein_da', () => {
+  it('classifies delivery note without goods receipt as wareneingang_offen', () => {
     const result = deriveSupplierWorkflowQueue(
       buildSnapshot({
         supplierDeliveryNoteId: 'dn-1',
@@ -87,7 +87,7 @@ describe('workflowQueue', () => {
       NOW,
     )
 
-    expect(result.queue).toBe('lieferschein_da')
+    expect(result.queue).toBe('wareneingang_offen')
   })
 
   it('classifies open goods receipt as wareneingang_offen', () => {
@@ -115,6 +115,21 @@ describe('workflowQueue', () => {
     )
 
     expect(result.queue).toBe('montagebereit')
+  })
+
+  it('classifies montagebereit rows with reached target date as erledigt', () => {
+    const result = deriveSupplierWorkflowQueue(
+      buildSnapshot({
+        supplierDeliveryNoteId: 'dn-1',
+        goodsReceiptId: 'gr-1',
+        bookedAt: '2026-02-11T08:00:00.000Z',
+        openDeliveryItems: 0,
+        installationDate: '2026-02-10',
+      }),
+      NOW,
+    )
+
+    expect(result.queue).toBe('erledigt')
   })
 
   it('classifies near-term missing material as brennt', () => {

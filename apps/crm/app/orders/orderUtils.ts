@@ -4,7 +4,6 @@ import {
   ClipboardCheck,
   FileCheck2,
   PackageCheck,
-  Truck,
 } from 'lucide-react'
 import { confidenceBand, normalizeConfidence } from '@/lib/orders/documentAnalysisConfidence'
 import type { SupplierOrderStatus } from '@/types'
@@ -28,37 +27,32 @@ const ORDER_SENT_OR_LATER_STATUSES = new Set<SupplierOrderStatus>([
 ])
 
 export const QUEUE_STYLES: Record<SupplierWorkflowQueue, QueueStyle> = {
-  lieferant_fehlt: {
-    chipClass: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
-    rowClass: 'bg-fuchsia-50/30',
-    icon: AlertTriangle,
+  zu_bestellen: {
+    chipClass: 'border-slate-300 bg-slate-100 text-slate-700',
+    rowClass: 'bg-slate-50',
+    icon: ClipboardCheck,
   },
   brennt: {
     chipClass: 'border-red-200 bg-red-50 text-red-700',
     rowClass: 'bg-red-50/40',
     icon: AlertTriangle,
   },
-  zu_bestellen: {
-    chipClass: 'border-amber-200 bg-amber-50 text-amber-700',
-    rowClass: 'bg-amber-50/30',
-    icon: ClipboardCheck,
-  },
   ab_fehlt: {
-    chipClass: 'border-orange-200 bg-orange-50 text-orange-700',
-    rowClass: 'bg-orange-50/30',
+    chipClass: 'border-slate-300 bg-slate-100 text-slate-700',
+    rowClass: 'bg-slate-50',
     icon: FileCheck2,
   },
-  lieferschein_da: {
-    chipClass: 'border-blue-200 bg-blue-50 text-blue-700',
-    rowClass: 'bg-blue-50/30',
-    icon: Truck,
-  },
   wareneingang_offen: {
-    chipClass: 'border-indigo-200 bg-indigo-50 text-indigo-700',
-    rowClass: 'bg-indigo-50/30',
+    chipClass: 'border-slate-300 bg-slate-100 text-slate-700',
+    rowClass: 'bg-slate-50',
     icon: PackageCheck,
   },
   montagebereit: {
+    chipClass: 'border-slate-300 bg-slate-100 text-slate-700',
+    rowClass: 'bg-slate-50',
+    icon: CheckCircle2,
+  },
+  erledigt: {
     chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     rowClass: 'bg-emerald-50/30',
     icon: CheckCircle2,

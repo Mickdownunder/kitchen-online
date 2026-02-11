@@ -55,42 +55,37 @@ export function OrderWorkflowRow({
   const isPickupOrder = row.deliveryType === 'pickup'
   const readinessLabel = isPickupOrder ? 'Abholung' : 'Montage'
   const readinessDate = isPickupOrder ? row.deliveryDate : row.installationDate
+  const isReadyOrDone = row.queue === 'montagebereit' || row.queue === 'erledigt'
+  const canEditPositions = row.queue === 'zu_bestellen' || row.queue === 'brennt'
+  const canSend = row.kind === 'supplier' && row.queue === 'zu_bestellen'
+  const canMarkAlreadyOrdered = row.kind === 'supplier' && row.queue === 'zu_bestellen'
+  const canCaptureAb = row.kind === 'supplier' && row.queue === 'ab_fehlt' && Boolean(row.orderId)
+  const canOpenDeliveryNote =
+    row.kind === 'supplier' &&
+    row.queue === 'wareneingang_offen' &&
+    Boolean(row.orderId) &&
+    hasAb &&
+    !hasSupplierDeliveryNote
+  const canBookGoodsReceipt =
+    row.kind === 'supplier' &&
+    row.queue === 'wareneingang_offen' &&
+    Boolean(row.orderId) &&
+    hasSupplierDeliveryNote &&
+    row.openDeliveryItems > 0
 
-  const primaryAction: 'send' | 'mark' | 'ab' | 'delivery' | 'we' | null =
-    row.kind !== 'supplier'
-      ? null
-      : row.queue === 'zu_bestellen'
-        ? row.openOrderItems > 0
-          ? 'mark'
-          : 'send'
-        : row.queue === 'ab_fehlt'
-          ? 'ab'
-          : hasAb && !hasSupplierDeliveryNote
-            ? 'delivery'
-            : (row.queue === 'lieferschein_da' || row.queue === 'wareneingang_offen') && row.openDeliveryItems > 0
-              ? 'we'
-              : null
-
-  const btnBase = 'inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-60'
-  const btnPrimary = 'ring-2 ring-slate-400 ring-offset-1'
+  const btnBase =
+    'inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-60'
+  const btnNeutral = 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+  const btnPrimary = 'border-slate-800 bg-slate-900 text-white hover:bg-slate-800'
   const installationReservationLabel =
     row.installationReservationStatus === 'confirmed'
       ? 'Reservierung'
       : row.installationReservationStatus === 'requested'
         ? 'Bestätigung'
         : 'Montage reservieren'
-  const installationReservationButtonClass =
-    row.installationReservationStatus === 'confirmed'
-      ? 'border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-      : row.installationReservationStatus === 'requested'
-        ? 'border border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200'
-        : 'border border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100'
 
   return (
-    <tr
-      className={row.queue === 'brennt' || row.queue === 'lieferant_fehlt' ? style.rowClass : undefined}
-      data-queue={row.queue}
-    >
+    <tr className={row.queue === 'brennt' ? style.rowClass : undefined} data-queue={row.queue}>
       <td className="px-4 py-4 align-top">
         <span
           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${style.chipClass}`}
@@ -103,6 +98,13 @@ export function OrderWorkflowRow({
         <p className="text-sm font-black text-slate-900">#{row.projectOrderNumber}</p>
         <p className="text-sm text-slate-700">{row.customerName}</p>
         <p className="mt-1 text-xs font-semibold text-slate-500">{row.supplierName}</p>
+        {row.kind === 'missing_supplier' && (
+          <p className="mt-1">
+            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700">
+              Lieferant fehlt
+            </span>
+          </p>
+        )}
         <p className="mt-1">
           <span
             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${channelMeta.chipClass}`}
@@ -120,7 +122,7 @@ export function OrderWorkflowRow({
           {renderStep('AB', hasAb)}
           {renderStep('Lieferschein', hasSupplierDeliveryNote)}
           {renderStep('Wareneingang', hasGoodsReceiptBooked)}
-          {renderStep(readinessLabel, row.queue === 'montagebereit')}
+          {renderStep(readinessLabel, isReadyOrDone)}
         </div>
         <p className="mt-2 text-[11px] text-slate-600">
           Positionen: {row.totalItems} · offen Bestellung {row.openOrderItems} · offen WE {row.openDeliveryItems}
@@ -145,109 +147,112 @@ export function OrderWorkflowRow({
                 : 'offen'}
           </p>
           {!isPickupOrder && (
-            <p>
-              Montage-Reservierung:{' '}
-              {row.installationReservationStatus === 'confirmed'
-                ? `bestätigt (${formatDate(row.installationReservationConfirmedDate)})`
-                : row.installationReservationStatus === 'requested'
-                  ? 'angefragt'
-                  : 'offen'}
-            </p>
+            <>
+              <p>
+                Montage-Reservierung:{' '}
+                {row.installationReservationStatus === 'confirmed'
+                  ? `bestätigt (${formatDate(row.installationReservationConfirmedDate)})`
+                  : row.installationReservationStatus === 'requested'
+                    ? 'angefragt'
+                    : 'offen'}
+              </p>
+              {row.kind === 'supplier' && (
+                <button
+                  type="button"
+                  onClick={() => onOpenInstallationReservation(row)}
+                  disabled={isBusy}
+                  aria-label={`Montage-Reservierung öffnen für ${row.customerName}`}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 underline decoration-slate-300 underline-offset-2 transition-colors hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  {installationReservationLabel}
+                </button>
+              )}
+            </>
           )}
         </div>
       </td>
       <td className="px-4 py-4 align-top">
         <p className="text-xs font-semibold text-slate-700">{row.nextAction}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => onOpenEditor(row)}
-            disabled={isBusy}
-            aria-label={`Positionen bearbeiten für Auftrag ${row.projectOrderNumber}`}
-            className={`${btnBase} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
-          >
-            <Pencil className="h-3.5 w-3.5" /> Positionen
-          </button>
+          {canEditPositions && (
+            <button
+              type="button"
+              onClick={() => onOpenEditor(row)}
+              disabled={isBusy}
+              aria-label={`Positionen bearbeiten für Auftrag ${row.projectOrderNumber}`}
+              className={`${btnBase} ${btnNeutral}`}
+            >
+              <Pencil className="h-3.5 w-3.5" /> Positionen
+            </button>
+          )}
 
-          {row.kind === 'supplier' && row.queue === 'zu_bestellen' && (
+          {canSend && (
             <button
               type="button"
               onClick={() => onSend(row)}
               disabled={isBusy}
               aria-label={`Bestellung senden an ${row.supplierName}`}
-              className={`${btnBase} ${primaryAction === 'send' ? btnPrimary : ''} border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100`}
+              className={`${btnBase} ${btnPrimary}`}
             >
               {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               Senden
             </button>
           )}
 
-          {row.kind === 'supplier' && row.openOrderItems > 0 && (
+          {canMarkAlreadyOrdered && (
             <button
               type="button"
               onClick={() => onRequestMarkExternallyOrdered(row)}
               disabled={isBusy}
               aria-label={`Als extern bestellt markieren für ${row.supplierName}`}
-              className={`${btnBase} ${primaryAction === 'mark' ? btnPrimary : ''} border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}
+              className={`${btnBase} ${btnNeutral}`}
             >
               {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
               Bereits bestellt
             </button>
           )}
 
-          {row.kind === 'supplier' && row.orderId && !hasAb && (
+          {canCaptureAb && (
             <button
               type="button"
               onClick={() => onOpenAb(row)}
               disabled={isBusy}
               aria-label={`AB erfassen für ${row.supplierName}`}
-              className={`${btnBase} ${primaryAction === 'ab' ? btnPrimary : ''} border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100`}
+              className={`${btnBase} ${btnNeutral}`}
             >
               AB erfassen
             </button>
           )}
 
-          {row.kind === 'supplier' && row.orderId && hasAb && !hasSupplierDeliveryNote && (
+          {canOpenDeliveryNote && (
             <button
               type="button"
               onClick={() => onOpenDelivery(row)}
               disabled={isBusy}
               aria-label={`Lieferschein erfassen für ${row.supplierName}`}
-              className={`${btnBase} ${primaryAction === 'delivery' ? btnPrimary : ''} border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}
+              className={`${btnBase} ${btnNeutral}`}
             >
               Lieferschein
             </button>
           )}
 
-          {row.kind === 'supplier' && row.orderId && hasSupplierDeliveryNote && row.openDeliveryItems > 0 && (
+          {canBookGoodsReceipt && (
             <button
               type="button"
               onClick={() => onOpenGoodsReceipt(row)}
               disabled={isBusy}
               aria-label={`Wareneingang buchen für ${row.supplierName}`}
-              className={`${btnBase} ${primaryAction === 'we' ? btnPrimary : ''} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
+              className={`${btnBase} ${btnNeutral}`}
             >
               Wareneingang
-            </button>
-          )}
-
-          {row.kind === 'supplier' && !isPickupOrder && (
-            <button
-              type="button"
-              onClick={() => onOpenInstallationReservation(row)}
-              disabled={isBusy}
-              aria-label={`Montage-Reservierung öffnen für ${row.customerName}`}
-              className={`${btnBase} ${installationReservationButtonClass}`}
-            >
-              <CalendarClock className="h-3.5 w-3.5" />
-              {installationReservationLabel}
             </button>
           )}
 
           <Link
             href={`/projects?projectId=${row.projectId}`}
             aria-label={`Auftrag ${row.projectOrderNumber} öffnen`}
-            className={`${btnBase} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+            className={`${btnBase} ${btnNeutral}`}
           >
             Auftrag
           </Link>

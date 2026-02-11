@@ -214,7 +214,7 @@ export function useOrderWorkflow() {
   const searchParams = useSearchParams()
   const { projects } = useApp()
 
-  const initialQueueFromUrl = fromQueueParam(searchParams.get('queue')) || 'brennt'
+  const initialQueueFromUrl = fromQueueParam(searchParams.get('queue')) || 'zu_bestellen'
   const initialSearchFromUrl = searchParams.get('search') || ''
 
   const [activeQueue, setActiveQueue] = useState<SupplierWorkflowQueue>(initialQueueFromUrl)
@@ -581,10 +581,10 @@ export function useOrderWorkflow() {
             totalItems: unresolvedItems.length,
             openOrderItems: unresolvedItems.length,
             openDeliveryItems,
-            queue: 'lieferant_fehlt',
-            queueLabel: SUPPLIER_WORKFLOW_QUEUE_META.lieferant_fehlt.label,
+            queue: 'zu_bestellen',
+            queueLabel: SUPPLIER_WORKFLOW_QUEUE_META.zu_bestellen.label,
             nextAction:
-              'Lieferant zuordnen und Bestellung für diese Positionen direkt anlegen.',
+              'Lieferant zuordnen, dann Bestellung senden oder als extern bestellt markieren.',
             abTimingStatus: 'open',
             projectItems: [],
             unresolvedItems,
@@ -595,7 +595,9 @@ export function useOrderWorkflow() {
       )
 
       const nextRows = [...missingSupplierRows, ...supplierRows].sort((a, b) => {
-        const queueDiff = queueOrderLookup[a.queue] - queueOrderLookup[b.queue]
+        const aQueueIndex = queueOrderLookup[a.queue] ?? Number.MAX_SAFE_INTEGER
+        const bQueueIndex = queueOrderLookup[b.queue] ?? Number.MAX_SAFE_INTEGER
+        const queueDiff = aQueueIndex - bQueueIndex
         if (queueDiff !== 0) {
           return queueDiff
         }

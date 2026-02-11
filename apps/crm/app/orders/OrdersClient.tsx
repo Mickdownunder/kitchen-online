@@ -166,13 +166,12 @@ export default function OrdersClient() {
   }
 
   return (
-    <div className="w-full space-y-6 p-6 md:p-8">
+    <div className="w-full space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Bestellungen</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Linearer Ablauf pro Lieferant und Auftrag: Bestellung, AB, Lieferanten-Lieferschein,
-            Wareneingang, Montage-Readiness.
+            Klarer Ablauf: Zu bestellen, Bestellbestätigung, Wareneingang, Montagebereit, erledigt.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -229,18 +228,18 @@ export default function OrdersClient() {
 
       {activeQueue === 'zu_bestellen' && (
         <p className="text-xs text-slate-500">
-          Per CRM-Mail senden oder als extern bestellt markieren (z. B. Danküchen über anderes Programm).
+          Nur hier wird bestellt: senden oder als bereits bestellt markieren.
         </p>
       )}
 
       {activeQueue === 'montagebereit' && (
         <p className="text-xs text-slate-500">
-          Material ist bereit: Lieferaufträge sind montagebereit, Abholaufträge sind abholbereit.
+          Material ist vollständig verfügbar. Nach erreichtem Montage-/Abholtag verschiebt sich der Eintrag automatisch nach „Erledigt“.
         </p>
       )}
 
       <p className="text-xs text-slate-500">
-        Montage-Reservierung ist queue-unabhängig verfügbar, aber nur für Lieferaufträge mit Montage (nicht Abholer).
+        Montage-Reservierung ist in jeder Queue direkt im Datensatz möglich (nicht bei Abholaufträgen).
       </p>
 
       <OrderWorkflowTable

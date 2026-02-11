@@ -1,13 +1,12 @@
 import type { SupplierOrderStatus } from '@/types'
 
 export type SupplierWorkflowQueue =
-  | 'lieferant_fehlt'
-  | 'brennt'
   | 'zu_bestellen'
+  | 'brennt'
   | 'ab_fehlt'
-  | 'lieferschein_da'
   | 'wareneingang_offen'
   | 'montagebereit'
+  | 'erledigt'
 
 export type AbTimingStatus = 'open' | 'on_time' | 'late'
 
@@ -35,23 +34,21 @@ export const SUPPLIER_WORKFLOW_QUEUE_META: Record<
   SupplierWorkflowQueue,
   { label: string; urgency: number }
 > = {
-  lieferant_fehlt: { label: 'Lieferant fehlt', urgency: 0 },
-  brennt: { label: 'Brennt', urgency: 1 },
-  zu_bestellen: { label: 'Zu bestellen', urgency: 2 },
-  ab_fehlt: { label: 'AB fehlt', urgency: 3 },
-  lieferschein_da: { label: 'Lieferschein da', urgency: 4 },
-  wareneingang_offen: { label: 'Wareneingang offen', urgency: 5 },
-  montagebereit: { label: 'Montage-/Abholbereit', urgency: 6 },
+  zu_bestellen: { label: 'Zu bestellen', urgency: 1 },
+  brennt: { label: 'Brennt', urgency: 2 },
+  ab_fehlt: { label: 'Bestellbestätigung', urgency: 3 },
+  wareneingang_offen: { label: 'Wareneingang', urgency: 4 },
+  montagebereit: { label: 'Montagebereit', urgency: 5 },
+  erledigt: { label: 'Erledigt', urgency: 6 },
 }
 
 export const SUPPLIER_WORKFLOW_QUEUE_ORDER: SupplierWorkflowQueue[] = [
-  'lieferant_fehlt',
-  'brennt',
   'zu_bestellen',
+  'brennt',
   'ab_fehlt',
-  'lieferschein_da',
   'wareneingang_offen',
   'montagebereit',
+  'erledigt',
 ]
 
 const SENT_OR_LATER_STATUSES = new Set<SupplierOrderStatus>([
@@ -100,8 +97,15 @@ export function fromQueueParam(value: string | null): SupplierWorkflowQueue | nu
   }
 
   const normalized = value.toLowerCase().trim().replace(/-/g, '_')
-  return SUPPLIER_WORKFLOW_QUEUE_ORDER.includes(normalized as SupplierWorkflowQueue)
-    ? (normalized as SupplierWorkflowQueue)
+  const legacyMapped =
+    normalized === 'lieferschein_da'
+      ? 'wareneingang_offen'
+      : normalized === 'lieferant_fehlt'
+        ? 'zu_bestellen'
+        : normalized
+
+  return SUPPLIER_WORKFLOW_QUEUE_ORDER.includes(legacyMapped as SupplierWorkflowQueue)
+    ? (legacyMapped as SupplierWorkflowQueue)
     : null
 }
 
@@ -141,9 +145,9 @@ export function deriveSupplierWorkflowQueue(
     Boolean(snapshot.sentAt) ||
     (snapshot.orderStatus ? SENT_OR_LATER_STATUSES.has(snapshot.orderStatus) : false)
 
-  const daysUntilInstallation = getDaysUntil(snapshot.installationDate, now)
-  const installClose = daysUntilInstallation !== null && daysUntilInstallation <= 2
-  const orderingCritical = daysUntilInstallation !== null && daysUntilInstallation <= 7
+  const daysUntilTarget = getDaysUntil(snapshot.installationDate, now)
+  const targetClose = daysUntilTarget !== null && daysUntilTarget <= 2
+  const orderingCritical = daysUntilTarget !== null && daysUntilTarget <= 7
 
   const confirmedAbDate = toDateOnly(snapshot.abConfirmedDeliveryDate)
   const today = new Date(now)
@@ -157,12 +161,12 @@ export function deriveSupplierWorkflowQueue(
 
   if (
     abOverdue ||
-    (installClose && (snapshot.openOrderItems > 0 || snapshot.openDeliveryItems > 0)) ||
+    (targetClose && (snapshot.openOrderItems > 0 || snapshot.openDeliveryItems > 0)) ||
     (orderingCritical && snapshot.openOrderItems > 0)
   ) {
     return {
       queue: 'brennt',
-      nextAction: 'Sofort Eskalation: Liefertermin und Wareneingang mit Lieferant klären.',
+      nextAction: 'Dringend: Bestellung/Wareneingang sofort mit Lieferant klären.',
     }
   }
 
@@ -170,34 +174,37 @@ export function deriveSupplierWorkflowQueue(
     return {
       queue: 'zu_bestellen',
       nextAction: snapshot.hasOrder
-        ? 'Bestellung prüfen, senden oder als extern bestellt markieren.'
-        : 'Bestell-Bucket aus Positionen erzeugen und Bestellung senden.',
+        ? 'Bestellung senden oder als bereits bestellt markieren.'
+        : 'Bestellung anlegen und versenden.',
     }
   }
 
   if (!hasAB) {
     return {
       queue: 'ab_fehlt',
-      nextAction: 'AB erfassen (AB-Nummer + bestätigter Liefertermin + Abweichungen).',
-    }
-  }
-
-  if (hasDeliveryNote && !hasGoodsReceipt) {
-    return {
-      queue: 'lieferschein_da',
-      nextAction: 'Lieferanten-Lieferschein zuordnen und Wareneingang starten.',
+      nextAction: 'Bestellbestätigung (AB) erfassen.',
     }
   }
 
   if (snapshot.openDeliveryItems > 0) {
     return {
       queue: 'wareneingang_offen',
-      nextAction: 'Wareneingang idempotent buchen und Restmengen prüfen.',
+      nextAction: hasDeliveryNote
+        ? 'Wareneingang erfassen und bestätigen.'
+        : 'Lieferschein hochladen und Wareneingang bestätigen.',
+    }
+  }
+
+  const targetDate = toDateOnly(snapshot.installationDate)
+  if (targetDate && targetDate.getTime() <= today.getTime()) {
+    return {
+      queue: 'erledigt',
+      nextAction: 'Automatisch erledigt nach erreichtem Montage-/Abholtag.',
     }
   }
 
   return {
     queue: 'montagebereit',
-    nextAction: 'Keine Aktion: Material ist montage- oder abholbereit.',
+    nextAction: 'Bereit für Montage/Abholung.',
   }
 }

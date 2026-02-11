@@ -217,6 +217,7 @@ const CrmLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const isActive = (path: string) =>
     pathname === path || (pathname === '/' && path === '/dashboard')
+  const isWideOrdersRoute = pathname === '/orders'
 
   // IMPORTANT: don't use hooks (useMemo) here, because Layout has early returns
   // (auth pages/loading), and changing hook order will break React.
@@ -371,7 +372,13 @@ const CrmLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         role="main"
         aria-label="Hauptinhalt"
       >
-        <div className="relative mx-auto min-h-full max-w-[1400px] p-4 md:p-10 3xl:max-w-[1800px] 4xl:max-w-[2200px] 5xl:max-w-none print:m-0 print:max-w-none print:p-0">
+        <div
+          className={
+            isWideOrdersRoute
+              ? 'relative min-h-full p-4 md:p-8 xl:p-10 print:m-0 print:max-w-none print:p-0'
+              : 'relative mx-auto min-h-full max-w-[1400px] p-4 md:p-10 3xl:max-w-[1800px] 4xl:max-w-[2200px] 5xl:max-w-none print:m-0 print:max-w-none print:p-0'
+          }
+        >
           {children}
         </div>
       </main>
