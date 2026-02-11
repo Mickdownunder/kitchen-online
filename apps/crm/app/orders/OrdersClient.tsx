@@ -678,13 +678,13 @@ export default function OrdersClient() {
     }
   }
 
-  const handleMarkAsExternallyOrdered = async (row: OrderWorkflowRow) => {
+  const handleMarkAsExternallyOrdered = async (row: OrderWorkflowRow): Promise<boolean> => {
     if (row.kind !== 'supplier') {
-      return
+      return false
     }
 
     if (!window.confirm(`Als extern bestellt markieren für ${row.supplierName}?`)) {
-      return
+      return false
     }
 
     const busyId = `mark:${row.key}`
@@ -711,10 +711,12 @@ export default function OrdersClient() {
           throw new Error(payload?.error || 'Externes Bestell-Flag konnte nicht gesetzt werden.')
         }
       })
+      return true
     } catch (markError) {
       const message =
         markError instanceof Error ? markError.message : 'Externes Bestell-Flag konnte nicht gesetzt werden.'
       alert(message)
+      return false
     } finally {
       setBusyKey(null)
     }
@@ -1437,7 +1439,7 @@ export default function OrdersClient() {
 
       {editorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-[95vw] rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl xl:max-w-[1600px]">
             <h2 className="text-lg font-black text-slate-900">Bestellung bearbeiten</h2>
             <p className="mt-1 text-sm text-slate-600">Auftrag, Lieferant und Positionen direkt in Bestellungen pflegen.</p>
 
@@ -1492,18 +1494,18 @@ export default function OrdersClient() {
               </div>
             )}
 
-            <div className="mt-4 max-h-80 overflow-y-auto rounded-xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200">
+            <div className="mt-4 max-h-80 overflow-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[1080px] table-fixed divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Bestellen</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Beschreibung</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Marke / Modell</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Lieferant</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Menge</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Einheit</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Termin</th>
-                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500"></th>
+                    <th className="w-[90px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Bestellen</th>
+                    <th className="w-[26%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Beschreibung</th>
+                    <th className="w-[16%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Marke / Modell</th>
+                    <th className="w-[20%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Lieferant</th>
+                    <th className="w-[9%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Menge</th>
+                    <th className="w-[9%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Einheit</th>
+                    <th className="w-[13%] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Termin</th>
+                    <th className="w-[120px] px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-500"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
@@ -1530,13 +1532,13 @@ export default function OrdersClient() {
                             value={item.manufacturer}
                             onChange={(event) => updateEditorItem(item.localId, { manufacturer: event.target.value })}
                             placeholder="Marke"
-                            className="w-32 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                           />
                           <input
                             value={item.modelNumber}
                             onChange={(event) => updateEditorItem(item.localId, { modelNumber: event.target.value })}
                             placeholder="Modell"
-                            className="w-32 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                           />
                         </div>
                       </td>
@@ -1545,7 +1547,7 @@ export default function OrdersClient() {
                           value={item.supplierId}
                           onChange={(event) => updateEditorItem(item.localId, { supplierId: event.target.value })}
                           disabled={supplierLockedInEditor}
-                          className="w-44 rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-400 disabled:bg-slate-50"
+                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-400 disabled:bg-slate-50"
                         >
                           <option value="">Lieferant fehlt</option>
                           {suppliers.map((supplier) => (
@@ -1559,14 +1561,14 @@ export default function OrdersClient() {
                         <input
                           value={item.quantity}
                           onChange={(event) => updateEditorItem(item.localId, { quantity: event.target.value })}
-                          className="w-24 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                         />
                       </td>
                       <td className="px-3 py-2">
                         <input
                           value={item.unit}
                           onChange={(event) => updateEditorItem(item.localId, { unit: event.target.value })}
-                          className="w-20 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -1576,7 +1578,7 @@ export default function OrdersClient() {
                           onChange={(event) =>
                             updateEditorItem(item.localId, { expectedDeliveryDate: event.target.value })
                           }
-                          className="rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                          className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                         />
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -1616,7 +1618,23 @@ export default function OrdersClient() {
 
             {editorError && <p className="mt-3 text-sm font-semibold text-red-700">{editorError}</p>}
 
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+              {editorRow?.kind === 'supplier' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const success = await handleMarkAsExternallyOrdered(editorRow)
+                    if (success) {
+                      closeEditor()
+                    }
+                  }}
+                  disabled={busyKey === `mark:${editorRow.key}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {busyKey === `mark:${editorRow.key}` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Bereits bestellt
+                </button>
+              )}
               <button
                 type="button"
                 onClick={closeEditor}
