@@ -100,7 +100,9 @@ async function markProjectItemsOrderedForSupplier(
     const relationSupplierId = getSupplierIdFromRelation(
       item.articles as { supplier_id: string | null } | { supplier_id: string | null }[] | null,
     )
-    return relationSupplierId === supplierId
+    if (relationSupplierId === supplierId) return true
+    if (relationSupplierId == null || relationSupplierId === '') return true
+    return false
   })
 
   for (const item of candidateItems) {

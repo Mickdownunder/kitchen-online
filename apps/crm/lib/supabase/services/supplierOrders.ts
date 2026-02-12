@@ -360,11 +360,19 @@ async function upsertSupplierOrderItems(
     return ok(undefined)
   }
 
-  const payload = items.map((item, index) => ({
+  const seenInvoiceItemIds = new Set<string>()
+  const dedupedItems = items.filter((item) => {
+    const id = item.invoiceItemId?.trim()
+    if (id && seenInvoiceItemIds.has(id)) return false
+    if (id) seenInvoiceItemIds.add(id)
+    return true
+  })
+
+  const payload = dedupedItems.map((item, index) => ({
     supplier_order_id: orderId,
     invoice_item_id: item.invoiceItemId || null,
     article_id: item.articleId || null,
-    position_number: item.positionNumber || index + 1,
+    position_number: index + 1,
     description: item.description,
     model_number: item.modelNumber || null,
     manufacturer: item.manufacturer || null,

@@ -144,11 +144,19 @@ export function mapRowItemsToEditableItems(row: OrderWorkflowRow): EditableOrder
       [...row.projectItems, ...row.unresolvedItems].map((item) => [item.id, item]),
     )
 
-    return row.orderItems.map((item, index) => ({
+    const seenInvoiceItemIds = new Set<string>()
+    const dedupedOrderItems = row.orderItems.filter((item) => {
+      const id = item.invoiceItemId?.trim()
+      if (id && seenInvoiceItemIds.has(id)) return false
+      if (id) seenInvoiceItemIds.add(id)
+      return true
+    })
+
+    return dedupedOrderItems.map((item, index) => ({
       procurementType:
         (item.invoiceItemId ? projectItemById.get(item.invoiceItemId)?.procurementType : undefined) ||
         'external_order',
-      localId: `${item.id}-${index}`,
+      localId: `${item.invoiceItemId || item.id}-${index}`,
       selected:
         ((item.invoiceItemId ? projectItemById.get(item.invoiceItemId)?.procurementType : undefined) ||
           'external_order') === 'external_order',

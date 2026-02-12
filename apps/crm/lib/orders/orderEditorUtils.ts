@@ -166,6 +166,16 @@ export function groupSelectedOrderItemsBySupplier(
       groups[supplierId] = []
     }
 
+    const existingIds = new Set(
+      groups[supplierId].map((g) => g.invoiceItemId).filter((id): id is string => Boolean(id)),
+    )
+    if (item.invoiceItemId && existingIds.has(item.invoiceItemId)) {
+      return
+    }
+    if (item.invoiceItemId) {
+      existingIds.add(item.invoiceItemId)
+    }
+
     groups[supplierId].push({
       invoiceItemId: item.invoiceItemId,
       articleId: item.articleId,

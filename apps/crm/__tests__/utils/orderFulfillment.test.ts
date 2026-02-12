@@ -72,6 +72,20 @@ describe('orderFulfillment', () => {
     expect(result.allDelivered).toBe(true)
   })
 
+  it('includes external_order items with no supplier when marking order sent (fix 5/8 display)', () => {
+    const candidates = collectSupplierOrderCandidateInvoiceItemIds(
+      [
+        { id: 'a', supplierId: 'supplier-1', procurementType: 'external_order' },
+        { id: 'b', supplierId: 'supplier-1', procurementType: 'external_order' },
+        { id: 'c', supplierId: null, procurementType: 'external_order' },
+        { id: 'd', supplierId: '', procurementType: 'external_order' },
+      ],
+      'supplier-1',
+      ['a'],
+    )
+    expect(Array.from(candidates).sort()).toEqual(['a', 'b', 'c', 'd'])
+  })
+
   it('skips non-external items for supplier ordering candidates', () => {
     const candidates = collectSupplierOrderCandidateInvoiceItemIds(
       [

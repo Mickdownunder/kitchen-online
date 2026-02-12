@@ -856,7 +856,7 @@ export function OrderEditorModal({
 
                     if (orderId) {
                       const metaResult = await updateSupplierOrder(orderId, {
-                        deliveryCalendarWeek: deliveryCalendarWeek.trim() || null,
+                        deliveryCalendarWeek: deliveryCalendarWeek.trim() || undefined,
                       })
                       if (!metaResult.ok) {
                         throw new Error(metaResult.message || 'Bestellung konnte nicht gespeichert werden.')
@@ -892,12 +892,19 @@ export function OrderEditorModal({
                             )
                           }
 
-                          const mergedItems = [...(existingOrderResult.data.items || []), ...payloadItems].map(
-                            (item, index) => ({
-                              ...item,
-                              positionNumber: index + 1,
-                            }),
+                          const existingItems = existingOrderResult.data.items || []
+                          const existingInvoiceIds = new Set(
+                            existingItems
+                              .map((i) => i.invoiceItemId?.trim())
+                              .filter((id): id is string => Boolean(id)),
                           )
+                          const newFromPayload = payloadItems.filter(
+                            (p) => !p.invoiceItemId?.trim() || !existingInvoiceIds.has(p.invoiceItemId.trim()),
+                          )
+                          const mergedItems = [...existingItems, ...newFromPayload].map((item, index) => ({
+                            ...item,
+                            positionNumber: index + 1,
+                          }))
 
                           const mergedResult = await replaceSupplierOrderItems(existingRow.orderId, mergedItems)
                           if (!mergedResult.ok) {

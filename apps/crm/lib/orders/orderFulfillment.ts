@@ -57,7 +57,11 @@ export function collectSupplierOrderCandidateInvoiceItemIds(
 
   rows.forEach((row) => {
     const isExternalOrder = normalizeProcurementType(row.procurementType) === 'external_order'
-    if (isExternalOrder && (explicitIds.has(row.id) || row.supplierId === supplierId)) {
+    if (!isExternalOrder) return
+    const inOrder = explicitIds.has(row.id)
+    const sameSupplier = row.supplierId === supplierId
+    const noSupplier = row.supplierId == null || row.supplierId === ''
+    if (inOrder || sameSupplier || noSupplier) {
       candidates.add(row.id)
     }
   })
