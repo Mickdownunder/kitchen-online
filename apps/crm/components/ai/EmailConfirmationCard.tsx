@@ -1,15 +1,31 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Mail, Send, X, Loader2 } from 'lucide-react'
+import { Mail, Paperclip, Send, X, Loader2 } from 'lucide-react'
 import type { PendingEmailAction } from '@/app/providers/ai/types/pendingEmail'
 
 interface EmailConfirmationCardProps {
   pending: PendingEmailAction
   functionCallId: string
-  onConfirm: () => Promise<string | void>
+  onConfirm: (extraPayload?: Record<string, unknown>) => Promise<string | void>
   onCancel: () => void
 }
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      const base64 = result.includes(',') ? result.split(',')[1] : result
+      resolve(base64 ?? '')
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+const isSupplierOrder = (pending: PendingEmailAction) => pending.functionName === 'sendSupplierOrderEmail'
 
 export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
   pending,
@@ -20,13 +36,31 @@ export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
   void functionCallId
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleConfirm = async () => {
     setIsSending(true)
     setError(null)
     try {
-      await onConfirm()
-      // onConfirm handles clearing state and follow-up; no error = success
+      let extraPayload: Record<string, unknown> | undefined
+      if (isSupplierOrder(pending) && selectedFile) {
+        if (selectedFile.size > MAX_ATTACHMENT_BYTES) {
+          setError('Datei ist zu groß (max. 10 MB).')
+          setIsSending(false)
+          return
+        }
+        const content = await readFileAsBase64(selectedFile)
+        extraPayload = {
+          attachments: [
+            {
+              filename: selectedFile.name,
+              content,
+              contentType: selectedFile.type || 'application/octet-stream',
+            },
+          ],
+        }
+      }
+      await onConfirm(extraPayload)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -45,9 +79,11 @@ export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
             E-Mail-Bestätigung
           </p>
           <p className="text-sm font-medium text-slate-200">
-            {pending.functionName === 'sendReminder'
-              ? 'Mahnung versenden'
-              : 'E-Mail versenden'}
+            {pending.functionName === 'sendSupplierOrderEmail'
+              ? 'Bestellung versenden'
+              : pending.functionName === 'sendReminder'
+                ? 'Mahnung versenden'
+                : 'E-Mail versenden'}
           </p>
         </div>
       </div>
@@ -65,6 +101,35 @@ export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
           <p className="line-clamp-2 text-slate-400">{pending.bodyPreview}</p>
         )}
       </div>
+
+      {isSupplierOrder(pending) && (
+        <label className="mt-3 block text-xs text-slate-400">
+          <span className="font-semibold text-slate-300">Anhang (optional)</span>
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.dwg"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+              className="block max-w-[220px] text-[11px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-600 file:px-2 file:py-1 file:text-slate-200"
+            />
+            {selectedFile && (
+              <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                <Paperclip className="h-3.5 w-3.5" />
+                {selectedFile.name}
+                <button
+                  type="button"
+                  onClick={() => setSelectedFile(null)}
+                  className="rounded p-0.5 text-slate-500 hover:bg-slate-700 hover:text-white"
+                  aria-label="Anhang entfernen"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[10px] text-slate-500">z. B. Plan/Zeichnung (PDF, Bilder, Office, DWG)</p>
+        </label>
+      )}
 
       <p className="mt-3 text-xs text-amber-400/90">
         Bitte auf „Senden“ klicken – die E-Mail geht erst nach deiner Bestätigung raus.

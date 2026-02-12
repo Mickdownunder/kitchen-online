@@ -345,16 +345,17 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
     }
   }
 
-  const handleEmailConfirm = useCallback(async () => {
+  const handleEmailConfirm = useCallback(async (extraPayload?: Record<string, unknown>) => {
     if (!pendingEmail) return
 
     const { pending } = pendingEmail
+    const body = extraPayload ? { ...pending.payload, ...extraPayload } : pending.payload
 
     try {
       const res = await fetch(pending.api, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pending.payload),
+        body: JSON.stringify(body),
       })
 
       const data = await res.json().catch(() => ({}))

@@ -745,7 +745,7 @@ export const agentTools: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       description:
-        'Bereitet den Versand einer Lieferanten-Bestellung vor. Der finale Versand erfolgt erst nach Nutzer-Freigabe mit der Frage: Darf ich an <email> senden?.',
+        'Bereitet den Versand einer Lieferanten-Bestellung vor. Der finale Versand erfolgt erst nach Nutzer-Freigabe mit der Frage: Darf ich an <email> senden?. In der Bestätigungskarte kann der Nutzer optional einen Anhang (z. B. Plan, Zeichnung) hinzufügen.',
       properties: {
         supplierOrderId: {
           type: Type.STRING,

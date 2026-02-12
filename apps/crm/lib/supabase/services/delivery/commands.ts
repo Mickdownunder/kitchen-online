@@ -168,10 +168,14 @@ async function updateInvoiceItemDeliveryStatus(
   const newQuantityDelivered = toNumber(deliveryItem.quantity_delivered) + receivedQuantity
   const totalQuantity = toNumber(deliveryItem.quantity)
   const newQuantityOrdered = Math.max(toNumber(deliveryItem.quantity_ordered), newQuantityDelivered)
+  const wasOrdered =
+    totalQuantity > 0 &&
+    (toNumber(deliveryItem.quantity_ordered) >= totalQuantity ||
+      ['ordered', 'partially_delivered', 'delivered'].includes(deliveryItem.delivery_status || ''))
 
   let deliveryStatus: string
   if (newQuantityDelivered >= totalQuantity && totalQuantity > 0) {
-    deliveryStatus = 'delivered'
+    deliveryStatus = wasOrdered ? 'delivered' : 'partially_delivered'
   } else if (deliveryItem.delivery_status === 'missing') {
     deliveryStatus = 'missing'
   } else if (newQuantityDelivered > 0) {

@@ -129,7 +129,11 @@ export default function OrdersClient() {
     }
   }
 
-  const sendOrder = async (row: OrderWorkflowRow, recipient: string) => {
+  const sendOrder = async (
+    row: OrderWorkflowRow,
+    recipient: string,
+    attachment?: { filename: string; content: string; contentType: string },
+  ) => {
     const busyId = `send:${row.key}`
     setBusyKey(busyId)
 
@@ -146,6 +150,7 @@ export default function OrdersClient() {
         body: JSON.stringify({
           toEmail: recipient,
           idempotencyKey: stableIdempotencyKey,
+          attachments: attachment ? [attachment] : undefined,
         }),
       })
 
@@ -303,11 +308,11 @@ export default function OrdersClient() {
         row={sendRow}
         busy={Boolean(sendRow && busyKey === `send:${sendRow.key}`)}
         onClose={() => setSendRow(null)}
-        onConfirm={async (recipientEmail) => {
+        onConfirm={async (recipientEmail, attachment) => {
           if (!sendRow) {
             return
           }
-          await sendOrder(sendRow, recipientEmail)
+          await sendOrder(sendRow, recipientEmail, attachment)
         }}
       />
 

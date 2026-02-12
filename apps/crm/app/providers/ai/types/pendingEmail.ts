@@ -3,11 +3,11 @@
  */
 export interface PendingEmailAction {
   type: 'pendingEmail'
-  functionName: 'sendEmail' | 'sendReminder'
+  functionName: 'sendEmail' | 'sendReminder' | 'sendSupplierOrderEmail'
   to: string
   subject: string
   bodyPreview: string
-  /** API-Pfad (z.B. /api/email/send oder /api/email/send-with-pdf) */
+  /** API-Pfad (z.B. /api/email/send oder /api/supplier-orders/[id]/send) */
   api: string
   /** Request-Body für den API-Aufruf */
   payload: Record<string, unknown>

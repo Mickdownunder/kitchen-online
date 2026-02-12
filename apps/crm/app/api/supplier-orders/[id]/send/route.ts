@@ -136,6 +136,31 @@ function getSupplierIdFromRelation(
   return relation.supplier_id || null
 }
 
+const MAX_EXTRA_ATTACHMENT_BASE64_LENGTH = 15 * 1024 * 1024
+
+function parseExtraAttachments(value: unknown): Array<{ filename: string; content: string; contentType: string }> {
+  if (!Array.isArray(value) || value.length === 0) {
+    return []
+  }
+  const out: Array<{ filename: string; content: string; contentType: string }> = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue
+    }
+    const filename = typeof (entry as { filename?: unknown }).filename === 'string' ? (entry as { filename: string }).filename.trim() : ''
+    const content = typeof (entry as { content?: unknown }).content === 'string' ? (entry as { content: string }).content : ''
+    const contentType = typeof (entry as { contentType?: unknown }).contentType === 'string' ? (entry as { contentType: string }).contentType.trim() : 'application/octet-stream'
+    if (!filename || !content) {
+      continue
+    }
+    if (content.length > MAX_EXTRA_ATTACHMENT_BASE64_LENGTH) {
+      continue
+    }
+    out.push({ filename, content, contentType })
+  }
+  return out
+}
+
 async function markProjectItemsOrderedForSupplier(
   supabase: Awaited<ReturnType<typeof createClient>>,
   orderId: string,
@@ -283,6 +308,7 @@ export async function POST(
     const idempotencyKey =
       typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : ''
     const toEmailOverride = typeof body.toEmail === 'string' ? body.toEmail.trim() : ''
+    const extraAttachments = parseExtraAttachments(body.attachments)
 
     const supabase = await createClient()
     const {
@@ -491,6 +517,11 @@ export async function POST(
           content: pdfContent,
           contentType: 'application/pdf',
         },
+        ...extraAttachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        })),
       ],
     }
 
