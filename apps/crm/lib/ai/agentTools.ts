@@ -700,7 +700,7 @@ export const agentTools: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       description:
-        'Versendet eine E-Mail an einen oder mehrere Empfänger. Kann für Lieferscheine, Rechnungen, Reklamationen oder allgemeine Kommunikation verwendet werden. WICHTIG: Wenn ein PDF angehängt werden soll, verwende pdfType statt emailType - dann wird automatisch das PDF generiert und angehängt.',
+        'Versendet eine E-Mail an einen oder mehrere Empfänger. E-Mail MIT Lieferschein: pdfType "deliveryNote" setzen UND projectId angeben (aus getProject/Projektliste). E-Mail MIT Rechnung: pdfType "invoice" und projectId. Ohne pdfType nur Text-Mail. Bei pdfType ist projectId Pflicht.',
       properties: {
         to: {
           type: Type.STRING,

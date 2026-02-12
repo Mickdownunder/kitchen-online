@@ -35,6 +35,8 @@ const AI_FUNCTION_LABELS: Record<string, string> = {
   searchArticles: 'Artikel gesucht',
   getCompanySettings: 'Firmendaten abgerufen',
   listCustomers: 'Kundenliste abgerufen',
+  sendEmail: 'E-Mail versenden',
+  sendSupplierOrderEmail: 'Bestellung per E-Mail',
 }
 
 /** Technische Aktionen/Entitäten in lesbare deutsche Beschreibungen übersetzen */

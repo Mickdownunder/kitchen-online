@@ -210,6 +210,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
       const decoder = new TextDecoder()
       let fullText = ''
       let hadFunctionCalls = false
+      let lastFunctionResult = ''
       let updatedProjectIds: string[] = []
 
       if (reader) {
@@ -237,7 +238,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
                   break
 
                 case 'functionCalls':
-                  // Server is executing these - show progress to user
+                  // Server is executing these - show progress to user (only if no streamed text yet)
                   hadFunctionCalls = true
                   if (data.functionCalls?.length > 0) {
                     const names = data.functionCalls.map((fc: { name: string }) => fc.name).join(', ')
@@ -248,9 +249,10 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
                 case 'functionResult':
                   // Show individual function results as they complete
                   if (data.result) {
+                    const resultLine = `${data.functionName}: ${data.result}`
+                    lastFunctionResult = resultLine
                     setStreamingText(prev => {
-                      const resultLine = `${data.functionName}: ${data.result}`
-                      if (prev.includes('Führe Aktionen aus:') || prev.includes('...')) {
+                      if (prev.includes('Führe Aktionen aus:') || (prev.endsWith('...') && prev.length < 80)) {
                         return resultLine
                       }
                       return prev + '\n' + resultLine
@@ -306,7 +308,14 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
 
       let finalText = fullText.trim()
       if (!finalText) {
-        finalText = hadFunctionCalls ? 'Aktionen erfolgreich ausgeführt.' : 'Ich bearbeite deine Anfrage...'
+        if (hadFunctionCalls) {
+          // Zeige letzten Funktions-Ergebnis (z. B. "sendEmail: E-Mail-Versand erfordert Bestätigung...") statt nur "Aktion ausgeführt"
+          finalText =
+            lastFunctionResult ||
+            'Aktionen erfolgreich ausgeführt. Bitte ggf. Bestätigung unten nutzen.'
+        } else {
+          finalText = 'Ich bearbeite deine Anfrage...'
+        }
       }
 
       addMessage({ role: 'model', text: finalText })

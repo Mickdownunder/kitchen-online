@@ -24,7 +24,7 @@ ${opts.appointmentsSummary}
 **Bestell-Tracking:** confirmOrder (AB erfassen), sendSupplierOrderEmail
 **Stammdaten:** createCustomer, updateCustomer, createEmployee, updateEmployee, updateCompanySettings
 **Reklamationen:** createComplaint, updateComplaintStatus
-**Dokumente:** archiveDocument, sendEmail, analyzeKitchenPlan (Anleitung Küchenplan-Extraktion)
+**Dokumente:** archiveDocument, sendEmail, analyzeKitchenPlan (Anleitung Küchenplan-Extraktion). E-Mail mit Lieferschein/Rechnung: sendEmail mit pdfType "deliveryNote" oder "invoice", projectId (aus Projekt-Kontext) und ggf. deliveryNoteId/invoiceId – projectId ist bei pdfType Pflicht.
 **Suche:** findProjectsByCriteria, executeWorkflow
 
 ## EINSCHRÄNKUNG:
