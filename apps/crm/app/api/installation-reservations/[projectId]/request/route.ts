@@ -1,7 +1,12 @@
 import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { queueAndSendEmailOutbox } from '@/lib/supabase/services/emailOutbox'
+import { sendEmail } from '@/lib/supabase/services/email'
+import {
+  EMAIL_OUTBOX_MIGRATION_HINT,
+  isEmailOutboxSchemaMissing,
+  queueAndSendEmailOutbox,
+} from '@/lib/supabase/services/emailOutbox'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import {
   INSTALLATION_RESERVATION_MIGRATION_HINT,
@@ -404,30 +409,53 @@ export async function POST(
       })
     }
 
-    const outboxResult = await queueAndSendEmailOutbox({
-      supabase,
-      userId: user.id,
-      kind: 'installation_reservation_request',
-      dedupeKey: buildReservationRequestDedupeKey({
-        projectId,
-        supplierOrderId,
-        installerEmail,
-        requestedInstallationDate,
-        planDocumentIds: selectedPlanDocumentIds,
-        requestNotes,
-      }),
-      payload: {
-        to: installerEmail,
-        subject: emailContent.subject,
-        html: emailContent.html,
-        text: emailContent.text,
-        attachments,
-      },
-      metadata: {
-        projectId,
-        supplierOrderId,
-      },
-    })
+    const emailPayload = {
+      to: installerEmail,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
+      attachments,
+    }
+
+    let outboxResult: {
+      outboxId: string
+      alreadySent: boolean
+      sentAt: string
+      providerMessageId: string | null
+    }
+
+    try {
+      outboxResult = await queueAndSendEmailOutbox({
+        supabase,
+        userId: user.id,
+        kind: 'installation_reservation_request',
+        dedupeKey: buildReservationRequestDedupeKey({
+          projectId,
+          supplierOrderId,
+          installerEmail,
+          requestedInstallationDate,
+          planDocumentIds: selectedPlanDocumentIds,
+          requestNotes,
+        }),
+        payload: emailPayload,
+        metadata: {
+          projectId,
+          supplierOrderId,
+        },
+      })
+    } catch (outboxError) {
+      if (!isEmailOutboxSchemaMissing(outboxError)) {
+        throw outboxError
+      }
+
+      const providerMessageId = await sendEmail(emailPayload)
+      outboxResult = {
+        outboxId: 'legacy-direct-send',
+        alreadySent: false,
+        sentAt: new Date().toISOString(),
+        providerMessageId,
+      }
+    }
 
     const nowIso = outboxResult.sentAt
     const { data: finalizedReservation, error: finalizeError } = await supabase
@@ -465,6 +493,34 @@ export async function POST(
       },
     })
   } catch (error) {
+    const err = error as Error
+    if (isEmailOutboxSchemaMissing(err)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: EMAIL_OUTBOX_MIGRATION_HINT,
+        },
+        { status: 400 },
+      )
+    }
+    if (err.message.includes('RESEND_API_KEY')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'E-Mail-Versand ist nicht konfiguriert. Bitte RESEND_API_KEY setzen.',
+        },
+        { status: 503 },
+      )
+    }
+    if (err.message.includes('E-Mail-Versand fehlgeschlagen')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Reservierungs-E-Mail konnte beim Versanddienst nicht zugestellt werden. Bitte erneut versuchen.',
+        },
+        { status: 502 },
+      )
+    }
     return apiErrors.internal(error as Error, {
       component: 'api/installation-reservations/request',
     })

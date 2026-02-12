@@ -2,7 +2,12 @@ import React from 'react'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { queueAndSendEmailOutbox } from '@/lib/supabase/services/emailOutbox'
+import { sendEmail } from '@/lib/supabase/services/email'
+import {
+  EMAIL_OUTBOX_MIGRATION_HINT,
+  isEmailOutboxSchemaMissing,
+  queueAndSendEmailOutbox,
+} from '@/lib/supabase/services/emailOutbox'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import type { Json } from '@/types/database.types'
 import {
@@ -475,30 +480,53 @@ export async function POST(
     const pdfContent = pdfBuffer.toString('base64')
     const pdfFileName = supplierOrderPdfFileName(row.order_number, supplier.name)
 
-    const outboxResult = await queueAndSendEmailOutbox({
-      supabase,
-      userId: user.id,
-      kind: 'supplier_order_dispatch',
-      dedupeKey: idempotencyKey ? `supplier-order:${id}:${idempotencyKey}` : null,
-      payload: {
-        to: recipientEmail,
-        subject: template.subject,
-        html: template.html,
-        text: template.text,
-        attachments: [
-          {
-            filename: pdfFileName,
-            content: pdfContent,
-            contentType: 'application/pdf',
-          },
-        ],
-      },
-      metadata: {
-        supplierOrderId: id,
-        projectId: row.project_id,
-        supplierId: row.supplier_id,
-      } as Json,
-    })
+    const emailPayload = {
+      to: recipientEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+      attachments: [
+        {
+          filename: pdfFileName,
+          content: pdfContent,
+          contentType: 'application/pdf',
+        },
+      ],
+    }
+
+    let outboxResult: {
+      outboxId: string
+      alreadySent: boolean
+      sentAt: string
+      providerMessageId: string | null
+    }
+
+    try {
+      outboxResult = await queueAndSendEmailOutbox({
+        supabase,
+        userId: user.id,
+        kind: 'supplier_order_dispatch',
+        dedupeKey: idempotencyKey ? `supplier-order:${id}:${idempotencyKey}` : null,
+        payload: emailPayload,
+        metadata: {
+          supplierOrderId: id,
+          projectId: row.project_id,
+          supplierId: row.supplier_id,
+        } as Json,
+      })
+    } catch (outboxError) {
+      if (!isEmailOutboxSchemaMissing(outboxError)) {
+        throw outboxError
+      }
+
+      const providerMessageId = await sendEmail(emailPayload)
+      outboxResult = {
+        outboxId: 'legacy-direct-send',
+        alreadySent: false,
+        sentAt: new Date().toISOString(),
+        providerMessageId,
+      }
+    }
 
     const nowIso = outboxResult.sentAt
 
@@ -558,6 +586,34 @@ export async function POST(
       templateVersion: template.version,
     })
   } catch (error) {
+    const err = error as Error
+    if (isEmailOutboxSchemaMissing(err)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: EMAIL_OUTBOX_MIGRATION_HINT,
+        },
+        { status: 400 },
+      )
+    }
+    if (err.message.includes('RESEND_API_KEY')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'E-Mail-Versand ist nicht konfiguriert. Bitte RESEND_API_KEY setzen.',
+        },
+        { status: 503 },
+      )
+    }
+    if (err.message.includes('E-Mail-Versand fehlgeschlagen')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'E-Mail konnte beim Versanddienst nicht zugestellt werden. Bitte erneut versuchen.',
+        },
+        { status: 502 },
+      )
+    }
     return apiErrors.internal(error as Error, {
       component: 'api/supplier-orders/send',
     })

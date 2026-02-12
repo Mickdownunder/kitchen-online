@@ -54,6 +54,49 @@ interface EmailOutboxRow {
   metadata: Json
 }
 
+interface OutboxErrorLike extends Error {
+  code?: string
+  details?: string
+  hint?: string
+}
+
+interface SupabaseErrorLike {
+  message: string
+  code?: string
+  details?: string
+  hint?: string
+}
+
+export const EMAIL_OUTBOX_MIGRATION_HINT =
+  'E-Mail-Outbox fehlt. Bitte Migration ausführen: 20260212150000_email_outbox.sql ' +
+  '(z. B. mit `pnpm --filter @kitchen/db migrate`).'
+
+function toOutboxError(error: SupabaseErrorLike): OutboxErrorLike {
+  const next = new Error(error.message) as OutboxErrorLike
+  if (error.code) {
+    next.code = error.code
+  }
+  if (error.details) {
+    next.details = error.details
+  }
+  if (error.hint) {
+    next.hint = error.hint
+  }
+  return next
+}
+
+export function isEmailOutboxSchemaMissing(error: unknown): boolean {
+  const err = (error || {}) as { code?: string; message?: string; details?: string; hint?: string }
+  const code = String(err.code || '').toUpperCase()
+  const blob = [err.message, err.details, err.hint].filter(Boolean).join(' ').toLowerCase()
+
+  if (code === '42P01' || code === 'PGRST204' || code === 'PGRST205') {
+    return blob.includes('email_outbox') || code === '42P01'
+  }
+
+  return blob.includes('email_outbox') && (blob.includes('does not exist') || blob.includes('could not find'))
+}
+
 function toMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
@@ -129,7 +172,7 @@ async function loadOutboxByDedupeKey(
     .maybeSingle()
 
   if (error) {
-    throw new Error(error.message)
+    throw toOutboxError(error as SupabaseErrorLike)
   }
 
   return (data as EmailOutboxRow | null) || null
@@ -148,7 +191,7 @@ async function loadOutboxById(
     .maybeSingle()
 
   if (error) {
-    throw new Error(error.message)
+    throw toOutboxError(error as SupabaseErrorLike)
   }
 
   return (data as EmailOutboxRow | null) || null
@@ -172,7 +215,7 @@ async function updateOutboxStatus(
     .eq('id', id)
 
   if (error) {
-    throw new Error(error.message)
+    throw toOutboxError(error as SupabaseErrorLike)
   }
 }
 
@@ -213,7 +256,7 @@ async function dispatchExistingOutboxRow(input: {
     .maybeSingle()
 
   if (claimError) {
-    throw new Error(claimError.message)
+    throw toOutboxError(claimError as SupabaseErrorLike)
   }
 
   if (!claimedData) {
@@ -292,7 +335,7 @@ export async function queueAndSendEmailOutbox(
       if (code === '23505' && normalizedDedupeKey) {
         row = await loadOutboxByDedupeKey(input.supabase, normalizedDedupeKey)
       } else {
-        throw new Error(error.message)
+        throw toOutboxError(error as SupabaseErrorLike)
       }
     } else {
       row = data as EmailOutboxRow
@@ -326,7 +369,7 @@ export async function processEmailOutboxBatch(input: {
     .limit(limit)
 
   if (error) {
-    throw new Error(error.message)
+    throw toOutboxError(error as SupabaseErrorLike)
   }
 
   let processed = 0
