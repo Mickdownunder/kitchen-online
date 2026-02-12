@@ -4,6 +4,7 @@ import { Check, Loader2, Pencil, Plus, Package, Trash2, X, MapPin } from 'lucide
 import { CompanySettings, Supplier } from '@/types'
 
 export function SuppliersTab({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- prop kept for API, may be used later
   companySettings,
   suppliers,
   editingSupplier,

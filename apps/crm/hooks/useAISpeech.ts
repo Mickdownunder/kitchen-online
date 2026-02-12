@@ -166,7 +166,7 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
     let ttsTimer: number | null = null
 
     if ('speechSynthesis' in window) {
-      const loadVoice = () => {
+      const loadVoice = (): void => {
         const voices = window.speechSynthesis.getVoices()
         preferredVoiceRef.current = pickGermanFemaleVoice(voices)
       }

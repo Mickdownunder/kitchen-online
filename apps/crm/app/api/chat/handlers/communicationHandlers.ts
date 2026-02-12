@@ -254,7 +254,7 @@ export const handleGetCalendarView: ServerHandler = async (args, supabase) => {
     endDate = d.toISOString().slice(0, 10)
   }
 
-  let query = supabase
+  const query = supabase
     .from('planning_appointments')
     .select('id, customer_name, date, time, type, notes')
     .eq('company_id', companyId)

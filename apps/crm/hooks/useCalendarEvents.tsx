@@ -31,51 +31,51 @@ const TYPE_COLORS: Record<
   { color: string; bgColor: string; borderColor: string; label: string }
 > = {
   Consultation: {
-    color: 'text-emerald-800',
-    bgColor: 'bg-emerald-100',
-    borderColor: 'border-emerald-500',
+    color: 'text-rose-900',
+    bgColor: 'bg-rose-200',
+    borderColor: 'border-rose-600',
     label: 'Beratung / Planung',
   },
   FirstMeeting: {
-    color: 'text-sky-800',
-    bgColor: 'bg-sky-100',
-    borderColor: 'border-sky-500',
+    color: 'text-blue-900',
+    bgColor: 'bg-blue-200',
+    borderColor: 'border-blue-600',
     label: 'Erstgespräch',
   },
   Measurement: {
-    color: 'text-indigo-800',
-    bgColor: 'bg-indigo-100',
-    borderColor: 'border-indigo-500',
+    color: 'text-lime-900',
+    bgColor: 'bg-lime-200',
+    borderColor: 'border-lime-600',
     label: 'Aufmaß',
   },
   Installation: {
-    color: 'text-amber-800',
-    bgColor: 'bg-amber-100',
-    borderColor: 'border-amber-500',
+    color: 'text-red-900',
+    bgColor: 'bg-red-200',
+    borderColor: 'border-red-600',
     label: 'Montage',
   },
   Service: {
-    color: 'text-violet-800',
-    bgColor: 'bg-violet-100',
-    borderColor: 'border-violet-500',
+    color: 'text-fuchsia-900',
+    bgColor: 'bg-fuchsia-200',
+    borderColor: 'border-fuchsia-600',
     label: 'Service / Wartung',
   },
   ReMeasurement: {
-    color: 'text-cyan-800',
-    bgColor: 'bg-cyan-100',
-    borderColor: 'border-cyan-500',
+    color: 'text-cyan-900',
+    bgColor: 'bg-cyan-200',
+    borderColor: 'border-cyan-600',
     label: 'Nachmessung',
   },
   Delivery: {
-    color: 'text-orange-800',
-    bgColor: 'bg-orange-100',
-    borderColor: 'border-orange-500',
+    color: 'text-amber-900',
+    bgColor: 'bg-amber-200',
+    borderColor: 'border-amber-600',
     label: 'Abholung',
   },
   Lieferung: {
-    color: 'text-teal-800',
-    bgColor: 'bg-teal-100',
-    borderColor: 'border-teal-500',
+    color: 'text-violet-900',
+    bgColor: 'bg-violet-200',
+    borderColor: 'border-violet-600',
     label: 'Lieferung',
   },
   Other: {
@@ -158,6 +158,7 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
         const materialReadyLabel = materialReady ? 'Montagebereit' : 'Material offen'
 
         if (p.measurementDate === dateStr) {
+          const measurementColor = TYPE_COLORS.Measurement
           events.push({
             id: `project-${p.id}-measurement`,
             type: 'Aufmaß',
@@ -166,13 +167,14 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
             appointment: null,
             time: p.measurementTime,
             date: dateStr,
-            color: 'text-indigo-800',
-            bgColor: 'bg-indigo-100',
-            borderColor: 'border-indigo-500',
+            color: measurementColor.color,
+            bgColor: measurementColor.bgColor,
+            borderColor: measurementColor.borderColor,
             icon: <Ruler className="h-3 w-3" />,
           })
         }
         if (p.installationDate === dateStr) {
+          const installationColor = TYPE_COLORS.Installation
           events.push({
             id: `project-${p.id}-installation`,
             type: 'Montage',
@@ -181,9 +183,9 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
             appointment: null,
             time: p.installationTime,
             date: dateStr,
-            color: 'text-amber-800',
-            bgColor: 'bg-amber-100',
-            borderColor: 'border-amber-500',
+            color: installationColor.color,
+            bgColor: installationColor.bgColor,
+            borderColor: installationColor.borderColor,
             icon: <Truck className="h-3 w-3" />,
             materialReady,
             materialReadyLabel,
@@ -191,6 +193,7 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
         }
         if (p.deliveryDate === dateStr) {
           const isLieferung = p.deliveryType === 'delivery'
+          const deliveryColor = isLieferung ? TYPE_COLORS.Lieferung : TYPE_COLORS.Delivery
           events.push({
             id: `project-${p.id}-delivery`,
             type: isLieferung ? 'Lieferung' : 'Abholung',
@@ -199,9 +202,9 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
             appointment: null,
             time: p.deliveryTime,
             date: dateStr,
-            color: isLieferung ? 'text-teal-800' : 'text-orange-800',
-            bgColor: isLieferung ? 'bg-teal-100' : 'bg-orange-100',
-            borderColor: isLieferung ? 'border-teal-500' : 'border-orange-500',
+            color: deliveryColor.color,
+            bgColor: deliveryColor.bgColor,
+            borderColor: deliveryColor.borderColor,
             icon: <Package className="h-3 w-3" />,
           })
         }
