@@ -5,6 +5,7 @@ import {
   getAllowedEmails,
   checkEmailWhitelist,
   formatWhitelistError,
+  extractEmailsFromText,
 } from '../serverHandlers'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 import { buildSupplierOrderTemplate } from '@/lib/orders/supplierOrderTemplate'
@@ -286,7 +287,7 @@ export const handleAnalyzeKitchenPlan: ServerHandler = async () => {
   return { result: KITCHEN_PLAN_ANALYSIS_INSTRUCTION }
 }
 
-export const handleSendEmail: ServerHandler = async (args, supabase, userId) => {
+export const handleSendEmail: ServerHandler = async (args, supabase, userId, context) => {
   const emailTo = args.to as string
   const emailSubject = args.subject as string
   const emailBody = args.body as string
@@ -295,8 +296,10 @@ export const handleSendEmail: ServerHandler = async (args, supabase, userId) => 
     return { result: '❌ E-Mail-Parameter unvollständig. Benötigt: to, subject, body' }
   }
 
-  // SECURITY: Email whitelist check
+  // SECURITY: Whitelist = Projekt-/Mitarbeiter-E-Mails + in der User-Nachricht genannte Adressen
   const allowed = await getAllowedEmails(supabase, userId, args.projectId as string | undefined)
+  const fromUserMessage = extractEmailsFromText(context?.userMessage)
+  fromUserMessage.forEach((e) => allowed.add(e))
   const { ok, blocked } = checkEmailWhitelist(emailTo, allowed)
   if (!ok) return { result: formatWhitelistError(blocked) }
 
@@ -429,7 +432,7 @@ export const handleSendSupplierOrderEmail: ServerHandler = async (args, supabase
   }
 }
 
-export const handleSendReminder: ServerHandler = async (args, supabase, userId) => {
+export const handleSendReminder: ServerHandler = async (args, supabase, userId, context) => {
   const project = await findProject(supabase, args.projectId as string)
   if (!project) return { result: '❌ Projekt nicht gefunden.' }
 
@@ -461,8 +464,10 @@ export const handleSendReminder: ServerHandler = async (args, supabase, userId) 
     return { result: '❌ Keine E-Mail-Adresse hinterlegt.' }
   }
 
-  // SECURITY: Email whitelist check
+  // SECURITY: Whitelist = Projekt-/Mitarbeiter-E-Mails + in der User-Nachricht genannte Adressen
   const allowed = await getAllowedEmails(supabase, userId, project.id)
+  const fromUserMessage = extractEmailsFromText(context?.userMessage)
+  fromUserMessage.forEach((e) => allowed.add(e))
   const { ok, blocked } = checkEmailWhitelist(effectiveEmail, allowed)
   if (!ok) return { result: formatWhitelistError(blocked) }
 

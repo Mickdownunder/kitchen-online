@@ -114,8 +114,10 @@ async function executeFunctionCalls(
   userId: string,
   send: (data: Record<string, unknown>) => void,
   allUpdatedProjectIds: Set<string>,
+  userMessage?: string,
 ): Promise<unknown[]> {
   const parts: unknown[] = []
+  const context = userMessage ? { userMessage } : undefined
 
   for (const functionCall of functionCalls) {
     logger.info('Executing server function call', {
@@ -128,6 +130,7 @@ async function executeFunctionCalls(
       functionCall.args,
       supabase,
       userId,
+      context,
     )
 
     if (handlerResult.updatedProjectIds) {
@@ -214,6 +217,7 @@ export function createChatStreamResponse(input: CreateChatStreamResponseInput): 
             input.userId,
             send,
             allUpdatedProjectIds,
+            input.message,
           )
           const nextStream = await chat.sendMessageStream({
             message: nextMessageParts as unknown as PartListUnion,

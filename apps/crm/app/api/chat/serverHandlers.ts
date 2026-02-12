@@ -99,10 +99,16 @@ export interface PendingEmailInfo {
   reminderType?: string
 }
 
+export interface ServerHandlerContext {
+  /** Aktuelle User-Nachricht im Chat – darin genannte E-Mail-Adressen gelten als freigegeben. */
+  userMessage?: string
+}
+
 export type ServerHandler = (
   args: Args,
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  context?: ServerHandlerContext
 ) => Promise<ServerHandlerResult>
 
 // ============================================
@@ -176,7 +182,7 @@ export async function appendProjectNote(
 // ============================================
 
 /**
- * Collects allowed email addresses from projects and employees.
+ * Collects allowed email addresses from projects, employees and suppliers (Firmenstamm).
  * This is the server-side equivalent of lib/ai/emailWhitelist.ts
  * but uses the server Supabase client instead of browser services.
  */
@@ -187,7 +193,7 @@ export async function getAllowedEmails(
 ): Promise<Set<string>> {
   const allowed = new Set<string>()
 
-  // Collect project emails
+  // Collect project emails (Kunden-E-Mails an Aufträgen)
   if (projectId) {
     const { data: project } = await supabase
       .from('projects')
@@ -207,24 +213,42 @@ export async function getAllowedEmails(
     }
   }
 
-  // Collect employee emails
   const { data: settings } = await supabase
     .from('company_settings')
     .select('id')
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (settings?.id) {
-    const { data: employees } = await supabase
-      .from('employees')
-      .select('email')
-      .eq('company_id', settings.id)
-      .eq('is_active', true)
-      .not('email', 'is', null)
-    if (employees) {
-      for (const e of employees) {
-        if (e.email) allowed.add((e.email as string).trim().toLowerCase())
+  if (!settings?.id) return allowed
+  const companyId = settings.id
+
+  // Collect employee emails (Mitarbeiter)
+  const { data: employees } = await supabase
+    .from('employees')
+    .select('email')
+    .eq('company_id', companyId)
+    .eq('is_active', true)
+    .not('email', 'is', null)
+  if (employees) {
+    for (const e of employees) {
+      if (e.email) allowed.add((e.email as string).trim().toLowerCase())
+    }
+  }
+
+  // Collect supplier emails (Lieferanten im Firmenstamm: email, order_email, Kontakt-E-Mails)
+  const { data: suppliers } = await supabase
+    .from('suppliers')
+    .select('email, order_email, contact_person_internal_email, contact_person_external_email')
+    .eq('company_id', companyId)
+  if (suppliers) {
+    for (const s of suppliers) {
+      const add = (v: unknown) => {
+        if (v && typeof v === 'string') allowed.add(v.trim().toLowerCase())
       }
+      add(s.email)
+      add(s.order_email)
+      add(s.contact_person_internal_email)
+      add(s.contact_person_external_email)
     }
   }
 
@@ -241,7 +265,19 @@ export function checkEmailWhitelist(
 }
 
 export function formatWhitelistError(blocked: string[]): string {
-  return `❌ E-Mail-Adresse(n) "${blocked.join(', ')}" nicht freigegeben. Nur an im Projekt hinterlegte Kunden-E-Mails oder Mitarbeiter-E-Mails erlaubt.`
+  return `❌ E-Mail-Adresse(n) "${blocked.join(', ')}" nicht freigegeben. Erlaubt: Kunden-E-Mails (Auftrag), Mitarbeiter-E-Mails, Lieferanten-E-Mails (Firmenstamm) oder in deiner Chat-Nachricht genannte Adressen.`
+}
+
+/** Extrahiert E-Mail-Adressen aus einem Text (z. B. User-Nachricht im Chat). */
+const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi
+export function extractEmailsFromText(text: string | undefined): Set<string> {
+  const set = new Set<string>()
+  if (!text || typeof text !== 'string') return set
+  const matches = text.match(EMAIL_REGEX) ?? []
+  for (const m of matches) {
+    set.add(m.trim().toLowerCase())
+  }
+  return set
 }
 
 // ============================================
@@ -354,7 +390,8 @@ export async function executeServerFunctionCall(
   name: string,
   args: Args,
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  context?: ServerHandlerContext
 ): Promise<ServerHandlerResult> {
   // Block dangerous functions
   if (blockedFunctions.has(name)) {
@@ -372,7 +409,7 @@ export async function executeServerFunctionCall(
 
   const start = Date.now()
   try {
-    const result = await handler(args, supabase, userId)
+    const result = await handler(args, supabase, userId, context)
     const duration = Date.now() - start
     const success = result.result.startsWith('✅')
 
