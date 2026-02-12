@@ -35,6 +35,9 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onClick, compact })
         }}
         className={`min-h-[28px] rounded border-l-2 px-2 py-2 text-[11px] ${event.bgColor} ${event.borderColor} ${event.color} cursor-grab truncate active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
       >
+        <span className="block text-[9px] font-semibold uppercase tracking-wide opacity-90">
+          {event.typeLabel ?? event.type}
+        </span>
         <span className="truncate font-medium">{event.customer}</span>
         {event.materialReadyLabel && (
           <span
