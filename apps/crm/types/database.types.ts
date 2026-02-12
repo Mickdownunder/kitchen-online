@@ -313,6 +313,65 @@ export type Database = {
           },
         ]
       }
+      email_outbox: {
+        Row: {
+          id: string
+          user_id: string
+          kind: string
+          dedupe_key: string | null
+          status: string
+          attempts: number
+          last_error: string | null
+          provider_message_id: string | null
+          processing_started_at: string | null
+          sent_at: string | null
+          payload: Json
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          kind: string
+          dedupe_key?: string | null
+          status?: string
+          attempts?: number
+          last_error?: string | null
+          provider_message_id?: string | null
+          processing_started_at?: string | null
+          sent_at?: string | null
+          payload?: Json
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          kind?: string
+          dedupe_key?: string | null
+          status?: string
+          attempts?: number
+          last_error?: string | null
+          provider_message_id?: string | null
+          processing_started_at?: string | null
+          sent_at?: string | null
+          payload?: Json
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_outbox_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       installation_reservations: {
         Row: {
           id: string

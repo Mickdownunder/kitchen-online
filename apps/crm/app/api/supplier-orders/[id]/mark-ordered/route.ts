@@ -218,6 +218,8 @@ export async function POST(
         row.sent_at,
     )
 
+    await markProjectItemsOrderedForSupplier(supabase, row.id, row.project_id, row.supplier_id)
+
     if (!alreadyMarkedWithSameKey) {
       const { error: orderUpdateError } = await supabase
         .from('supplier_orders')
@@ -238,8 +240,6 @@ export async function POST(
         })
       }
     }
-
-    await markProjectItemsOrderedForSupplier(supabase, row.id, row.project_id, row.supplier_id)
 
     return NextResponse.json({
       success: true,

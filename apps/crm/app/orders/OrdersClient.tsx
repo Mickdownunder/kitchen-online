@@ -290,6 +290,11 @@ export default function OrdersClient() {
         }}
         onSaved={refreshAll}
         onMarkExternallyOrdered={markAsExternallyOrdered}
+        onOpenInstallationReservation={(targetRow) => {
+          setEditorOpen(false)
+          setEditorRow(null)
+          setReservationRow(targetRow)
+        }}
       />
 
       <SendOrderConfirm

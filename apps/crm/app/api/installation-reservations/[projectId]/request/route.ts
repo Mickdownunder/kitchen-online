@@ -1,6 +1,7 @@
+import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/supabase/services/email'
+import { queueAndSendEmailOutbox } from '@/lib/supabase/services/emailOutbox'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import {
   INSTALLATION_RESERVATION_MIGRATION_HINT,
@@ -86,6 +87,26 @@ function buildReservationEmail(params: {
     .join('')
 
   return { subject, text, html }
+}
+
+function buildReservationRequestDedupeKey(params: {
+  projectId: string
+  supplierOrderId: string | null
+  installerEmail: string
+  requestedInstallationDate: string | null
+  planDocumentIds: string[]
+  requestNotes: string | null
+}): string {
+  const normalized = JSON.stringify({
+    projectId: params.projectId,
+    supplierOrderId: params.supplierOrderId,
+    installerEmail: params.installerEmail,
+    requestedInstallationDate: params.requestedInstallationDate,
+    planDocumentIds: [...params.planDocumentIds].sort(),
+    requestNotes: params.requestNotes || null,
+  })
+
+  return `installation-reservation:${params.projectId}:${createHash('sha256').update(normalized).digest('hex')}`
 }
 
 export async function POST(
@@ -289,16 +310,6 @@ export async function POST(
       notes: requestNotes,
     })
 
-    await sendEmail({
-      to: installerEmail,
-      subject: emailContent.subject,
-      html: emailContent.html,
-      text: emailContent.text,
-      attachments,
-    })
-
-    const nowIso = new Date().toISOString()
-
     const { data: existingReservation, error: existingReservationError } = await supabase
       .from('installation_reservations')
       .select('*')
@@ -332,11 +343,7 @@ export async function POST(
           requested_installation_date: requestedInstallationDate,
           request_notes: requestNotes,
           plan_document_ids: selectedPlanDocumentIds,
-          request_email_subject: emailContent.subject,
-          request_email_to: installerEmail,
-          request_email_message: emailContent.text,
-          request_email_sent_at: nowIso,
-          status: 'requested',
+          status: 'draft',
         })
         .eq('id', (existingReservation as InstallationReservationRow).id)
         .eq('user_id', user.id)
@@ -370,11 +377,7 @@ export async function POST(
           requested_installation_date: requestedInstallationDate,
           request_notes: requestNotes,
           plan_document_ids: selectedPlanDocumentIds,
-          request_email_subject: emailContent.subject,
-          request_email_to: installerEmail,
-          request_email_message: emailContent.text,
-          request_email_sent_at: nowIso,
-          status: 'requested',
+          status: 'draft',
         })
         .select('*')
         .single()
@@ -395,11 +398,70 @@ export async function POST(
       persistedReservation = data as InstallationReservationRow
     }
 
+    if (!persistedReservation?.id) {
+      return apiErrors.internal(new Error('Reservierung konnte nicht vorbereitet werden.'), {
+        component: 'api/installation-reservations/request',
+      })
+    }
+
+    const outboxResult = await queueAndSendEmailOutbox({
+      supabase,
+      userId: user.id,
+      kind: 'installation_reservation_request',
+      dedupeKey: buildReservationRequestDedupeKey({
+        projectId,
+        supplierOrderId,
+        installerEmail,
+        requestedInstallationDate,
+        planDocumentIds: selectedPlanDocumentIds,
+        requestNotes,
+      }),
+      payload: {
+        to: installerEmail,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text,
+        attachments,
+      },
+      metadata: {
+        projectId,
+        supplierOrderId,
+      },
+    })
+
+    const nowIso = outboxResult.sentAt
+    const { data: finalizedReservation, error: finalizeError } = await supabase
+      .from('installation_reservations')
+      .update({
+        request_email_subject: emailContent.subject,
+        request_email_to: installerEmail,
+        request_email_message: emailContent.text,
+        request_email_sent_at: nowIso,
+        status: 'requested',
+      })
+      .eq('id', persistedReservation.id)
+      .eq('user_id', user.id)
+      .select('*')
+      .single()
+
+    if (finalizeError) {
+      if (isReservationSchemaMissing(finalizeError)) {
+        return NextResponse.json(
+          { success: false, error: INSTALLATION_RESERVATION_MIGRATION_HINT },
+          { status: 400 },
+        )
+      }
+
+      return apiErrors.internal(new Error(finalizeError.message), {
+        component: 'api/installation-reservations/request',
+      })
+    }
+
     return NextResponse.json({
       success: true,
       message: `Montage-Reservierung wurde an ${installerEmail} versendet.`,
       data: {
-        reservation: mapInstallationReservation(persistedReservation),
+        reservation: mapInstallationReservation(finalizedReservation as InstallationReservationRow),
       },
     })
   } catch (error) {

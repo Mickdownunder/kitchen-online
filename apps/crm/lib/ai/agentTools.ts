@@ -98,10 +98,10 @@ export const agentTools: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       description:
-        'Fügt einen Eintrag zum Projektverlauf/Notizfeld hinzu. JEDE Aktion sollte protokolliert werden!',
+        'Fügt einen Eintrag zum Projektverlauf/Notizfeld hinzu. WICHTIG bei E-Mail/Lieferschein: Wenn sendEmail/sendSupplierOrderEmail "Bestätigung durch den Nutzer" zurückgibt, ist die E-Mail NOCH NICHT versendet – schreibe in der Notiz NICHT "versendet" oder "gesendet", sondern z.B. "E-Mail an X vorbereitet, Bestätigung im Chat ausstehend" oder füge die Notiz erst nach Nutzer-Bestätigung hinzu.',
       properties: {
         projectId: { type: Type.STRING },
-        note: { type: Type.STRING, description: 'Der Text der Notiz (was wurde gemacht?)' },
+        note: { type: Type.STRING, description: 'Der Text der Notiz (was wurde gemacht?). Bei E-Mail: nur "versendet" wenn der Nutzer im Chat bestätigt hat.' },
       },
       required: ['projectId', 'note'],
     },

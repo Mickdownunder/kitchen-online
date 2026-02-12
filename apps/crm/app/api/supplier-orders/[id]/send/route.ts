@@ -2,7 +2,7 @@ import React from 'react'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/supabase/services/email'
+import { queueAndSendEmailOutbox } from '@/lib/supabase/services/emailOutbox'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import type { Json } from '@/types/database.types'
 import {
@@ -25,6 +25,9 @@ interface SupplierOrderRouteRow {
   order_number: string
   status: string
   created_by_type: string
+  sent_at: string | null
+  sent_to_email: string | null
+  idempotency_key: string | null
   delivery_calendar_week: string | null
   installation_reference_date: string | null
   notes: string | null
@@ -94,6 +97,17 @@ function relationToSingle<T>(value: T | T[] | null): T | null {
 
 function toNumber(value: unknown): number {
   return toFiniteNumber(value)
+}
+
+function resolveSentOrderStatus(currentStatus: string): string {
+  const advancedStates = new Set([
+    'ab_received',
+    'delivery_note_received',
+    'goods_receipt_open',
+    'goods_receipt_booked',
+    'ready_for_installation',
+  ])
+  return advancedStates.has(currentStatus) ? currentStatus : 'sent'
 }
 
 function getSupplierIdFromRelation(
@@ -287,29 +301,6 @@ export async function POST(
       return apiErrors.forbidden({ component: 'api/supplier-orders/send' })
     }
 
-    if (idempotencyKey) {
-      const { data: existingLog, error: existingLogError } = await supabase
-        .from('supplier_order_dispatch_logs')
-        .select('id, sent_at')
-        .eq('supplier_order_id', id)
-        .eq('idempotency_key', idempotencyKey)
-        .maybeSingle()
-
-      if (existingLogError) {
-        return apiErrors.internal(new Error(existingLogError.message), {
-          component: 'api/supplier-orders/send',
-        })
-      }
-
-      if (existingLog?.id) {
-        return NextResponse.json({
-          success: true,
-          alreadySent: true,
-          message: 'Bestellung wurde mit diesem Idempotency-Key bereits versendet.',
-        })
-      }
-    }
-
     const { data: orderData, error: orderError } = await supabase
       .from('supplier_orders')
       .select(
@@ -321,6 +312,9 @@ export async function POST(
         order_number,
         status,
         created_by_type,
+        sent_at,
+        sent_to_email,
+        idempotency_key,
         delivery_calendar_week,
         installation_reference_date,
         notes,
@@ -371,6 +365,71 @@ export async function POST(
       )
     }
 
+    let existingDispatchLog:
+      | {
+          id: string
+          sent_at: string
+          to_email: string
+          template_version: string
+          payload: Json
+        }
+      | null = null
+    if (idempotencyKey) {
+      const { data: existingLog, error: existingLogError } = await supabase
+        .from('supplier_order_dispatch_logs')
+        .select('id, sent_at, to_email, template_version, payload')
+        .eq('supplier_order_id', id)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle()
+
+      if (existingLogError) {
+        return apiErrors.internal(new Error(existingLogError.message), {
+          component: 'api/supplier-orders/send',
+        })
+      }
+
+      existingDispatchLog = existingLog
+    }
+
+    const alreadySentWithSameKey = Boolean(
+      idempotencyKey &&
+        row.idempotency_key &&
+        row.idempotency_key === idempotencyKey &&
+        row.sent_at,
+    )
+    if (alreadySentWithSameKey || existingDispatchLog?.id) {
+      const nowIso = new Date().toISOString()
+
+      await markProjectItemsOrderedForSupplier(supabase, row.id, row.project_id, row.supplier_id)
+
+      const { error: orderSyncError } = await supabase
+        .from('supplier_orders')
+        .update({
+          status: resolveSentOrderStatus(row.status),
+          sent_to_email: row.sent_to_email || existingDispatchLog?.to_email || recipientEmail,
+          sent_at: row.sent_at || existingDispatchLog?.sent_at || nowIso,
+          approved_by_user_id: user.id,
+          approved_at: nowIso,
+          idempotency_key: idempotencyKey || row.idempotency_key || null,
+          template_version: existingDispatchLog?.template_version || undefined,
+          template_snapshot: existingDispatchLog?.payload || undefined,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (orderSyncError) {
+        return apiErrors.internal(new Error(orderSyncError.message), {
+          component: 'api/supplier-orders/send',
+        })
+      }
+
+      return NextResponse.json({
+        success: true,
+        alreadySent: true,
+        message: 'Bestellung wurde mit diesem Idempotency-Key bereits versendet.',
+      })
+    }
+
     const items = (row.supplier_order_items || []).map((item, index) => ({
       positionNumber: item.position_number || index + 1,
       description: item.description,
@@ -416,51 +475,32 @@ export async function POST(
     const pdfContent = pdfBuffer.toString('base64')
     const pdfFileName = supplierOrderPdfFileName(row.order_number, supplier.name)
 
-    await sendEmail({
-      to: recipientEmail,
-      subject: template.subject,
-      html: template.html,
-      text: template.text,
-      attachments: [
-        {
-          filename: pdfFileName,
-          content: pdfContent,
-          contentType: 'application/pdf',
-        },
-      ],
+    const outboxResult = await queueAndSendEmailOutbox({
+      supabase,
+      userId: user.id,
+      kind: 'supplier_order_dispatch',
+      dedupeKey: idempotencyKey ? `supplier-order:${id}:${idempotencyKey}` : null,
+      payload: {
+        to: recipientEmail,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+        attachments: [
+          {
+            filename: pdfFileName,
+            content: pdfContent,
+            contentType: 'application/pdf',
+          },
+        ],
+      },
+      metadata: {
+        supplierOrderId: id,
+        projectId: row.project_id,
+        supplierId: row.supplier_id,
+      } as Json,
     })
 
-    const nowIso = new Date().toISOString()
-    const advancedStates = new Set([
-      'ab_received',
-      'delivery_note_received',
-      'goods_receipt_open',
-      'goods_receipt_booked',
-      'ready_for_installation',
-    ])
-    const status = advancedStates.has(row.status) ? row.status : 'sent'
-
-    const { error: orderUpdateError } = await supabase
-      .from('supplier_orders')
-      .update({
-        status,
-        sent_to_email: recipientEmail,
-        sent_at: nowIso,
-        approved_by_user_id: user.id,
-        approved_at: nowIso,
-        template_version: template.version,
-        template_snapshot: template.snapshot as Json,
-      })
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (orderUpdateError) {
-      return apiErrors.internal(new Error(orderUpdateError.message), {
-        component: 'api/supplier-orders/send',
-      })
-    }
-
-    await markProjectItemsOrderedForSupplier(supabase, row.id, row.project_id, row.supplier_id)
+    const nowIso = outboxResult.sentAt
 
     const { error: logError } = await supabase.from('supplier_order_dispatch_logs').insert({
       supplier_order_id: id,
@@ -473,6 +513,8 @@ export async function POST(
         ...template.snapshot,
         recipientEmail,
         pdfFileName,
+        outboxId: outboxResult.outboxId,
+        outboxProviderMessageId: outboxResult.providerMessageId,
       } as Json,
       idempotency_key: idempotencyKey || null,
       sent_at: nowIso,
@@ -485,6 +527,29 @@ export async function POST(
           component: 'api/supplier-orders/send',
         })
       }
+    }
+
+    await markProjectItemsOrderedForSupplier(supabase, row.id, row.project_id, row.supplier_id)
+
+    const { error: orderUpdateError } = await supabase
+      .from('supplier_orders')
+      .update({
+        status: resolveSentOrderStatus(row.status),
+        sent_to_email: recipientEmail,
+        sent_at: row.sent_at || nowIso,
+        approved_by_user_id: user.id,
+        approved_at: nowIso,
+        template_version: template.version,
+        template_snapshot: template.snapshot as Json,
+        idempotency_key: idempotencyKey || row.idempotency_key || null,
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (orderUpdateError) {
+      return apiErrors.internal(new Error(orderUpdateError.message), {
+        component: 'api/supplier-orders/send',
+      })
     }
 
     return NextResponse.json({

@@ -14,6 +14,13 @@ export interface ProjectDeliveryProgressRow {
   procurement_type?: unknown
 }
 
+export interface InvoiceItemProgressSnapshot {
+  delivery_status: string | null
+  quantity: unknown
+  quantity_ordered: unknown
+  quantity_delivered: unknown
+}
+
 export interface SupplierOrderInvoiceCandidateRow {
   id: string
   supplierId: string | null
@@ -56,6 +63,30 @@ export function collectSupplierOrderCandidateInvoiceItemIds(
   })
 
   return candidates
+}
+
+export function deriveInternalStockFulfillmentQuantity(
+  snapshot: InvoiceItemProgressSnapshot,
+  requestedQuantity: unknown,
+): number {
+  return Math.max(
+    1,
+    toFiniteNumber(requestedQuantity),
+    toFiniteNumber(snapshot.quantity),
+    toFiniteNumber(snapshot.quantity_ordered),
+    toFiniteNumber(snapshot.quantity_delivered),
+  )
+}
+
+export function shouldResetSyntheticInternalStockProgress(
+  snapshot: InvoiceItemProgressSnapshot,
+): boolean {
+  const quantity = Math.max(0, toFiniteNumber(snapshot.quantity))
+  const ordered = Math.max(0, toFiniteNumber(snapshot.quantity_ordered))
+  const delivered = Math.max(0, toFiniteNumber(snapshot.quantity_delivered))
+  const reachedQuantity = quantity > 0 ? ordered >= quantity && delivered >= quantity : delivered > 0
+
+  return snapshot.delivery_status === 'delivered' && reachedQuantity
 }
 
 export function deriveProjectDeliveryStatus(rows: ProjectDeliveryProgressRow[]): {

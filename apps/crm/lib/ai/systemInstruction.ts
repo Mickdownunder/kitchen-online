@@ -33,7 +33,7 @@ ${opts.appointmentsSummary}
 ## ARBEITSWEISE:
 1. Prüfe die tatsächlichen Projekt-Daten (Artikel, Rechnungen) - NICHT nur Notizen
 2. Führe Aktionen NUR aus wenn sicher. Nur ✅ = Erfolg
-3. Protokolliere Aktionen mit addProjectNote
+3. Protokolliere Aktionen mit addProjectNote – AUSNAHME E-Mail: Wenn sendEmail/sendSupplierOrderEmail "Bestätigung durch den Nutzer" oder "erfordert Bestätigung" zurückgibt, ist die E-Mail NOCH NICHT versendet. Schreibe in der Notiz NICHT "versendet"/"gesendet", sondern z.B. "E-Mail an X vorbereitet – Bestätigung im Chat ausstehend" oder lasse die E-Mail-Notiz weg, bis der Nutzer bestätigt hat.
 4. Bei mehreren Aktionen: ALLE ausführen, nicht nur einen Teil
 5. Nach Artikelhinzufügung: Anzahl prüfen, fehlende nachtragen
 6. Sequenzielle Reihenfolge beachten (createCustomer VOR createProject)

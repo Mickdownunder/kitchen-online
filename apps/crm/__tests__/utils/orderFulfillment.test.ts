@@ -1,6 +1,8 @@
 import {
   collectSupplierOrderCandidateInvoiceItemIds,
+  deriveInternalStockFulfillmentQuantity,
   deriveProjectDeliveryStatus,
+  shouldResetSyntheticInternalStockProgress,
   toFiniteNumber,
 } from '@/lib/orders/orderFulfillment'
 
@@ -81,5 +83,39 @@ describe('orderFulfillment', () => {
     )
 
     expect(Array.from(candidates)).toEqual(['external'])
+  })
+
+  it('derives internal-stock fulfillment quantity without decreasing persisted progress', () => {
+    const quantity = deriveInternalStockFulfillmentQuantity(
+      {
+        delivery_status: 'partially_delivered',
+        quantity: 2,
+        quantity_ordered: 3,
+        quantity_delivered: 1,
+      },
+      1,
+    )
+
+    expect(quantity).toBe(3)
+  })
+
+  it('resets synthetic internal-stock progress only for fully auto-fulfilled rows', () => {
+    expect(
+      shouldResetSyntheticInternalStockProgress({
+        delivery_status: 'delivered',
+        quantity: 2,
+        quantity_ordered: 2,
+        quantity_delivered: 2,
+      }),
+    ).toBe(true)
+
+    expect(
+      shouldResetSyntheticInternalStockProgress({
+        delivery_status: 'partially_delivered',
+        quantity: 2,
+        quantity_ordered: 2,
+        quantity_delivered: 1,
+      }),
+    ).toBe(false)
   })
 })

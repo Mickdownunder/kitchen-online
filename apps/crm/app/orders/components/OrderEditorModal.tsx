@@ -13,7 +13,11 @@ import {
   mapProjectItemsToEditorItems,
   type ProjectInvoiceItemForOrderEditor,
 } from '@/lib/orders/orderEditorUtils'
-import { deriveProjectDeliveryStatus } from '@/lib/orders/orderFulfillment'
+import {
+  deriveInternalStockFulfillmentQuantity,
+  deriveProjectDeliveryStatus,
+  shouldResetSyntheticInternalStockProgress,
+} from '@/lib/orders/orderFulfillment'
 import type { CustomerProject } from '@/types'
 import { createEmptyEditableItem, mapRowItemsToEditableItems } from '../orderUtils'
 import type { EditableOrderItem, EditorViewFilter, OrderWorkflowRow, SupplierLookupOption } from '../types'
@@ -30,6 +34,7 @@ interface OrderEditorModalProps {
   onClose: () => void
   onSaved: () => Promise<void>
   onMarkExternallyOrdered: (row: OrderWorkflowRow) => Promise<boolean>
+  onOpenInstallationReservation?: (row: OrderWorkflowRow) => void
 }
 
 type InvoiceItemProcurementType = 'external_order' | 'internal_stock' | 'reservation_only'
@@ -56,6 +61,7 @@ export function OrderEditorModal({
   onClose,
   onSaved,
   onMarkExternallyOrdered,
+  onOpenInstallationReservation,
 }: OrderEditorModalProps) {
   const [orderId, setOrderId] = useState<string | null>(null)
   const [projectId, setProjectId] = useState('')
@@ -132,6 +138,7 @@ export function OrderEditorModal({
   }, [open, row])
 
   const selectedItemsCount = items.filter((item) => item.selected).length
+  const hasReservationOnlyItems = items.some((item) => item.procurementType === 'reservation_only')
   const selectedWithoutSupplierCount = items.filter(
     (item) =>
       item.selected &&
@@ -609,6 +616,22 @@ export function OrderEditorModal({
             {error && <p className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
 
             <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+              {row &&
+                row.deliveryType !== 'pickup' &&
+                hasReservationOnlyItems &&
+                onOpenInstallationReservation && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose()
+                      onOpenInstallationReservation(row)
+                    }}
+                    disabled={saveBusy || markBusy}
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-black uppercase tracking-wider text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Montage reservieren
+                  </button>
+                )}
               {row?.kind === 'supplier' && row.externalOrderItems > 0 && (
                 <button
                   type="button"
@@ -693,17 +716,83 @@ export function OrderEditorModal({
                   try {
                     setSaving(true)
 
+                    const existingInvoiceStateById = new Map<
+                      string,
+                      {
+                        deliveryStatus: string | null
+                        quantity: unknown
+                        quantityOrdered: unknown
+                        quantityDelivered: unknown
+                        procurementType: InvoiceItemProcurementType
+                        actualDeliveryDate: string | null
+                      }
+                    >()
+
+                    if (invoiceItemsById.size > 0) {
+                      const invoiceIds = Array.from(invoiceItemsById.keys())
+                      const { data: existingRows, error: existingRowsError } = await supabase
+                        .from('invoice_items')
+                        .select(
+                          'id, delivery_status, quantity, quantity_ordered, quantity_delivered, procurement_type, actual_delivery_date',
+                        )
+                        .eq('project_id', normalizedProjectId)
+                        .in('id', invoiceIds)
+
+                      if (existingRowsError) {
+                        throw new Error(existingRowsError.message)
+                      }
+
+                      ;(existingRows || []).forEach((existingRow) => {
+                        const itemId = String(existingRow.id || '')
+                        if (!itemId) {
+                          return
+                        }
+
+                        existingInvoiceStateById.set(itemId, {
+                          deliveryStatus: existingRow.delivery_status || null,
+                          quantity: existingRow.quantity,
+                          quantityOrdered: existingRow.quantity_ordered,
+                          quantityDelivered: existingRow.quantity_delivered,
+                          procurementType: normalizeProcurementType(existingRow.procurement_type || undefined),
+                          actualDeliveryDate: existingRow.actual_delivery_date || null,
+                        })
+                      })
+                    }
+
                     for (const [invoiceItemId, data] of invoiceItemsById.entries()) {
+                      const existingSnapshot = existingInvoiceStateById.get(invoiceItemId)
                       const updatePayload: Record<string, unknown> = {
                         procurement_type: data.procurementType,
                       }
 
                       if (data.procurementType === 'internal_stock') {
-                        const fulfilledQuantity = data.quantity > 0 ? data.quantity : 1
+                        const fulfilledQuantity = deriveInternalStockFulfillmentQuantity(
+                          {
+                            delivery_status: existingSnapshot?.deliveryStatus || null,
+                            quantity: existingSnapshot?.quantity ?? data.quantity,
+                            quantity_ordered: existingSnapshot?.quantityOrdered ?? 0,
+                            quantity_delivered: existingSnapshot?.quantityDelivered ?? 0,
+                          },
+                          data.quantity,
+                        )
                         updatePayload.delivery_status = 'delivered'
                         updatePayload.quantity_ordered = fulfilledQuantity
                         updatePayload.quantity_delivered = fulfilledQuantity
-                        updatePayload.actual_delivery_date = new Date().toISOString().slice(0, 10)
+                        updatePayload.actual_delivery_date =
+                          existingSnapshot?.actualDeliveryDate || new Date().toISOString().slice(0, 10)
+                      } else if (
+                        existingSnapshot?.procurementType === 'internal_stock' &&
+                        shouldResetSyntheticInternalStockProgress({
+                          delivery_status: existingSnapshot.deliveryStatus,
+                          quantity: existingSnapshot.quantity,
+                          quantity_ordered: existingSnapshot.quantityOrdered,
+                          quantity_delivered: existingSnapshot.quantityDelivered,
+                        })
+                      ) {
+                        updatePayload.delivery_status = 'not_ordered'
+                        updatePayload.quantity_ordered = 0
+                        updatePayload.quantity_delivered = 0
+                        updatePayload.actual_delivery_date = null
                       }
 
                       const { error: invoiceUpdateError } = await supabase

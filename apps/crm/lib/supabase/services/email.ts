@@ -24,7 +24,7 @@ interface SendEmailOptions {
 /**
  * Sendet eine E-Mail über Resend API
  */
-export async function sendEmail(options: SendEmailOptions): Promise<void> {
+export async function sendEmail(options: SendEmailOptions): Promise<string | null> {
   const apiKey = process.env.RESEND_API_KEY
 
   if (!apiKey) {
@@ -85,6 +85,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
       subject: options.subject,
       emailId: data.id,
     })
+    return data?.id ? String(data.id) : null
   } catch (error: unknown) {
     logger.error(
       'Fehler beim Versenden der E-Mail',

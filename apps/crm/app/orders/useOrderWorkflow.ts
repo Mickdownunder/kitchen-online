@@ -13,6 +13,7 @@ import {
   type SupplierWorkflowQueue,
 } from '@/lib/orders/workflowQueue'
 import { deriveSupplierOrderChannel } from '@/lib/orders/orderChannel'
+import { splitMissingSupplierItemsByProcurement } from '@/lib/orders/workflowGrouping'
 import { getSupplierOrders } from '@/lib/supabase/services'
 import { supabase } from '@/lib/supabase/client'
 import type { InvoiceItemProcurementType, SupplierOrder, SupplierOrderStatus } from '@/types'
@@ -84,7 +85,6 @@ const SENT_OR_LATER_STATUSES = new Set<SupplierOrderStatus>([
   'goods_receipt_booked',
   'ready_for_installation',
 ])
-const INTERNAL_STOCK_SUPPLIER_NAMES = new Set(['baleah eigen', 'lagerware', 'lager'])
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number') {
@@ -191,33 +191,6 @@ function normalizeProcurementType(value: string | null | undefined): InvoiceItem
     return value
   }
   return 'external_order'
-}
-
-function isInternalStockSupplierName(name: string | undefined): boolean {
-  return INTERNAL_STOCK_SUPPLIER_NAMES.has((name || '').trim().toLowerCase())
-}
-
-function normalizeProjectItemsForSupplier(
-  items: WorkflowProjectItem[],
-  supplierName: string | undefined,
-): WorkflowProjectItem[] {
-  if (!isInternalStockSupplierName(supplierName)) {
-    return items
-  }
-
-  return items.map((item) => {
-    if (item.procurementType !== 'external_order') {
-      return item
-    }
-
-    return {
-      ...item,
-      procurementType: 'internal_stock',
-      quantityOrdered: Math.max(item.quantityOrdered, item.quantity),
-      quantityDelivered: Math.max(item.quantityDelivered, item.quantity),
-      deliveryStatus: 'delivered',
-    }
-  })
 }
 
 function summarizeProcurement(items: WorkflowProjectItem[]): {
@@ -533,7 +506,6 @@ export function useOrderWorkflow() {
             order?.supplierName ||
             supplier?.name ||
             `Lieferant ${bucket.supplierId.slice(0, 6).toUpperCase()}`
-          const normalizedProjectItems = normalizeProjectItemsForSupplier(projectItems, supplierName)
           const {
             totalItems,
             openOrderItems,
@@ -541,7 +513,7 @@ export function useOrderWorkflow() {
             externalOrderItems,
             internalStockItems,
             reservationOnlyItems,
-          } = summarizeProcurement(normalizedProjectItems)
+          } = summarizeProcurement(projectItems)
           const isProjectCompleted = Boolean(
             project?.completionDate || project?.status === ProjectStatus.COMPLETED,
           )
@@ -624,7 +596,7 @@ export function useOrderWorkflow() {
             queueLabel: SUPPLIER_WORKFLOW_QUEUE_META[decision.queue].label,
             nextAction,
             abTimingStatus: getAbTimingStatus(order?.abConfirmedDeliveryDate, order?.bookedAt),
-            projectItems: normalizedProjectItems,
+            projectItems,
             unresolvedItems: [],
             orderItems: order?.items || [],
             orderChannel: externalOrderItems > 0 ? deriveSupplierOrderChannel(order) : 'pending',
@@ -636,17 +608,9 @@ export function useOrderWorkflow() {
         })
         .filter((row): row is OrderWorkflowRow => Boolean(row))
 
-      const missingSupplierRows = Array.from(missingSupplierByProject.entries()).map(
-        ([projectId, unresolvedItems]): OrderWorkflowRow => {
+      const missingSupplierRows = Array.from(missingSupplierByProject.entries()).flatMap(
+        ([projectId, unresolvedItems]): OrderWorkflowRow[] => {
           const project = projectLookup.get(projectId)
-          const {
-            totalItems,
-            openDeliveryItems,
-            openOrderItems,
-            externalOrderItems,
-            internalStockItems,
-            reservationOnlyItems,
-          } = summarizeProcurement(unresolvedItems)
           const deliveryType = project?.deliveryType || 'delivery'
           const deliveryDate = project?.deliveryDate
           const installationDate = project?.installationDate
@@ -659,63 +623,81 @@ export function useOrderWorkflow() {
           const isProjectCompleted = Boolean(
             project?.completionDate || project?.status === ProjectStatus.COMPLETED,
           )
-          const decision = deriveSupplierWorkflowQueue({
-            hasOrder: false,
-            installationDate: readinessTargetDate,
-            openOrderItems,
-            openDeliveryItems,
-            hasExternalOrderItems: externalOrderItems > 0,
-            hasInternalStockItems: internalStockItems > 0,
-            hasReservationOnlyItems: reservationOnlyItems > 0 && deliveryType !== 'pickup',
-            reservationStatus: installationReservationStatus,
-            isProjectCompleted,
-          })
+          const groupedMissingRows = splitMissingSupplierItemsByProcurement(unresolvedItems)
+          const hasMixedProcurementGroups = groupedMissingRows.length > 1
 
-          let nextAction = decision.nextAction
-          if (decision.queue === 'montagebereit') {
-            if (deliveryType === 'pickup') {
-              nextAction = 'Abholung mit Kunde abstimmen und Abholtermin bestätigen.'
-            } else if (installationReservationStatus === 'confirmed') {
-              nextAction = installationReservationConfirmedDate
-                ? `Montage reserviert (${installationReservationConfirmedDate}) bei ${
-                    installationReservationCompany || 'Montagepartner'
-                  }.`
-                : `Montage reserviert bei ${installationReservationCompany || 'Montagepartner'}.`
+          return groupedMissingRows.map((group) => {
+            const {
+              totalItems,
+              openDeliveryItems,
+              openOrderItems,
+              externalOrderItems,
+              internalStockItems,
+              reservationOnlyItems,
+            } = summarizeProcurement(group.items)
+
+            const decision = deriveSupplierWorkflowQueue({
+              hasOrder: false,
+              installationDate: readinessTargetDate,
+              openOrderItems,
+              openDeliveryItems,
+              hasExternalOrderItems: externalOrderItems > 0,
+              hasInternalStockItems: internalStockItems > 0,
+              hasReservationOnlyItems: reservationOnlyItems > 0 && deliveryType !== 'pickup',
+              reservationStatus: installationReservationStatus,
+              isProjectCompleted,
+            })
+
+            let nextAction = decision.nextAction
+            if (decision.queue === 'montagebereit') {
+              if (deliveryType === 'pickup') {
+                nextAction = 'Abholung mit Kunde abstimmen und Abholtermin bestätigen.'
+              } else if (installationReservationStatus === 'confirmed') {
+                nextAction = installationReservationConfirmedDate
+                  ? `Montage reserviert (${installationReservationConfirmedDate}) bei ${
+                      installationReservationCompany || 'Montagepartner'
+                    }.`
+                  : `Montage reserviert bei ${installationReservationCompany || 'Montagepartner'}.`
+              }
             }
-          }
 
-          return {
-            key: `${projectId}:missing-supplier`,
-            kind: 'missing_supplier',
-            projectId,
-            projectOrderNumber: project?.orderNumber || '—',
-            customerName: project?.customerName || 'Unbekannt',
-            deliveryType,
-            deliveryDate,
-            installationDate,
-            daysUntilInstallation: getDaysUntilInstallation(
-              readinessTargetDate,
-            ),
-            supplierName: 'Lieferant fehlt',
-            totalItems,
-            openOrderItems,
-            openDeliveryItems,
-            externalOrderItems,
-            internalStockItems,
-            reservationOnlyItems,
-            queue: decision.queue,
-            queueLabel: SUPPLIER_WORKFLOW_QUEUE_META[decision.queue].label,
-            nextAction,
-            abTimingStatus: 'open',
-            projectItems: [],
-            unresolvedItems,
-            orderItems: [],
-            orderChannel: 'pending',
-            installationReservationStatus,
-            installationReservationRequestedAt,
-            installationReservationConfirmedDate,
-            installationReservationCompany,
-          }
+            const rowKey = hasMixedProcurementGroups
+              ? `${projectId}:missing-supplier:${group.key}`
+              : `${projectId}:missing-supplier`
+
+            return {
+              key: rowKey,
+              kind: 'missing_supplier',
+              projectId,
+              projectOrderNumber: project?.orderNumber || '—',
+              customerName: project?.customerName || 'Unbekannt',
+              deliveryType,
+              deliveryDate,
+              installationDate,
+              daysUntilInstallation: getDaysUntilInstallation(
+                readinessTargetDate,
+              ),
+              supplierName: group.key === 'external' ? 'Lieferant fehlt' : 'Interne Positionen',
+              totalItems,
+              openOrderItems,
+              openDeliveryItems,
+              externalOrderItems,
+              internalStockItems,
+              reservationOnlyItems,
+              queue: decision.queue,
+              queueLabel: SUPPLIER_WORKFLOW_QUEUE_META[decision.queue].label,
+              nextAction,
+              abTimingStatus: 'open',
+              projectItems: [],
+              unresolvedItems: group.items,
+              orderItems: [],
+              orderChannel: 'pending',
+              installationReservationStatus,
+              installationReservationRequestedAt,
+              installationReservationConfirmedDate,
+              installationReservationCompany,
+            }
+          })
         },
       )
 
