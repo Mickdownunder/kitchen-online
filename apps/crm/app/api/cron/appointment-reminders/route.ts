@@ -3,21 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendEmail } from '@/lib/supabase/services/email'
 import { getCompanySettingsById } from '@/lib/supabase/services/company'
 import { logger } from '@/lib/utils/logger'
-
-const TYPE_LABELS: Record<string, string> = {
-  Consultation: 'Beratung / Planung',
-  FirstMeeting: 'Erstgespräch',
-  Measurement: 'Aufmaß',
-  Installation: 'Montage',
-  Service: 'Service / Wartung',
-  ReMeasurement: 'Nachmessung',
-  Delivery: 'Abholung',
-  Other: 'Sonstiges',
-}
-
-function getTypeLabel(type: string): string {
-  return TYPE_LABELS[type] || type
-}
+import { getAppointmentTypeLabel } from '@/lib/utils/appointmentTypeLabels'
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('de-DE', {
@@ -71,7 +57,7 @@ export async function GET(request: NextRequest) {
     if (currentHour === 7) {
       const { data: appointments1Day, error: err1 } = await admin
         .from('planning_appointments')
-        .select('id, customer_name, date, time, type, assigned_user_id, company_id')
+        .select('id, customer_name, date, time, type, notes, assigned_user_id, company_id')
         .eq('date', tomorrowStr)
         .not('assigned_user_id', 'is', null)
 
@@ -109,7 +95,7 @@ export async function GET(request: NextRequest) {
           const html = `
             <p>Hallo ${profile.full_name || 'Mitarbeiter'},</p>
             <p>morgen haben Sie einen Termin:</p>
-            <p><strong>${getTypeLabel(apt.type)}</strong><br>
+            <p><strong>${getAppointmentTypeLabel(apt.type, { notes: apt.notes })}</strong><br>
             Kunde: ${apt.customer_name}<br>
             Datum: ${formatDate(apt.date)}<br>
             Uhrzeit: ${formatTime(apt.time)}</p>
@@ -137,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     const { data: appointments1Hour, error: err2 } = await admin
       .from('planning_appointments')
-      .select('id, customer_name, date, time, type, assigned_user_id, company_id')
+      .select('id, customer_name, date, time, type, notes, assigned_user_id, company_id')
       .eq('date', today)
       .not('assigned_user_id', 'is', null)
       .not('time', 'is', null)
@@ -178,7 +164,7 @@ export async function GET(request: NextRequest) {
         const html = `
           <p>Hallo ${profile.full_name || 'Mitarbeiter'},</p>
           <p>in etwa einer Stunde haben Sie einen Termin:</p>
-          <p><strong>${getTypeLabel(apt.type)}</strong><br>
+          <p><strong>${getAppointmentTypeLabel(apt.type, { notes: apt.notes })}</strong><br>
           Kunde: ${apt.customer_name}<br>
           Uhrzeit: ${formatTime(apt.time)}</p>
           <p>Mit freundlichen Grüßen<br>${companyName}</p>

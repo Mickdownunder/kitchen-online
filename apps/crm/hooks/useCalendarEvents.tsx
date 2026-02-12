@@ -5,6 +5,10 @@ import { Ruler, Truck, ChefHat, Package } from 'lucide-react'
 import type { CustomerProject, PlanningAppointment } from '@/types'
 import { ProjectStatus } from '@/types'
 import { formatDate as formatDateUtil, getStatusColor as getStatusColorUtil } from '@/lib/utils'
+import {
+  getAppointmentTypeColorKey,
+  getAppointmentTypeLabel,
+} from '@/lib/utils/appointmentTypeLabels'
 
 export type CalendarEvent = {
   id: string
@@ -31,15 +35,15 @@ const TYPE_COLORS: Record<
   { color: string; bgColor: string; borderColor: string; label: string }
 > = {
   Consultation: {
-    color: 'text-rose-900',
-    bgColor: 'bg-rose-200',
-    borderColor: 'border-rose-600',
+    color: 'text-sky-900',
+    bgColor: 'bg-sky-200',
+    borderColor: 'border-sky-600',
     label: 'Beratung / Planung',
   },
   FirstMeeting: {
-    color: 'text-blue-900',
-    bgColor: 'bg-blue-200',
-    borderColor: 'border-blue-600',
+    color: 'text-indigo-900',
+    bgColor: 'bg-indigo-200',
+    borderColor: 'border-indigo-600',
     label: 'Erstgespräch',
   },
   Measurement: {
@@ -216,18 +220,24 @@ export function useCalendarEvents(options: UseCalendarEventsOptions): UseCalenda
         .map(a => {
           const assignedUserId = a.assignedUserId
           const assignedUserName = assignedUserId && teamMap ? teamMap[assignedUserId] : undefined
-          const typeColor = TYPE_COLORS[a.type] || DEFAULT_TYPE_COLOR
           const associatedProject = projects.find(
             p =>
               p.customerName === a.customerName ||
               (a.customerId && p.customerId && a.customerId === p.customerId)
           )
+          const appointmentTypeOptions = {
+            projectDeliveryType: associatedProject?.deliveryType,
+            notes: a.notes,
+          }
+          const typeColorKey = getAppointmentTypeColorKey(a.type, appointmentTypeOptions)
+          const typeColor = TYPE_COLORS[typeColorKey] || DEFAULT_TYPE_COLOR
+          const typeLabel = getAppointmentTypeLabel(a.type, appointmentTypeOptions)
           // Planung/Beratung: keine Montagebereit-Anzeige (nur bei Montage-Terminen)
 
           return {
             id: `appointment-${a.id}`,
             type: 'Planung' as const,
-            typeLabel: typeColor.label,
+            typeLabel,
             customer: a.customerName,
             time: a.time,
             project: associatedProject || null,

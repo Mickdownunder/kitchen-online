@@ -102,7 +102,7 @@ export function useCalendarDragDrop(
           } else if (draggedEvent.type === 'Montage') {
             updatedProject.installationDate = newDate
             updatedProject.installationTime = newTime
-          } else if (draggedEvent.type === 'Abholung') {
+          } else if (draggedEvent.type === 'Abholung' || draggedEvent.type === 'Lieferung') {
             updatedProject.deliveryDate = newDate
             updatedProject.deliveryTime = newTime
           }
@@ -131,7 +131,7 @@ export function useCalendarDragDrop(
           updatedProject.measurementDate = newDate
         } else if (draggedEvent.type === 'Montage') {
           updatedProject.installationDate = newDate
-        } else if (draggedEvent.type === 'Abholung') {
+        } else if (draggedEvent.type === 'Abholung' || draggedEvent.type === 'Lieferung') {
           updatedProject.deliveryDate = newDate
         }
         onUpdateProject(updatedProject)

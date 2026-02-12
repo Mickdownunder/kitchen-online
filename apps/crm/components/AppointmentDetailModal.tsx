@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Calendar, Clock, User, Phone, Save, Edit2, Check, Trash2 } from 'lucide-react'
 import { PlanningAppointment, CustomerProject } from '@/types'
 import { logger } from '@/lib/utils/logger'
+import { getAppointmentTypeLabel } from '@/lib/utils/appointmentTypeLabels'
 
 interface AppointmentDetailModalProps {
   appointment: PlanningAppointment | null
@@ -35,12 +36,11 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
       // For project-based appointments, try to extract notes from project
       if (appointment.id.startsWith('temp-') && project) {
-        const typeLabel =
-          appointment.type === 'Measurement'
-            ? 'Aufmaß'
-            : appointment.type === 'Installation'
-              ? 'Montage'
-              : 'Abholung'
+        const typeLabel = getAppointmentTypeLabel(appointment.type, {
+          projectDeliveryType: project.deliveryType,
+          notes: appointment.notes,
+          defaultDeliveryKind: 'Abholung',
+        })
         const notesMatch = project.notes?.match(
           new RegExp(`${typeLabel}.*?:\\s*(.+?)(?=\\n|$)`, 'i')
         )
@@ -85,21 +85,7 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
     })
   }
 
-  const getTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      Consultation: 'Beratung / Planung',
-      FirstMeeting: 'Erstgespräch',
-      Measurement: 'Aufmaß',
-      Installation: 'Montage',
-      Service: 'Service / Wartung',
-      ReMeasurement: 'Nachmessung',
-      Delivery: 'Abholung',
-      Other: 'Sonstiges',
-    }
-    return labels[type] || type
-  }
-
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type: string, typeLabel?: string) => {
     const colors: Record<string, string> = {
       Consultation: 'bg-emerald-500',
       FirstMeeting: 'bg-blue-500',
@@ -107,13 +93,18 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
       Installation: 'bg-amber-500',
       Service: 'bg-purple-500',
       ReMeasurement: 'bg-cyan-500',
-      Delivery: 'bg-orange-500',
+      Delivery: typeLabel === 'Abholung' ? 'bg-orange-500' : 'bg-violet-500',
       Other: 'bg-slate-500',
     }
     return colors[type] || 'bg-slate-500'
   }
 
   const isProjectBased = appointment.id.startsWith('temp-')
+  const appointmentTypeLabel = getAppointmentTypeLabel(appointment.type, {
+    projectDeliveryType: project?.deliveryType,
+    notes: appointment.notes,
+    defaultDeliveryKind: isProjectBased ? 'Abholung' : 'Lieferung',
+  })
 
   return (
     <div
@@ -126,7 +117,7 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
       >
         {/* Header */}
         <div
-          className={`flex shrink-0 items-start justify-between p-6 text-white ${getTypeColor(appointment.type)}`}
+          className={`flex shrink-0 items-start justify-between p-6 text-white ${getTypeColor(appointment.type, appointmentTypeLabel)}`}
         >
           <div className="flex-1">
             <div className="flex items-center gap-3">
@@ -135,7 +126,7 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
               </div>
               <div>
                 <p className="mb-0.5 text-xs font-semibold uppercase tracking-wider text-white/80">
-                  {getTypeLabel(appointment.type)}
+                  {appointmentTypeLabel}
                 </p>
                 <h3 className="text-xl font-bold">{appointment.customerName}</h3>
               </div>
