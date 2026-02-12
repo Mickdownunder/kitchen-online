@@ -62,8 +62,15 @@ export const handleAddProjectNote: ServerHandler = async (args, supabase) => {
   const project = await findProject(supabase, args.projectId as string)
   if (!project) return { result: '❌ Projekt nicht gefunden.' }
 
-  await appendProjectNote(supabase, project.id, args.note as string)
-  return { result: `✅ Notiz hinzugefügt.`, updatedProjectIds: [project.id] }
+  const note = String(args.note ?? '').trim()
+  if (!note) return { result: '❌ Notiztext fehlt.' }
+
+  await appendProjectNote(supabase, project.id, note)
+  const preview = note.length > 250 ? `${note.slice(0, 250)}…` : note
+  return {
+    result: `✅ Notiz im Projektverlauf (${project.order_number}): ${preview}`,
+    updatedProjectIds: [project.id],
+  }
 }
 
 export const handleCreateProject: ServerHandler = async (args, supabase, userId) => {

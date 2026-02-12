@@ -8,6 +8,7 @@ import {
 } from '../serverHandlers'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
 import { buildSupplierOrderTemplate } from '@/lib/orders/supplierOrderTemplate'
+import { sendEmailFromPayload } from '@/lib/email/sendEmailFromPayload'
 
 interface SupplierOrderAgentRow {
   id: string
@@ -300,12 +301,13 @@ export const handleSendEmail: ServerHandler = async (args, supabase, userId) => 
   if (!ok) return { result: formatWhitelistError(blocked) }
 
   const pdfType = args.pdfType as string | undefined
-  const bodyPreview = emailBody.length > 150 ? `${emailBody.slice(0, 150)}...` : emailBody
+  const toArray = emailTo.split(',').map((e: string) => e.trim()).filter(Boolean)
 
-  if (pdfType) {
-    if (!args.projectId) return { result: '❌ projectId ist erforderlich wenn pdfType gesetzt ist.' }
+  // pdfType "order" (Auftrag mit Unterschrift-Link) erfordert Token/Sign-URL → weiterhin Bestätigung im Chat
+  if (pdfType === 'order') {
+    const bodyPreview = emailBody.length > 150 ? `${emailBody.slice(0, 150)}...` : emailBody
     return {
-      result: 'E-Mail-Versand erfordert Bestätigung durch den Nutzer.',
+      result: 'Auftrag per E-Mail (mit Unterschrift-Link) bitte unten mit „Senden“ bestätigen.',
       pendingEmail: {
         functionName: 'sendEmail',
         to: emailTo,
@@ -313,10 +315,10 @@ export const handleSendEmail: ServerHandler = async (args, supabase, userId) => 
         bodyPreview,
         api: '/api/email/send-with-pdf',
         payload: {
-          to: emailTo.split(',').map((e: string) => e.trim()),
+          to: toArray,
           subject: emailSubject,
           body: emailBody,
-          pdfType,
+          pdfType: 'order',
           projectId: args.projectId,
           invoiceId: args.invoiceId,
           deliveryNoteId: args.deliveryNoteId,
@@ -326,22 +328,20 @@ export const handleSendEmail: ServerHandler = async (args, supabase, userId) => 
     }
   }
 
+  // Plain, invoice, deliveryNote: E-Mail direkt versenden (kein Bestätigungs-Button)
+  const sendResult = await sendEmailFromPayload(supabase, userId, {
+    to: toArray,
+    subject: emailSubject,
+    body: emailBody,
+    pdfType: pdfType === 'invoice' || pdfType === 'deliveryNote' ? pdfType : undefined,
+    projectId: args.projectId as string | undefined,
+    invoiceId: args.invoiceId as string | undefined,
+    deliveryNoteId: args.deliveryNoteId as string | undefined,
+  })
+  const projectIdStr = args.projectId as string | undefined
   return {
-    result: 'E-Mail-Versand erfordert Bestätigung durch den Nutzer.',
-    pendingEmail: {
-      functionName: 'sendEmail',
-      to: emailTo,
-      subject: emailSubject,
-      bodyPreview,
-      api: '/api/email/send',
-      payload: {
-        to: emailTo.split(',').map((e: string) => e.trim()),
-        subject: emailSubject,
-        html: emailBody,
-        text: emailBody,
-      },
-      projectId: args.projectId as string | undefined,
-    },
+    result: sendResult.message,
+    ...(sendResult.success && projectIdStr ? { updatedProjectIds: [projectIdStr] } : {}),
   }
 }
 
