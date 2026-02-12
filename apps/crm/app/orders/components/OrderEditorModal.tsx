@@ -6,6 +6,7 @@ import {
   createSupplierOrder,
   getSupplierOrder,
   replaceSupplierOrderItems,
+  updateSupplierOrder,
 } from '@/lib/supabase/services'
 import { supabase } from '@/lib/supabase/client'
 import {
@@ -66,6 +67,7 @@ export function OrderEditorModal({
   const [orderId, setOrderId] = useState<string | null>(null)
   const [projectId, setProjectId] = useState('')
   const [supplierId, setSupplierId] = useState('')
+  const [deliveryCalendarWeek, setDeliveryCalendarWeek] = useState('')
   const [items, setItems] = useState<EditableOrderItem[]>([])
   const [viewFilter, setViewFilter] = useState<EditorViewFilter>('all')
   const [error, setError] = useState<string | null>(null)
@@ -95,6 +97,7 @@ export function OrderEditorModal({
         setOrderId(null)
         setProjectId('')
         setSupplierId('')
+        setDeliveryCalendarWeek('')
         setItems([createEmptyEditableItem()])
         setInitializing(false)
         return
@@ -119,11 +122,13 @@ export function OrderEditorModal({
         }
 
         setOrderId(result.data.id)
+        setDeliveryCalendarWeek(result.data.deliveryCalendarWeek ?? '')
         setItems(mapRowItemsToEditableItems({ ...row, orderItems: result.data.items || [] }))
         setInitializing(false)
         return
       }
 
+      setDeliveryCalendarWeek('')
       const mappedItems = mapRowItemsToEditableItems(row)
       setOrderId(null)
       setItems(mappedItems.length > 0 ? mappedItems : [createEmptyEditableItem(row.supplierId)])
@@ -177,7 +182,7 @@ export function OrderEditorModal({
           </div>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label className="text-xs font-black uppercase tracking-widest text-slate-500">
                 Auftrag
                 <select
@@ -210,6 +215,17 @@ export function OrderEditorModal({
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className="text-xs font-black uppercase tracking-widest text-slate-500">
+                Lieferwoche
+                <input
+                  type="text"
+                  value={deliveryCalendarWeek}
+                  onChange={(event) => setDeliveryCalendarWeek(event.target.value)}
+                  placeholder="z. B. KW 8 oder offen"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400"
+                />
               </label>
             </div>
 
@@ -839,6 +855,12 @@ export function OrderEditorModal({
                     }
 
                     if (orderId) {
+                      const metaResult = await updateSupplierOrder(orderId, {
+                        deliveryCalendarWeek: deliveryCalendarWeek.trim() || null,
+                      })
+                      if (!metaResult.ok) {
+                        throw new Error(metaResult.message || 'Bestellung konnte nicht gespeichert werden.')
+                      }
                       const payloadItems = toPayloadItems(grouped.groups[normalizedSupplierId] || [])
                       const updateResult = await replaceSupplierOrderItems(orderId, payloadItems)
                       if (!updateResult.ok) {
@@ -889,6 +911,7 @@ export function OrderEditorModal({
                           supplierId: targetSupplierId,
                           status: 'draft',
                           createdByType: 'user',
+                          deliveryCalendarWeek: deliveryCalendarWeek.trim() || undefined,
                           installationReferenceDate: projectLookup.get(normalizedProjectId)?.installationDate,
                           items: payloadItems,
                         })

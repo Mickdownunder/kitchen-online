@@ -113,13 +113,12 @@ export function buildSupplierOrderTemplate(
 
             <div style="margin-top:18px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
               <div><strong>Lieferwoche:</strong> ${escapeHtml(input.deliveryCalendarWeek || 'offen')}</div>
-              <div><strong>Montagebezug:</strong> ${escapeHtml(formatDate(input.installationReferenceDate))}</div>
             </div>
 
             ${input.notes ? `<p style="margin-top:14px;"><strong>Hinweis:</strong> ${escapeHtml(input.notes)}</p>` : ''}
 
             <p style="margin-top:18px;">Bitte senden Sie uns die Auftragsbestätigung mit bestätigtem Liefertermin zurück.</p>
-            <p style="margin-top:22px;">Vielen Dank<br/>${escapeHtml(input.companyName)}</p>
+            <p style="margin-top:22px;">Mit freundlichen Grüßen<br/>${escapeHtml(input.companyName)}</p>
           </div>
         </div>
       </body>
@@ -133,7 +132,6 @@ export function buildSupplierOrderTemplate(
     `Lieferant: ${input.supplierName}`,
     input.supplierEmail ? `E-Mail: ${input.supplierEmail}` : null,
     `Lieferwoche: ${input.deliveryCalendarWeek || 'offen'}`,
-    `Montagebezug: ${formatDate(input.installationReferenceDate)}`,
     '',
     'Positionen:',
     ...input.items.map((item) => {
@@ -144,6 +142,9 @@ export function buildSupplierOrderTemplate(
     '',
     input.notes ? `Hinweis: ${input.notes}` : null,
     'Bitte senden Sie die AB mit bestätigtem Liefertermin zurück.',
+    '',
+    'Mit freundlichen Grüßen',
+    input.companyName,
   ].filter(Boolean)
 
   return {

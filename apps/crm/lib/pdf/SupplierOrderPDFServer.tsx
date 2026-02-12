@@ -148,10 +148,6 @@ export function SupplierOrderPDFDocumentServer({
           <Text style={styles.metaLabel}>Lieferwoche</Text>
           <Text style={styles.metaValue}>{templateInput.deliveryCalendarWeek || 'offen'}</Text>
         </View>
-        <View style={styles.metaRow}>
-          <Text style={styles.metaLabel}>Montagebezug</Text>
-          <Text style={styles.metaValue}>{formatDate(templateInput.installationReferenceDate)}</Text>
-        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Positionen</Text>
