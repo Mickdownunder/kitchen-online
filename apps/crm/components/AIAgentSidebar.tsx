@@ -427,8 +427,8 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
                   isSpeaking
                     ? 'Sprachausgabe stoppen'
                     : isTTSEnabled
-                      ? 'Sprachausgabe deaktivieren'
-                      : 'Sprachausgabe aktivieren'
+                      ? 'Antwort per Stimme (weiblich) – deaktivieren'
+                      : 'Antwort per Stimme aktivieren (weibliche Stimme)'
                 }
               >
                 {isSpeaking ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
@@ -458,6 +458,21 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
         </div>
 
         <ProactiveSuggestions projects={projects} onSelectSuggestion={setInput} />
+
+        {!isMinimized && (
+          <>
+            {!isTTSEnabled && isSpeechSupported && (
+              <p className="mt-2 px-2 text-[11px] text-slate-500">
+                Antwort per Stimme: Lautsprecher-Symbol oben aktivieren.
+              </p>
+            )}
+            {!isSpeechSupported && (
+              <p className="mt-2 px-2 text-[11px] text-slate-500">
+                Spracheingabe: Chrome oder Edge nutzen.
+              </p>
+            )}
+          </>
+        )}
 
         {showHistory && (
           <ChatHistory

@@ -8,6 +8,7 @@ import BankReconciliationView from '@/components/accounting/BankReconciliationVi
 import { AccountingControls } from '@/components/accounting/AccountingControls'
 import { AccountingOverviewTab } from '@/components/accounting/AccountingOverviewTab'
 import { AccountingOutgoingTab } from '@/components/accounting/AccountingOutgoingTab'
+import InboundDocumentInboxView from '@/components/accounting/InboundDocumentInboxView'
 
 interface AccountingViewContentProps extends AccountingDataState {
   projects: CustomerProject[]
@@ -75,6 +76,8 @@ const AccountingViewContent: React.FC<AccountingViewContentProps> = ({
       {activeTab === 'incoming' && (
         <SupplierInvoicesView projects={projects} onStatsChange={() => loadSupplierInvoices()} />
       )}
+
+      {activeTab === 'inbound' && <InboundDocumentInboxView projects={projects} />}
 
       {activeTab === 'overview' && (
         <AccountingOverviewTab

@@ -50,6 +50,50 @@ export {
   deleteSupplier,
 } from './suppliers'
 
+interface DbErrorLike {
+  message?: string
+  details?: string
+  hint?: string
+  code?: string
+}
+
+function normalizeOptionalEmail(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const normalized = value.trim().toLowerCase()
+  return normalized.length > 0 ? normalized : null
+}
+
+function toServiceError(error: unknown, fallbackMessage: string): Error {
+  if (error instanceof Error) {
+    return error
+  }
+
+  const dbError = (error || {}) as DbErrorLike
+  const parts: string[] = []
+
+  if (typeof dbError.message === 'string' && dbError.message.trim().length > 0) {
+    parts.push(dbError.message.trim())
+  }
+  if (typeof dbError.details === 'string' && dbError.details.trim().length > 0) {
+    parts.push(dbError.details.trim())
+  }
+  if (typeof dbError.hint === 'string' && dbError.hint.trim().length > 0) {
+    parts.push(`Hint: ${dbError.hint.trim()}`)
+  }
+  if (typeof dbError.code === 'string' && dbError.code.trim().length > 0) {
+    parts.push(`Code: ${dbError.code.trim()}`)
+  }
+
+  if (parts.length > 0) {
+    return new Error(parts.join(' | '))
+  }
+
+  return new Error(fallbackMessage)
+}
+
 // ============================================
 // Company ID resolution
 // ============================================
@@ -159,6 +203,10 @@ export async function saveCompanySettings(
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
 
+  const inboundEmailAb = normalizeOptionalEmail(settings.inboundEmailAb)
+  const inboundEmailInvoices = normalizeOptionalEmail(settings.inboundEmailInvoices)
+  const inboundEmailLegacy = inboundEmailAb || inboundEmailInvoices || null
+
   const dbData = {
     user_id: user.id,
     company_name: settings.companyName || '',
@@ -172,6 +220,10 @@ export async function saveCompanySettings(
     phone: settings.phone,
     fax: settings.fax,
     email: settings.email,
+    inbound_email_ab: inboundEmailAb,
+    inbound_email_invoices: inboundEmailInvoices,
+    // Legacy single inbox field kept for backward compatibility.
+    inbound_email: inboundEmailLegacy,
     website: settings.website,
     uid: settings.uid,
     company_register_number: settings.companyRegisterNumber,
@@ -206,7 +258,9 @@ export async function saveCompanySettings(
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    throw toServiceError(error, 'Fehler beim Speichern der Firmeneinstellungen.')
+  }
 
   const savedSettings = mapCompanySettingsFromDB(data)
 
@@ -224,6 +278,9 @@ export async function saveCompanySettings(
 // ============================================
 
 function mapCompanySettingsFromDB(db: Record<string, unknown>): CompanySettings {
+  const inboundEmailAb = normalizeOptionalEmail(db.inbound_email_ab) ?? normalizeOptionalEmail(db.inbound_email)
+  const inboundEmailInvoices = normalizeOptionalEmail(db.inbound_email_invoices)
+
   return {
     id: db.id,
     userId: db.user_id,
@@ -238,6 +295,8 @@ function mapCompanySettingsFromDB(db: Record<string, unknown>): CompanySettings 
     phone: db.phone,
     fax: db.fax,
     email: db.email,
+    inboundEmailAb: inboundEmailAb ?? undefined,
+    inboundEmailInvoices: inboundEmailInvoices ?? undefined,
     website: db.website,
     uid: db.uid,
     companyRegisterNumber: db.company_register_number,

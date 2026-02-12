@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowDownLeft, ArrowUpRight, Calculator, Calendar, Landmark } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Calculator, Calendar, Inbox, Landmark } from 'lucide-react'
 import type { AccountingTab, TimeRange } from '@/components/accounting/accounting.types'
 
 interface AccountingControlsProps {
@@ -107,9 +107,20 @@ export function AccountingControls({
           <Landmark className="h-5 w-5" />
           Bankabgleich
         </button>
+        <button
+          onClick={() => setActiveTab('inbound')}
+          className={`flex items-center gap-2 rounded-xl px-6 py-3 font-bold transition-all ${
+            activeTab === 'inbound'
+              ? 'bg-amber-500 text-white shadow-lg'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Inbox className="h-5 w-5" />
+          Dokument-Posteingang
+        </button>
       </div>
 
-      {activeTab !== 'bank' && (
+      {activeTab !== 'bank' && activeTab !== 'inbound' && (
         <div className="glass rounded-3xl border border-white/50 bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-xl">
           <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
             <div>

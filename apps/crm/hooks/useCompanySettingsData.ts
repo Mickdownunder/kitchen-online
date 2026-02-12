@@ -54,6 +54,8 @@ export function useCompanySettingsData(): UseCompanySettingsDataResult {
     country: 'Österreich',
     phone: '',
     email: '',
+    inboundEmailAb: '',
+    inboundEmailInvoices: '',
     uid: '',
     defaultPaymentTerms: 14,
     defaultTaxRate: 20,

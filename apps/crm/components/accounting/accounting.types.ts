@@ -2,7 +2,7 @@ import type { CustomerProject, Invoice, SupplierInvoice } from '@/types'
 
 export type TimeRange = 'month' | 'quarter' | 'year' | 'custom'
 export type ExportType = 'uva' | 'invoices' | 'datev' | 'all'
-export type AccountingTab = 'overview' | 'outgoing' | 'incoming' | 'bank'
+export type AccountingTab = 'overview' | 'outgoing' | 'incoming' | 'bank' | 'inbound'
 
 export interface DateRangeResult {
   startDate: Date

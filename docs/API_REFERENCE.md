@@ -41,6 +41,12 @@
 | `/api/supplier-orders/[id]/mark-ordered` | POST | Lieferantenbestellung als extern bestellt markieren |
 | `/api/supplier-orders/[id]/documents` | POST | AB/Lieferschein-Dokument zur Bestellung hochladen |
 | `/api/supplier-orders/[id]/document-analysis` | POST | AB/Lieferschein-Dokument mit KI analysieren |
+| `/api/inbound/email/webhook` | POST | Inbound-Lieferantenmails empfangen (Anhänge in Dokument-Inbox). Auth via Header `x-inbound-email-secret` oder Query `?secret=...` |
+| `/api/document-inbox` | GET | Dokument-Inbox abrufen (Filter: kinds/statuses/limit) |
+| `/api/document-inbox/[id]/confirm` | POST | Vorzuweisung prüfen und fachlich bestätigen/buchen |
+| `/api/document-inbox/[id]/reassign` | POST | Vorzuweisung korrigieren |
+| `/api/document-inbox/[id]/reject` | POST | Dokument ablehnen |
+| `/api/document-inbox/[id]/file` | GET | Signierte Beleg-URL für Inbox-Dokument öffnen |
 | `/api/chat` | POST | AI-Chat |
 | `/api/chat/stream` | POST | AI-Chat (Stream) |
 | `/api/email/send` | POST | E-Mail senden |
@@ -76,3 +82,4 @@ Basis: `Authorization: Bearer <customer_jwt>`.
 |-------|---------|------|--------------|
 | `/api/booking/webhook` | POST | Cal.com Payload | Buchung → Lead/Kunde/Projekt |
 | `/api/cron/appointment-reminders` | GET | CRON_SECRET | Termin-Erinnerungen |
+| `/api/cron/inbound-documents` | GET | CRON_SECRET | Inbound-Dokumente klassifizieren/vorzuweisen |

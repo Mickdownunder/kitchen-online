@@ -937,6 +937,9 @@ export type Database = {
           default_tax_rate: number | null
           display_name: string | null
           email: string | null
+          inbound_email: string | null
+          inbound_email_ab: string | null
+          inbound_email_invoices: string | null
           fax: string | null
           house_number: string | null
           id: string
@@ -974,6 +977,9 @@ export type Database = {
           default_tax_rate?: number | null
           display_name?: string | null
           email?: string | null
+          inbound_email?: string | null
+          inbound_email_ab?: string | null
+          inbound_email_invoices?: string | null
           fax?: string | null
           house_number?: string | null
           id?: string
@@ -1011,6 +1017,9 @@ export type Database = {
           default_tax_rate?: number | null
           display_name?: string | null
           email?: string | null
+          inbound_email?: string | null
+          inbound_email_ab?: string | null
+          inbound_email_invoices?: string | null
           fax?: string | null
           house_number?: string | null
           id?: string
@@ -1889,6 +1898,199 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbound_document_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          from_status: string | null
+          id: string
+          inbox_item_id: string
+          payload: Json
+          to_status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          from_status?: string | null
+          id?: string
+          inbox_item_id: string
+          payload?: Json
+          to_status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          from_status?: string | null
+          id?: string
+          inbox_item_id?: string
+          payload?: Json
+          to_status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_document_events_inbox_item_id_fkey"
+            columns: ["inbox_item_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_document_inbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_document_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbound_document_inbox: {
+        Row: {
+          assigned_project_id: string | null
+          assigned_supplier_invoice_id: string | null
+          assigned_supplier_order_id: string | null
+          assignment_candidates: Json
+          assignment_confidence: number | null
+          company_id: string | null
+          confirmed_at: string | null
+          confirmed_by_user_id: string | null
+          content_sha256: string
+          created_at: string
+          dedupe_key: string
+          document_kind: string
+          file_name: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          processing_error: string | null
+          processing_status: string
+          recipient_email: string | null
+          received_at: string
+          rejected_reason: string | null
+          sender_email: string | null
+          sender_name: string | null
+          source_attachment_id: string
+          source_message_id: string
+          source_provider: string
+          storage_path: string
+          subject: string | null
+          updated_at: string
+          user_id: string
+          extracted_payload: Json
+        }
+        Insert: {
+          assigned_project_id?: string | null
+          assigned_supplier_invoice_id?: string | null
+          assigned_supplier_order_id?: string | null
+          assignment_candidates?: Json
+          assignment_confidence?: number | null
+          company_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
+          content_sha256: string
+          created_at?: string
+          dedupe_key: string
+          document_kind?: string
+          file_name: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          processing_error?: string | null
+          processing_status?: string
+          recipient_email?: string | null
+          received_at?: string
+          rejected_reason?: string | null
+          sender_email?: string | null
+          sender_name?: string | null
+          source_attachment_id: string
+          source_message_id: string
+          source_provider?: string
+          storage_path: string
+          subject?: string | null
+          updated_at?: string
+          user_id: string
+          extracted_payload?: Json
+        }
+        Update: {
+          assigned_project_id?: string | null
+          assigned_supplier_invoice_id?: string | null
+          assigned_supplier_order_id?: string | null
+          assignment_candidates?: Json
+          assignment_confidence?: number | null
+          company_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
+          content_sha256?: string
+          created_at?: string
+          dedupe_key?: string
+          document_kind?: string
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          processing_error?: string | null
+          processing_status?: string
+          recipient_email?: string | null
+          received_at?: string
+          rejected_reason?: string | null
+          sender_email?: string | null
+          sender_name?: string | null
+          source_attachment_id?: string
+          source_message_id?: string
+          source_provider?: string
+          storage_path?: string
+          subject?: string | null
+          updated_at?: string
+          user_id?: string
+          extracted_payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_document_inbox_assigned_project_id_fkey"
+            columns: ["assigned_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_document_inbox_assigned_supplier_invoice_id_fkey"
+            columns: ["assigned_supplier_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_document_inbox_assigned_supplier_order_id_fkey"
+            columns: ["assigned_supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_document_inbox_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_document_inbox_confirmed_by_user_id_fkey"
+            columns: ["confirmed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_document_inbox_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]

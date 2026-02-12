@@ -33,9 +33,17 @@ export const handleGetSupplierOrdersForProject: ServerHandler = async (args, sup
     }
   }
 
-  type Row = { id: string; order_number: string; status: string; sent_at: string | null; suppliers: { name: string } | null }
+  type SupplierRelation = { name: string | null } | { name: string | null }[] | null
+  type Row = {
+    id: string
+    order_number: string
+    status: string
+    sent_at: string | null
+    suppliers: SupplierRelation
+  }
   const lines = (orders as Row[]).map((o) => {
-    const supplierName = o.suppliers?.name ?? '–'
+    const supplierRow = Array.isArray(o.suppliers) ? o.suppliers[0] : o.suppliers
+    const supplierName = supplierRow?.name ?? '–'
     const sent = o.sent_at ? 'versendet' : 'noch nicht versendet'
     return `id=${o.id} | ${o.order_number} | ${supplierName} | ${o.status} | ${sent}`
   })

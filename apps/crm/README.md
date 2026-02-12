@@ -211,6 +211,7 @@ kitchen-online/
 | **Nutzer** | `POST /api/users/invite`, `GET /api/users/members`, `POST /api/users/process-invite`, Permissions |
 | **PDF** | `/api/invoice/pdf`, `/api/delivery-note/pdf` |
 | **E-Mail** | `/api/email/send`, `/api/email/send-with-pdf` |
+| **Inbound-Dokumente** | `/api/inbound/email/webhook`, `/api/document-inbox`, `/api/document-inbox/[id]/confirm`, `/api/document-inbox/[id]/file` |
 | **Delivery Notes** | Upload, Analyze, Delete |
 | **Sonstiges** | Geocode, Audit-Logs, Chat/Stream (AI), Reminders, Portal Publish-Document |
 
@@ -242,6 +243,7 @@ Alle unter `app/api/customer/`; Zugriff nur mit gültigem Customer-JWT (Bearer T
 | Route | Beschreibung |
 |-------|--------------|
 | `POST /api/booking/webhook` | Cal.com BOOKING_CREATED: Lead/Kunde/Projekt/Termin anlegen, E-Mail senden. Siehe `docs/BOOKING_WEBHOOK_SETUP.md`. |
+| `GET /api/cron/inbound-documents` | Verarbeitet offene Inbound-Dokumente (AB/Lieferschein/Rechnung) mit KI-Vorzuweisung. |
 
 ---
 

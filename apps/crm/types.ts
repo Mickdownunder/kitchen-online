@@ -52,6 +52,8 @@ export interface CompanySettings {
   phone: string
   fax?: string
   email: string
+  inboundEmailAb?: string
+  inboundEmailInvoices?: string
   website?: string
 
   // Legal / Tax

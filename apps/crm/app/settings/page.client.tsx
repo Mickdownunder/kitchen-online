@@ -32,6 +32,45 @@ type TabType = 'company' | 'bank' | 'suppliers' | 'employees' | 'invoice' | 'agb
 
 type RoleKey = 'geschaeftsfuehrer' | 'administration' | 'buchhaltung' | 'verkaeufer' | 'monteur'
 
+function toError(err: unknown): Error {
+  if (err instanceof Error) {
+    return err
+  }
+
+  if (err && typeof err === 'object') {
+    const candidate = err as {
+      message?: unknown
+      details?: unknown
+      hint?: unknown
+      code?: unknown
+      error?: unknown
+    }
+
+    const parts: string[] = []
+    if (typeof candidate.message === 'string' && candidate.message.trim().length > 0) {
+      parts.push(candidate.message.trim())
+    }
+    if (typeof candidate.details === 'string' && candidate.details.trim().length > 0) {
+      parts.push(candidate.details.trim())
+    }
+    if (typeof candidate.hint === 'string' && candidate.hint.trim().length > 0) {
+      parts.push(`Hinweis: ${candidate.hint.trim()}`)
+    }
+    if (typeof candidate.code === 'string' && candidate.code.trim().length > 0) {
+      parts.push(`Code: ${candidate.code.trim()}`)
+    }
+    if (typeof candidate.error === 'string' && candidate.error.trim().length > 0) {
+      parts.push(candidate.error.trim())
+    }
+
+    if (parts.length > 0) {
+      return new Error(parts.join(' | '))
+    }
+  }
+
+  return new Error('Unbekannter Fehler')
+}
+
 export default function SettingsPageClient() {
   const { hasPermission } = useAuth()
   const { success, error } = useToast()
@@ -92,7 +131,8 @@ export default function SettingsPageClient() {
       await saveCompany()
       success('Firmendaten erfolgreich gespeichert')
     } catch (err) {
-      logger.error('Error saving company', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      const saveError = toError(err)
+      logger.error('Error saving company', { component: 'SettingsPageClient' }, saveError)
       error('Fehler beim Speichern der Firmendaten')
     }
   }
@@ -102,7 +142,8 @@ export default function SettingsPageClient() {
       await saveBank()
       success('Bankverbindung erfolgreich gespeichert')
     } catch (err) {
-      logger.error('Error saving bank', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      const saveError = toError(err)
+      logger.error('Error saving bank', { component: 'SettingsPageClient' }, saveError)
       error('Fehler beim Speichern der Bankverbindung')
     }
   }
@@ -113,7 +154,8 @@ export default function SettingsPageClient() {
       await removeBank(id)
       success('Bankverbindung erfolgreich gelöscht')
     } catch (err) {
-      logger.error('Error deleting bank', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      const deleteError = toError(err)
+      logger.error('Error deleting bank', { component: 'SettingsPageClient' }, deleteError)
       error('Fehler beim Löschen der Bankverbindung')
     }
   }
@@ -123,7 +165,8 @@ export default function SettingsPageClient() {
       await saveEmployeeEntry()
       success('Mitarbeiter erfolgreich gespeichert')
     } catch (err) {
-      logger.error('Error saving employee', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      const saveError = toError(err)
+      logger.error('Error saving employee', { component: 'SettingsPageClient' }, saveError)
       error('Fehler beim Speichern des Mitarbeiters')
     }
   }
@@ -134,7 +177,8 @@ export default function SettingsPageClient() {
       await removeEmployee(id)
       success('Mitarbeiter erfolgreich gelöscht')
     } catch (err) {
-      logger.error('Error deleting employee', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      const deleteError = toError(err)
+      logger.error('Error deleting employee', { component: 'SettingsPageClient' }, deleteError)
       error('Fehler beim Löschen des Mitarbeiters')
     }
   }
@@ -144,7 +188,8 @@ export default function SettingsPageClient() {
       await saveSupplierEntry()
       success('Lieferant erfolgreich gespeichert')
     } catch (err) {
-      logger.error('Error saving supplier', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      const saveError = toError(err)
+      logger.error('Error saving supplier', { component: 'SettingsPageClient' }, saveError)
       error('Fehler beim Speichern des Lieferanten')
     }
   }
@@ -155,7 +200,8 @@ export default function SettingsPageClient() {
       await removeSupplier(id)
       success('Lieferant erfolgreich gelöscht')
     } catch (err) {
-      logger.error('Error deleting supplier', { component: 'SettingsPageClient' }, err instanceof Error ? err : new Error(String(err)))
+      const deleteError = toError(err)
+      logger.error('Error deleting supplier', { component: 'SettingsPageClient' }, deleteError)
       error('Fehler beim Löschen des Lieferanten')
     }
   }

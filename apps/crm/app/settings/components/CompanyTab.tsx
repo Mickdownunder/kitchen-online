@@ -215,6 +215,43 @@ export function CompanyTab({
             />
           </div>
 
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                AB-Eingangsadresse
+              </label>
+              <input
+                type="email"
+                value={companySettings.inboundEmailAb || ''}
+                onChange={e =>
+                  setCompanySettings(prev => ({ ...prev, inboundEmailAb: e.target.value }))
+                }
+                className="w-full rounded-xl bg-slate-50 px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-yellow-500"
+                placeholder="ab@baleah.at"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Lieferanten senden Auftragsbestätigungen an diese Adresse.
+              </p>
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                Rechnungs-Eingangsadresse
+              </label>
+              <input
+                type="email"
+                value={companySettings.inboundEmailInvoices || ''}
+                onChange={e =>
+                  setCompanySettings(prev => ({ ...prev, inboundEmailInvoices: e.target.value }))
+                }
+                className="w-full rounded-xl bg-slate-50 px-4 py-3 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-yellow-500"
+                placeholder="rechnungen@baleah.at"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Lieferanten senden Eingangsrechnungen an diese Adresse.
+              </p>
+            </div>
+          </div>
+
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">
               <Globe className="mr-1 inline h-3 w-3" />

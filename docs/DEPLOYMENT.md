@@ -22,6 +22,9 @@
 | | BOOKING_EMAIL_FROM |
 | | CRON_SECRET |
 | | CALCOM_WEBHOOK_SECRET |
+| | INBOUND_EMAIL_WEBHOOK_SECRET |
+| | RESEND_WEBHOOK_SECRET |
+| | INBOUND_DEFAULT_USER_ID |
 
 ## Cron Jobs
 
@@ -29,10 +32,16 @@ Vercel Cron (vercel.json):
 
 ```json
 {
-  "crons": [{
-    "path": "/api/cron/appointment-reminders",
-    "schedule": "0 * * * *"
-  }]
+  "crons": [
+    {
+      "path": "/api/cron/appointment-reminders",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/inbound-documents",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }
 ```
 
@@ -44,6 +53,9 @@ Vercel Cron (vercel.json):
 
 - **Cal.com:** `POST /api/booking/webhook` auf Production-URL zeigen
 - Cal.com: Settings → Developer → Webhooks → Subscriber URL
+- **Resend Inbound:** Webhook auf
+  `POST /api/inbound/email/webhook?secret=<INBOUND_EMAIL_WEBHOOK_SECRET>` setzen
+  (alternativ Header `x-inbound-email-secret`).
 
 ## Supabase
 

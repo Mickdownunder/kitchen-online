@@ -22,6 +22,17 @@ interface UseAISpeechResult {
   toggleTTS: () => void
 }
 
+/** Wählt eine weibliche deutsche TTS-Stimme (Chrome: "Google deutsch Female", Safari: Anna/Helena, etc.) */
+function pickGermanFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const deVoices = voices.filter(v => v.lang === 'de-DE' || v.lang.startsWith('de-'))
+  const female = deVoices.find(
+    v =>
+      /female|frau|weiblich|anna|helena|karen|samantha|yuri/i.test(v.name) ||
+      (v.name.toLowerCase().includes('google') && v.name.toLowerCase().includes('female'))
+  )
+  return female ?? deVoices[0] ?? null
+}
+
 export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult {
   const [isListening, setIsListening] = useState(false)
   const [isSpeechSupported] = useState(
@@ -36,6 +47,9 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const userRequestedStopRef = useRef(false)
+  const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
+  const restartTimeoutRef = useRef<number | null>(null)
 
   // Store callbacks in refs so the useEffect doesn't re-run on every render.
   // Without this, the inline lambdas passed as options cause the effect to
@@ -92,8 +106,9 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         logger.error('[Speech] Recognition error', { component: 'useAISpeech', error: event.error })
-        setIsListening(false)
         setInterimTranscript('')
+        if (event.error === 'aborted') return
+        setIsListening(false)
 
         let errorMessage = 'Spracherkennungsfehler'
         switch (event.error) {
@@ -111,8 +126,6 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
           case 'network':
             errorMessage = 'Netzwerkfehler bei der Spracherkennung.'
             break
-          case 'aborted':
-            return
           default:
             errorMessage = `Spracherkennungsfehler: ${event.error}`
         }
@@ -123,8 +136,26 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
 
       recognition.onend = () => {
         logger.debug('[Speech] Recognition ended', { component: 'useAISpeech' })
-        setIsListening(false)
+        if (userRequestedStopRef.current) {
+          userRequestedStopRef.current = false
+          setIsListening(false)
+          setInterimTranscript('')
+          return
+        }
         setInterimTranscript('')
+        const r = recognitionRef.current
+        if (r) {
+          restartTimeoutRef.current = window.setTimeout(() => {
+            restartTimeoutRef.current = null
+            try {
+              r.start()
+            } catch {
+              setIsListening(false)
+            }
+          }, 300)
+        } else {
+          setIsListening(false)
+        }
       }
 
       recognitionRef.current = recognition
@@ -134,30 +165,39 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
 
     let ttsTimer: number | null = null
 
-    // Check TTS support and load preference
+    if ('speechSynthesis' in window) {
+      const loadVoice = () => {
+        const voices = window.speechSynthesis.getVoices()
+        preferredVoiceRef.current = pickGermanFemaleVoice(voices)
+      }
+      window.speechSynthesis.onvoiceschanged = loadVoice
+      loadVoice()
+    }
+
     if ('speechSynthesis' in window && typeof window.localStorage?.getItem === 'function') {
       const savedTTS = window.localStorage.getItem('ai_tts_enabled')
-      if (savedTTS === 'true') {
-        ttsTimer = window.setTimeout(() => {
-          setIsTTSEnabled(true)
-        }, 0)
+      const enableTTS = savedTTS === 'true' || savedTTS === null
+      if (enableTTS) {
+        ttsTimer = window.setTimeout(() => setIsTTSEnabled(true), 0)
+        if (savedTTS === null) window.localStorage.setItem('ai_tts_enabled', 'true')
       }
     }
 
     return () => {
-      if (ttsTimer !== null) {
-        window.clearTimeout(ttsTimer)
+      if (ttsTimer !== null) window.clearTimeout(ttsTimer)
+      if (restartTimeoutRef.current) {
+        window.clearTimeout(restartTimeoutRef.current)
+        restartTimeoutRef.current = null
       }
+      userRequestedStopRef.current = true
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop()
         } catch {
-          // Ignore errors when stopping
+          // ignore
         }
       }
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel()
-      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel()
     }
   }, []) // stable — callbacks accessed via refs
 
@@ -168,29 +208,20 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
     }
 
     if (isListening) {
+      userRequestedStopRef.current = true
+      if (restartTimeoutRef.current) {
+        window.clearTimeout(restartTimeoutRef.current)
+        restartTimeoutRef.current = null
+      }
       try {
         recognitionRef.current.stop()
-        setIsListening(false)
-        setInterimTranscript('')
       } catch (error) {
         logger.error('[Speech] Error stopping recognition', { component: 'useAISpeech' }, error as Error)
-        setIsListening(false)
       }
+      setIsListening(false)
+      setInterimTranscript('')
     } else {
       try {
-        if (navigator.permissions) {
-          const permissionStatus = await navigator.permissions.query({
-            name: 'microphone' as PermissionName,
-          })
-          if (permissionStatus.state === 'denied') {
-            setSpeechError(
-              'Mikrofon-Zugriff verweigert. Bitte erlaube den Zugriff in den Browser-Einstellungen.'
-            )
-            setTimeout(() => setSpeechError(null), 5000)
-            return
-          }
-        }
-
         recognitionRef.current.start()
         setIsListening(true)
         setSpeechError(null)
@@ -198,14 +229,13 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
         logger.error('[Speech] Error starting recognition', { component: 'useAISpeech' }, error as Error)
         setIsListening(false)
         const err = error as { name?: string; message?: string }
-
         if (err.name === 'NotAllowedError' || err.message?.includes('not-allowed')) {
           setSpeechError(
             'Mikrofon-Zugriff verweigert. Bitte erlaube den Zugriff in den Browser-Einstellungen.'
           )
         } else {
           setSpeechError(
-            `Fehler beim Starten der Spracherkennung: ${err.message || 'Unbekannter Fehler'}`
+            `Fehler beim Starten: ${err.message || 'Unbekannter Fehler'}. Nutze Chrome/Edge für beste Unterstützung.`
           )
         }
         setTimeout(() => setSpeechError(null), 5000)
@@ -224,6 +254,9 @@ export function useAISpeech(options: UseAISpeechOptions = {}): UseAISpeechResult
       utterance.rate = 1.0
       utterance.pitch = 1.0
       utterance.volume = 0.8
+      if (preferredVoiceRef.current) {
+        utterance.voice = preferredVoiceRef.current
+      }
 
       utterance.onstart = () => setIsSpeaking(true)
       utterance.onend = () => {
