@@ -36,6 +36,7 @@ function makeInvoiceItemRow(overrides: Partial<Row<'invoice_items'>> = {}): Row<
     manufacturer_support_phone: null,
     manufacturer_support_email: null,
     created_at: null,
+    updated_at: null,
     ...overrides,
   }
 }

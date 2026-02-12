@@ -1,3 +1,4 @@
+import type { InvoiceItem } from '@/types'
 import { calculateInvoiceViewAmounts, calculateProjectGrossTotal } from '@/lib/utils/invoiceViewAmounts'
 
 describe('invoiceViewAmounts', () => {
@@ -6,7 +7,7 @@ describe('invoiceViewAmounts', () => {
       [
         { grossTotal: 1200, netTotal: 1000, taxAmount: 200 },
         { netTotal: 500, taxAmount: 100 },
-      ],
+      ] as InvoiceItem[],
       9999,
     )
 
@@ -20,7 +21,7 @@ describe('invoiceViewAmounts', () => {
 
   it('calculates final invoice view amounts with partial payments', () => {
     const amounts = calculateInvoiceViewAmounts({
-      projectItems: [{ grossTotal: 6000 }, { grossTotal: 4000 }],
+      projectItems: [{ grossTotal: 6000 }, { grossTotal: 4000 }] as InvoiceItem[],
       fallbackGrossAmount: 10000,
       totalPartialPayments: 4000,
       taxRate: 20,

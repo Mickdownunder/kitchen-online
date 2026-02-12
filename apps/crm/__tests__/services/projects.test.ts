@@ -21,6 +21,8 @@ jest.mock('@/lib/utils/auditLogger', () => ({
   audit: { projectCreated: jest.fn(), projectDeleted: jest.fn(), projectUpdated: jest.fn() },
 }))
 
+import type { InvoiceItem } from '@/types'
+import { ProjectStatus } from '@/types'
 import { getProject, getProjects, createProject, updateProject, deleteProject } from '@/lib/supabase/services/projects'
 import { supabase } from './__mocks__/supabase'
 import { getCurrentUser } from '@/lib/supabase/services/auth'
@@ -147,7 +149,7 @@ describe('createProject', () => {
     const result = await createProject({
       customerName: 'Test',
       orderNumber: 'K-2026-0001',
-      status: 'Planung',
+      status: ProjectStatus.PLANNING,
       items: [],
       totalAmount: 0,
       netAmount: 0,
@@ -183,7 +185,7 @@ describe('createProject', () => {
     const result = await createProject({
       customerName: 'Neuer Kunde',
       orderNumber: 'K-2026-0002',
-      status: 'Planung',
+      status: ProjectStatus.PLANNING,
       items: [],
       totalAmount: 0,
       netAmount: 0,
@@ -221,8 +223,8 @@ describe('createProject', () => {
     const result = await createProject({
       customerName: 'Neuer Kunde',
       orderNumber: 'K-2026-0002',
-      status: 'Planung',
-      items: [{ description: 'Artikel 1', quantity: 1, pricePerUnit: 100 }],
+      status: ProjectStatus.PLANNING,
+      items: [{ description: 'Artikel 1', quantity: 1, pricePerUnit: 100 }] as InvoiceItem[],
       totalAmount: 100,
       netAmount: 100,
       taxAmount: 0,
@@ -250,7 +252,7 @@ describe('createProject', () => {
     const result = await createProject({
       customerName: 'Test',
       orderNumber: 'K-2026-0001',
-      status: 'Planung',
+      status: ProjectStatus.PLANNING,
       items: [],
       totalAmount: 0,
       netAmount: 0,
@@ -282,8 +284,8 @@ describe('createProject', () => {
     const result = await createProject({
       customerName: 'Test',
       orderNumber: 'K-2026-0002',
-      status: 'Planung',
-      items: [{ description: 'Artikel', quantity: 1, pricePerUnit: 10 }],
+      status: ProjectStatus.PLANNING,
+      items: [{ description: 'Artikel', quantity: 1, pricePerUnit: 10 }] as InvoiceItem[],
       totalAmount: 10,
       netAmount: 10,
       taxAmount: 0,
@@ -366,7 +368,7 @@ describe('updateProject', () => {
     })
 
     const result = await updateProject('proj-1', {
-      items: [{ description: 'Neuer Artikel', quantity: 1, pricePerUnit: 50 }],
+      items: [{ description: 'Neuer Artikel', quantity: 1, pricePerUnit: 50 }] as InvoiceItem[],
     })
 
     expect(result.ok).toBe(true)
@@ -386,7 +388,7 @@ describe('updateProject', () => {
     const result = await updateProject('proj-1', {
       items: [
         { id: existingItemId, description: 'Geändert', quantity: 2, pricePerUnit: 100 },
-      ],
+      ] as InvoiceItem[],
     })
 
     expect(result.ok).toBe(true)
@@ -406,7 +408,7 @@ describe('updateProject', () => {
     })
 
     const result = await updateProject('proj-1', {
-      items: [{ id: keptId, description: 'Behalten', quantity: 1, pricePerUnit: 50 }],
+      items: [{ id: keptId, description: 'Behalten', quantity: 1, pricePerUnit: 50 }] as InvoiceItem[],
     })
 
     expect(result.ok).toBe(true)
@@ -420,7 +422,7 @@ describe('updateProject', () => {
     mockQueryResult({ data: null, error: { message: 'update failed' } })
 
     const result = await updateProject('proj-1', {
-      items: [{ id: existingItemId, description: 'X', quantity: 1, pricePerUnit: 10 }],
+      items: [{ id: existingItemId, description: 'X', quantity: 1, pricePerUnit: 10 }] as InvoiceItem[],
     })
 
     expect(result.ok).toBe(false)

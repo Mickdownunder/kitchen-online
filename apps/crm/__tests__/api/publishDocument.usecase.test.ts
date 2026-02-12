@@ -40,7 +40,7 @@ const minimalPayload: PublishRequest = {
 const minimalRendered = {
   pdfBuffer: Buffer.from('pdf'),
   fileName: 'order_K-2026-0001.pdf',
-  portalType: 'order' as const,
+  portalType: 'KAUFVERTRAG' as const,
 }
 
 const minimalAuth: AuthorizationContext = {

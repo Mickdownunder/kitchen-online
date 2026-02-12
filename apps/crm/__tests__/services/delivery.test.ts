@@ -135,6 +135,9 @@ describe('createDeliveryNote', () => {
       supplierName: 'X',
       supplierDeliveryNoteNumber: 'LS-1',
       deliveryDate: '2026-01-01',
+      receivedDate: '2026-01-01',
+      status: 'received',
+      aiMatched: false,
     })
     expect(result.ok).toBe(false)
     if (!result.ok) {
@@ -154,6 +157,9 @@ describe('createDeliveryNote', () => {
       supplierName: 'Lieferant GmbH',
       supplierDeliveryNoteNumber: 'LS-001',
       deliveryDate: '2026-01-15',
+      receivedDate: '2026-01-15',
+      status: 'received',
+      aiMatched: false,
     })
 
     expect(result.ok).toBe(true)
@@ -176,9 +182,12 @@ describe('createDeliveryNote', () => {
       supplierName: 'Lieferant GmbH',
       supplierDeliveryNoteNumber: 'LS-001',
       deliveryDate: '2026-01-15',
+      receivedDate: '2026-01-15',
+      status: 'received',
+      aiMatched: false,
       items: [
         { description: 'Artikel 1', quantityOrdered: 2, quantityReceived: 2 },
-      ],
+      ] as import('@/types').DeliveryNoteItem[],
     })
 
     expect(result.ok).toBe(true)
@@ -199,7 +208,10 @@ describe('createDeliveryNote', () => {
       supplierName: 'X',
       supplierDeliveryNoteNumber: 'LS-1',
       deliveryDate: '2026-01-15',
-      items: [{ description: 'Item', quantityOrdered: 1, quantityReceived: 1 }],
+      receivedDate: '2026-01-15',
+      status: 'received',
+      aiMatched: false,
+      items: [{ description: 'Item', quantityOrdered: 1, quantityReceived: 1 }] as import('@/types').DeliveryNoteItem[],
     })
 
     expect(result.ok).toBe(false)
@@ -293,7 +305,7 @@ describe('getGoodsReceipts', () => {
           delivery_note_id: null,
           user_id: 'user-1',
           receipt_date: '2026-01-15',
-          receipt_type: 'delivery',
+          receipt_type: 'complete',
           status: 'received',
           notes: null,
           goods_receipt_items: [],
@@ -308,7 +320,7 @@ describe('getGoodsReceipts', () => {
     if (result.ok) {
       expect(result.data).toHaveLength(1)
       expect(result.data[0].id).toBe('gr-1')
-      expect(result.data[0].receiptType).toBe('delivery')
+      expect(result.data[0].receiptType).toBe('complete')
     }
   })
 })
@@ -319,7 +331,7 @@ describe('createGoodsReceipt', () => {
 
     const result = await createGoodsReceipt({
       projectId: 'proj-1',
-      receiptType: 'delivery',
+      receiptType: 'complete',
     })
 
     expect(result.ok).toBe(false)
@@ -337,7 +349,7 @@ describe('createGoodsReceipt', () => {
         delivery_note_id: null,
         user_id: 'user-1',
         receipt_date: '2026-01-15',
-        receipt_type: 'delivery',
+        receipt_type: 'complete',
         status: 'received',
         notes: null,
         created_at: '2026-01-15',
@@ -355,7 +367,7 @@ describe('createGoodsReceipt', () => {
           delivery_note_id: null,
           user_id: 'user-1',
           receipt_date: '2026-01-15',
-          receipt_type: 'delivery',
+          receipt_type: 'complete',
           status: 'received',
           notes: null,
           goods_receipt_items: [],
@@ -366,7 +378,7 @@ describe('createGoodsReceipt', () => {
 
     const result = await createGoodsReceipt({
       projectId: 'proj-1',
-      receiptType: 'delivery',
+      receiptType: 'complete',
     })
 
     expect(result.ok).toBe(true)
@@ -384,7 +396,7 @@ describe('createGoodsReceipt', () => {
         delivery_note_id: null,
         user_id: 'user-1',
         receipt_date: '2026-01-15',
-        receipt_type: 'delivery',
+        receipt_type: 'complete',
         status: 'pending',
         notes: null,
         created_at: '2026-01-15',
@@ -412,7 +424,7 @@ describe('createGoodsReceipt', () => {
           delivery_note_id: null,
           user_id: 'user-1',
           receipt_date: '2026-01-15',
-          receipt_type: 'delivery',
+          receipt_type: 'complete',
           status: 'received',
           notes: null,
           goods_receipt_items: [{ project_item_id: 'item-1', quantity_received: 1 }],
@@ -423,7 +435,7 @@ describe('createGoodsReceipt', () => {
 
     const result = await createGoodsReceipt({
       projectId: 'proj-1',
-      receiptType: 'delivery',
+      receiptType: 'complete',
       items: [{ projectItemId: 'item-1', quantityReceived: 1, quantityExpected: 1 }],
     })
 
@@ -442,7 +454,7 @@ describe('createGoodsReceipt', () => {
         delivery_note_id: null,
         user_id: 'user-1',
         receipt_date: '2026-01-15',
-        receipt_type: 'delivery',
+        receipt_type: 'complete',
         status: 'pending',
         notes: null,
         created_at: '2026-01-15',
@@ -455,7 +467,7 @@ describe('createGoodsReceipt', () => {
 
     const result = await createGoodsReceipt({
       projectId: 'proj-1',
-      receiptType: 'delivery',
+      receiptType: 'complete',
       items: [{ projectItemId: 'item-1', quantityReceived: 1, quantityExpected: 1 }],
     })
 
@@ -543,7 +555,9 @@ describe('createCustomerDeliveryNote', () => {
 
     const result = await createCustomerDeliveryNote({
       projectId: 'proj-1',
+      deliveryNoteNumber: 'LS-2026-0001',
       deliveryDate: '2026-01-15',
+      status: 'draft',
     })
 
     expect(result.ok).toBe(false)
@@ -570,6 +584,7 @@ describe('createCustomerDeliveryNote', () => {
       projectId: 'proj-1',
       deliveryNoteNumber: 'LS-2026-0001',
       deliveryDate: '2026-01-15',
+      status: 'draft',
     })
 
     expect(result.ok).toBe(true)
@@ -587,6 +602,7 @@ describe('createCustomerDeliveryNote', () => {
       projectId: 'proj-1',
       deliveryNoteNumber: 'LS-1',
       deliveryDate: '2026-01-15',
+      status: 'draft',
     })
 
     expect(result.ok).toBe(false)
@@ -604,6 +620,7 @@ describe('createCustomerDeliveryNote', () => {
       projectId: 'proj-1',
       deliveryNoteNumber: 'LS-1',
       deliveryDate: '2026-01-15',
+      status: 'draft',
     })
 
     expect(result.ok).toBe(false)
@@ -625,6 +642,7 @@ describe('createCustomerDeliveryNote', () => {
       projectId: 'proj-1',
       deliveryNoteNumber: 'LS-1',
       deliveryDate: '2026-01-15',
+      status: 'draft',
     })
 
     expect(result.ok).toBe(false)

@@ -107,7 +107,7 @@ describe('invoices mappers', () => {
       amount: 99.999,
       netAmount: 83.333,
       taxAmount: 16.666,
-      reminders: [{ date: '2026-02-10', type: 'email', sentAt: '2026-02-10T00:00:00.000Z' }],
+      reminders: [{ id: 'rem-1', type: 'first', sentAt: '2026-02-10T00:00:00.000Z', emailSent: false, pdfGenerated: false }],
       description: 'Neu',
     })
 

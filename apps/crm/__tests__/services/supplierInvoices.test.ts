@@ -351,12 +351,12 @@ describe('markSupplierInvoicePaid', () => {
         ...SUPPLIER_INVOICE_ROW,
         is_paid: true,
         paid_date: '2026-02-01',
-        payment_method: 'bank_transfer',
+        payment_method: 'bank',
       },
       error: null,
     })
 
-    const result = await markSupplierInvoicePaid('si-1', '2026-02-01', 'bank_transfer')
+    const result = await markSupplierInvoicePaid('si-1', '2026-02-01', 'bank')
 
     expect(result.ok).toBe(true)
     if (result.ok) {

@@ -637,6 +637,60 @@ export const agentTools: FunctionDeclaration[] = [
       required: ['appointmentType', 'date'],
     },
   },
+  {
+    name: 'updateAppointment',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Ändert einen bestehenden Kalender-Termin (Planung/Beratung). Die appointmentId findest du in den KALENDER-TERMINEN im Kontext (Format: id=...). Nur Planungstermine aus dem Kalender können geändert werden; Projekt-Termine (Aufmaß, Montage, Lieferung) gehören zum Projekt und werden dort gepflegt.',
+      properties: {
+        appointmentId: {
+          type: Type.STRING,
+          description: 'ID des Termins (aus user_calendar_appointments, z.B. id=xxx)',
+        },
+        date: { type: Type.STRING, description: 'Neues Datum YYYY-MM-DD (optional)' },
+        time: { type: Type.STRING, description: 'Neue Uhrzeit HH:MM (optional)' },
+        customerName: { type: Type.STRING, description: 'Neuer Kundenname (optional)' },
+        type: { type: Type.STRING, description: 'Neuer Typ z.B. Consultation (optional)' },
+        notes: { type: Type.STRING, description: 'Neue oder ergänzte Notizen (optional)' },
+      },
+      required: ['appointmentId'],
+    },
+  },
+  {
+    name: 'deleteAppointment',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Löscht einen Kalender-Termin (Planung/Beratung). Nur für Absagen oder Dubletten. Die appointmentId findest du in den KALENDER-TERMINEN im Kontext (id=...). Projekt-Termine (Aufmaß, Montage, Lieferung) werden hier nicht gelöscht.',
+      properties: {
+        appointmentId: {
+          type: Type.STRING,
+          description: 'ID des Termins (aus user_calendar_appointments, z.B. id=xxx)',
+        },
+      },
+      required: ['appointmentId'],
+    },
+  },
+  {
+    name: 'getCalendarView',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Liefert die Termine für einen Tag oder eine Woche (nur Planung/Beratung aus dem Kalender). So kannst du z.B. prüfen ob "morgen Vormittag frei" ist.',
+      properties: {
+        date: {
+          type: Type.STRING,
+          description: 'Datum YYYY-MM-DD (Starttag)',
+        },
+        range: {
+          type: Type.STRING,
+          description: 'Optional: "day" (nur dieser Tag) oder "week" (diese Woche). Standard: day',
+        },
+      },
+      required: ['date'],
+    },
+  },
 
   // ==========================================
   // E-MAIL-VERSAND
@@ -709,6 +763,102 @@ export const agentTools: FunctionDeclaration[] = [
         },
       },
       required: ['supplierOrderId'],
+    },
+  },
+  {
+    name: 'confirmOrder',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Markiert die Auftragsbestätigung (AB) eines Lieferanten als eingegangen. Setzt Status der Bestellung auf ab_received.',
+      properties: {
+        supplierOrderId: {
+          type: Type.STRING,
+          description: 'ID der Lieferanten-Bestellung (supplier_orders)',
+        },
+        abNumber: {
+          type: Type.STRING,
+          description: 'AB-Nummer / Bestätigungsnummer vom Lieferanten',
+        },
+        confirmedDeliveryDate: {
+          type: Type.STRING,
+          description: 'Optional: bestätigtes Lieferdatum YYYY-MM-DD',
+        },
+        notes: { type: Type.STRING, description: 'Optional: Notizen zur AB' },
+      },
+      required: ['supplierOrderId', 'abNumber'],
+    },
+  },
+  {
+    name: 'getLeadTimes',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Liefert die hinterlegten Lieferzeiten (in Wochen) pro Lieferant. Nützlich um zu prüfen ob ein Montagetermin realistisch ist.',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'setLeadTime',
+    parameters: {
+      type: Type.OBJECT,
+      description: 'Speichert die Lieferzeit (in Wochen) für einen Lieferanten.',
+      properties: {
+        supplierId: {
+          type: Type.STRING,
+          description: 'ID des Lieferanten (aus listSuppliers oder Kontext)',
+        },
+        leadTimeWeeks: {
+          type: Type.NUMBER,
+          description: 'Lieferzeit in Wochen (z.B. 8 für 8 Wochen)',
+        },
+      },
+      required: ['supplierId', 'leadTimeWeeks'],
+    },
+  },
+  {
+    name: 'analyzeKitchenPlan',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Gibt eine Anleitung für die Küchenplan-Analyse (PDF von DAN, Blanco, Bosch etc.). Die eigentliche Extraktion erfolgt über Dokumentenanalyse; nutze diese Funktion wenn der Nutzer nach Küchenplan-Auswertung fragt.',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'getFinancialReport',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Liefert eine Finanzübersicht: Umsatz (Rechnungen) und offene Anzahlungen für einen Monat oder das aktuelle Jahr.',
+      properties: {
+        year: {
+          type: Type.NUMBER,
+          description: 'Optional: Jahr (z.B. 2026). Ohne Angabe: aktuelles Jahr',
+        },
+        month: {
+          type: Type.NUMBER,
+          description: 'Optional: Monat 1–12. Ohne Angabe: Gesamtjahr oder aktueller Monat',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'automaticPaymentMatch',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Versucht, nicht zugeordnete Bankbewegungen (Eingänge) mit offenen Kundenrechnungen zu matchen (exakter Betrag). Setzt gefundene Rechnungen auf bezahlt und verknüpft die Buchung.',
+      properties: {
+        dryRun: {
+          type: Type.BOOLEAN,
+          description: 'Optional: true = nur Vorschläge anzeigen, nichts buchen. Standard: false',
+        },
+      },
+      required: [],
     },
   },
 

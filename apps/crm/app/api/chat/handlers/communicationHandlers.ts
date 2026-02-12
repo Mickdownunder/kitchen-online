@@ -178,6 +178,113 @@ export const handleScheduleAppointment: ServerHandler = async (args, supabase, u
   }
 }
 
+export const handleUpdateAppointment: ServerHandler = async (args, supabase) => {
+  let appointmentId = (args.appointmentId as string)?.trim() ?? ''
+  if (appointmentId.startsWith('id=')) appointmentId = appointmentId.slice(3).trim()
+  if (!appointmentId) return { result: '❌ appointmentId fehlt.' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updates: Record<string, any> = {}
+  if (args.date !== undefined && args.date !== null) updates.date = String(args.date)
+  if (args.time !== undefined && args.time !== null) updates.time = String(args.time)
+  if (args.customerName !== undefined && args.customerName !== null)
+    updates.customer_name = String(args.customerName)
+  if (args.type !== undefined && args.type !== null) updates.type = String(args.type)
+  if (args.notes !== undefined && args.notes !== null) updates.notes = String(args.notes)
+
+  if (Object.keys(updates).length === 0) {
+    return { result: '❌ Mindestens ein Feld angeben (date, time, customerName, type oder notes).' }
+  }
+
+  const { data, error } = await supabase
+    .from('planning_appointments')
+    .update(updates)
+    .eq('id', appointmentId)
+    .select('date, time, customer_name, type')
+    .single()
+
+  if (error) {
+    if ((error as { code?: string }).code === 'PGRST116') {
+      return { result: '❌ Termin nicht gefunden oder keine Berechtigung.' }
+    }
+    return { result: `❌ Fehler: ${error.message}` }
+  }
+
+  const d = data as { date: string; time: string | null; customer_name: string; type: string }
+  const timeStr = d.time ? ` um ${d.time}` : ''
+  return {
+    result: `✅ Termin aktualisiert: ${d.customer_name} am ${d.date}${timeStr} (${d.type}).`,
+  }
+}
+
+export const handleDeleteAppointment: ServerHandler = async (args, supabase) => {
+  let appointmentId = (args.appointmentId as string)?.trim() ?? ''
+  if (appointmentId.startsWith('id=')) appointmentId = appointmentId.slice(3).trim()
+  if (!appointmentId) return { result: '❌ appointmentId fehlt.' }
+
+  const { error } = await supabase.from('planning_appointments').delete().eq('id', appointmentId)
+
+  if (error) {
+    if ((error as { code?: string }).code === 'PGRST116') {
+      return { result: '❌ Termin nicht gefunden oder keine Berechtigung.' }
+    }
+    return { result: `❌ Fehler: ${error.message}` }
+  }
+  return { result: '✅ Termin gelöscht.' }
+}
+
+export const handleGetCalendarView: ServerHandler = async (args, supabase) => {
+  const dateStr = (args.date as string)?.trim()
+  if (!dateStr) return { result: '❌ date (YYYY-MM-DD) fehlt.' }
+
+  const { data: companyId, error: companyError } = await supabase.rpc('get_current_company_id')
+  if (companyError || !companyId) {
+    return { result: '❌ Keine Firma zugeordnet.' }
+  }
+
+  const range = ((args.range as string) || 'day').toLowerCase()
+  const isWeek = range === 'week'
+  const startDate = dateStr
+  let endDate = dateStr
+  if (isWeek) {
+    const d = new Date(dateStr + 'T12:00:00Z')
+    d.setUTCDate(d.getUTCDate() + 6)
+    endDate = d.toISOString().slice(0, 10)
+  }
+
+  let query = supabase
+    .from('planning_appointments')
+    .select('id, customer_name, date, time, type, notes')
+    .eq('company_id', companyId)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: true })
+    .order('time', { ascending: true })
+
+  const { data: rows, error } = await query
+
+  if (error) return { result: `❌ Fehler: ${error.message}` }
+  if (!rows?.length) {
+    return { result: `Keine Termine für ${isWeek ? `${startDate} bis ${endDate}` : startDate}.` }
+  }
+
+  const lines = rows.map(
+    (r: { id: string; customer_name: string; date: string; time: string | null; type: string; notes: string | null }) => {
+      const time = r.time ? ` ${r.time}` : ''
+      const notes = r.notes ? ` - ${r.notes.slice(0, 60)}` : ''
+      return `id=${r.id} | ${r.date}${time} | ${r.type} | ${r.customer_name}${notes}`
+    },
+  )
+  return { result: lines.join('\n') }
+}
+
+const KITCHEN_PLAN_ANALYSIS_INSTRUCTION =
+  'Für die Küchenplan-Analyse (DAN, Blanco, Bosch etc.): Dokument unter **Dokumentenanalyse** hochladen und den Prompt verwenden: "Küchenplan: Extrahiere alle Artikel mit Artikelnummer, Menge, Einzelpreis und Gesamtpreis in einer Liste." Die Liste kannst du dann zur Freigabe nutzen oder in ein Projekt übernehmen.'
+
+export const handleAnalyzeKitchenPlan: ServerHandler = async () => {
+  return { result: KITCHEN_PLAN_ANALYSIS_INSTRUCTION }
+}
+
 export const handleSendEmail: ServerHandler = async (args, supabase, userId) => {
   const emailTo = args.to as string
   const emailSubject = args.subject as string

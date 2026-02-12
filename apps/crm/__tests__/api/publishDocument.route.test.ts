@@ -49,7 +49,7 @@ describe('POST /api/portal/publish-document', () => {
 
   it('returns 401 when authorization fails', async () => {
     const payload = {
-      documentType: 'order',
+      documentType: 'order' as const,
       projectId: 'proj-1',
       project: { id: 'proj-1', customerName: 'Test', address: '', orderNumber: 'K-1', items: [] },
     }
@@ -66,7 +66,7 @@ describe('POST /api/portal/publish-document', () => {
 
   it('returns 200 when authorized and publish succeeds', async () => {
     const payload = {
-      documentType: 'order',
+      documentType: 'order' as const,
       projectId: 'proj-1',
       project: { id: 'proj-1', customerName: 'Test', address: '', orderNumber: 'K-1', items: [] },
     }

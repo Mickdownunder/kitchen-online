@@ -21,6 +21,8 @@ export {
   handleCreateFinalInvoice,
   handleUpdateInvoiceNumber,
   handleConfigurePaymentSchedule,
+  handleGetFinancialReport,
+  handleAutomaticPaymentMatch,
 } from './financeHandlers'
 
 export {
@@ -45,6 +47,16 @@ export {
 export {
   handleArchiveDocument,
   handleScheduleAppointment,
+  handleUpdateAppointment,
+  handleDeleteAppointment,
+  handleGetCalendarView,
+  handleAnalyzeKitchenPlan,
   handleSendEmail,
   handleSendReminder,
 } from './communicationHandlers'
+
+export {
+  handleConfirmOrder,
+  handleGetLeadTimes,
+  handleSetLeadTime,
+} from './orderHandlers'

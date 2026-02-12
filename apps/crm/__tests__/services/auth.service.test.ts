@@ -108,7 +108,7 @@ describe('auth service', () => {
 
     it('throws on auth error', async () => {
       const err = new Error('Invalid credentials')
-      mockSignInResult({ data: null, error: err })
+      mockSignInResult({ data: { session: null, user: null }, error: err })
       await expect(signIn('u@test.com', 'wrong')).rejects.toThrow('Invalid credentials')
     })
 

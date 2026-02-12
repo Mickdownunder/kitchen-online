@@ -57,7 +57,7 @@ const validEnvelope = {
 
 beforeEach(() => {
   mockProcessBookingWebhook.mockReset()
-  process.env.NODE_ENV = 'test'
+  Object.defineProperty(process.env, 'NODE_ENV', { value: 'test', writable: true })
 })
 
 describe('POST /api/booking/webhook', () => {
@@ -135,7 +135,7 @@ describe('POST /api/booking/webhook', () => {
   it('returns 401 in production when signature invalid', async () => {
     const body = JSON.stringify(validEnvelope)
     const request = createPostRequest(body)
-    process.env.NODE_ENV = 'production'
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true })
     const verifyMock = jest.requireMock('@/app/api/booking/webhook/helpers').verifyCalcomSignature
     verifyMock.mockReturnValueOnce(false)
 

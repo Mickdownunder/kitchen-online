@@ -264,7 +264,7 @@ describe('upsertUserPermission', () => {
       upsertUserPermission(
         'comp-1',
         '550e8400-e29b-41d4-a716-446655440000',
-        'menu_tickets',
+        'menu_tickets' as import('@/lib/supabase/services/permissions').PermissionCode,
         true
       )
     ).resolves.toBeUndefined()

@@ -48,6 +48,8 @@
 | `/api/delivery-note/pdf` | POST | Lieferschein als PDF |
 | `/api/reminders/send` | POST | Mahnung senden |
 | `/api/geocode` | GET | Adress-Autocomplete |
+| `/api/analyze-document` | POST | Dokument (PDF) analysieren (Prompt + Base64) |
+| `/api/analyze-kitchen-plan` | POST | Küchenplan-PDF (DAN, Blanco, Bosch) → strukturierte Artikel-Liste (Base64) |
 
 ## Customer-API (Kundenportal)
 

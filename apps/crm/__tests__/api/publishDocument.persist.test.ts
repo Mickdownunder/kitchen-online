@@ -55,7 +55,7 @@ const minimalRequest: PublishRequest = {
 const minimalRendered: RenderedDocument = {
   pdfBuffer: Buffer.from('pdf'),
   fileName: 'order_K-2026-0001.pdf',
-  portalType: 'order',
+  portalType: 'KAUFVERTRAG',
 }
 
 function createContext(serviceClient: ReturnType<typeof createMockServiceClient>): AuthorizationContext {

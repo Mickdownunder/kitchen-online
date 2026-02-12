@@ -33,7 +33,7 @@ const APT_ROW = {
   date: '2026-02-15',
   time: '09:00',
   title: 'Montage',
-  type: 'installation',
+  type: 'Installation',
   customer_name: 'Max Mustermann',
   project_id: 'proj-1',
   assigned_user_id: 'emp-1',
@@ -96,7 +96,7 @@ describe('createAppointment', () => {
       createAppointment({
         customerName: 'Test',
         date: '2026-02-15',
-        type: 'installation',
+        type: 'Installation',
       })
     ).rejects.toThrow('Not authenticated')
   })
@@ -109,7 +109,7 @@ describe('createAppointment', () => {
       createAppointment({
         customerName: 'Test',
         date: '2026-02-15',
-        type: 'installation',
+        type: 'Installation',
       })
     ).rejects.toThrow('No company found')
   })
@@ -122,7 +122,7 @@ describe('createAppointment', () => {
     const result = await createAppointment({
       customerName: 'Neuer Kunde',
       date: '2026-02-16',
-      type: 'installation',
+      type: 'Installation',
     })
 
     expect(result.id).toBe('apt-new')

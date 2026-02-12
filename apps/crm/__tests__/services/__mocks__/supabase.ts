@@ -38,7 +38,7 @@ export function resetMock(): void {
   _resetPasswordResult = { data: null, error: null }
   _updateUserResult = { data: null, error: null }
   _signUpResult = { data: null, error: null }
-  _signInResult = { data: null, error: null }
+  _signInResult = { data: { session: null, user: null }, error: null }
   _signOutResult = { error: null }
 }
 

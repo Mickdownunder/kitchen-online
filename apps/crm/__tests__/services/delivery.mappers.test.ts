@@ -54,7 +54,7 @@ describe('delivery mappers', () => {
 
     expect(note.id).toBe('dn-1')
     expect(note.items).toHaveLength(1)
-    expect(note.items[0].description).toBe('Schrank')
+    expect(note.items?.[0].description).toBe('Schrank')
   })
 
   it('maps goods receipt and items', () => {

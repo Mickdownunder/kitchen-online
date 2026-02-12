@@ -36,6 +36,8 @@ import {
   handleCreateFinalInvoice,
   handleUpdateInvoiceNumber,
   handleConfigurePaymentSchedule,
+  handleGetFinancialReport,
+  handleAutomaticPaymentMatch,
 } from './handlers/financeHandlers'
 
 import {
@@ -60,10 +62,19 @@ import {
 import {
   handleArchiveDocument,
   handleScheduleAppointment,
+  handleUpdateAppointment,
+  handleDeleteAppointment,
+  handleGetCalendarView,
+  handleAnalyzeKitchenPlan,
   handleSendEmail,
   handleSendSupplierOrderEmail,
   handleSendReminder,
 } from './handlers/communicationHandlers'
+import {
+  handleConfirmOrder,
+  handleGetLeadTimes,
+  handleSetLeadTime,
+} from './handlers/orderHandlers'
 
 // ============================================
 // Types
@@ -320,8 +331,17 @@ const handlerRegistry: Record<string, ServerHandler> = {
   updateCompanySettings: handleUpdateCompanySettings,
   archiveDocument: handleArchiveDocument,
   scheduleAppointment: handleScheduleAppointment,
+  updateAppointment: handleUpdateAppointment,
+  deleteAppointment: handleDeleteAppointment,
+  getCalendarView: handleGetCalendarView,
   sendEmail: handleSendEmail,
   sendSupplierOrderEmail: handleSendSupplierOrderEmail,
+  confirmOrder: handleConfirmOrder,
+  getLeadTimes: handleGetLeadTimes,
+  setLeadTime: handleSetLeadTime,
+  analyzeKitchenPlan: handleAnalyzeKitchenPlan,
+  getFinancialReport: handleGetFinancialReport,
+  automaticPaymentMatch: handleAutomaticPaymentMatch,
   executeWorkflow: handleExecuteWorkflow,
   findProjectsByCriteria: handleFindProjectsByCriteria,
 }

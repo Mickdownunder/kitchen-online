@@ -13,7 +13,7 @@ async function loadAppointmentsSummary(
 ): Promise<string> {
   const { data: planningAppointments } = await supabase
     .from('planning_appointments')
-    .select('customer_name, date, time, type, notes')
+    .select('id, customer_name, date, time, type, notes')
     .eq('company_id', companyId)
     .order('date', { ascending: true })
     .order('time', { ascending: true })
@@ -24,6 +24,7 @@ async function loadAppointmentsSummary(
 
   const lines = planningAppointments.map(
     (appointment: {
+      id: string
       customer_name: string
       date: string
       time: string | null
@@ -34,7 +35,7 @@ async function loadAppointmentsSummary(
       const notes = appointment.notes
         ? ` - ${appointment.notes.slice(0, 80)}${appointment.notes.length > 80 ? '...' : ''}`
         : ''
-      return `${appointment.date}${time} | ${appointment.type} | ${appointment.customer_name}${notes}`
+      return `id=${appointment.id} | ${appointment.date}${time} | ${appointment.type} | ${appointment.customer_name}${notes}`
     },
   )
 
