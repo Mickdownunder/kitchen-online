@@ -66,6 +66,10 @@ export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
         )}
       </div>
 
+      <p className="mt-3 text-xs text-amber-400/90">
+        Bitte auf „Senden“ klicken – die E-Mail geht erst nach deiner Bestätigung raus.
+      </p>
+
       {error && (
         <p className="mt-3 text-sm text-red-400">{error}</p>
       )}

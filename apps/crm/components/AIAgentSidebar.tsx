@@ -211,6 +211,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
       let fullText = ''
       let hadFunctionCalls = false
       let lastFunctionResult = ''
+      let hadPendingEmailThisTurn = false
       let updatedProjectIds: string[] = []
 
       if (reader) {
@@ -263,6 +264,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
                 case 'pendingEmail':
                   // Human-in-the-loop: Show email confirmation
                   if (data.email) {
+                    hadPendingEmailThisTurn = true
                     setPendingEmail({
                       pending: {
                         type: 'pendingEmail',
@@ -316,6 +318,9 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
         } else {
           finalText = 'Ich bearbeite deine Anfrage...'
         }
+      }
+      if (hadPendingEmailThisTurn) {
+        finalText = `${finalText}\n\n📧 Bitte E-Mail-Versand unten mit „Senden“ bestätigen.`
       }
 
       addMessage({ role: 'model', text: finalText })
@@ -462,23 +467,25 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
       {/* Main Content */}
       {!isMinimized && (
         <>
-          <ChatMessages
-            messages={messages}
-            streamingText={streamingText}
-            isLoading={isLoading}
-            isSpeaking={isSpeaking}
-          />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <ChatMessages
+              messages={messages}
+              streamingText={streamingText}
+              isLoading={isLoading}
+              isSpeaking={isSpeaking}
+            />
 
-          {pendingEmail && (
-            <div className="space-y-4 px-8 pb-4">
-              <EmailConfirmationCard
-                pending={pendingEmail.pending}
-                functionCallId={pendingEmail.pending.functionCallId}
-                onConfirm={handleEmailConfirm}
-                onCancel={handleEmailCancel}
-              />
-            </div>
-          )}
+            {pendingEmail && (
+              <div className="sticky bottom-0 z-10 shrink-0 border-t border-amber-500/20 bg-slate-900/95 px-8 py-4 backdrop-blur-sm">
+                <EmailConfirmationCard
+                  pending={pendingEmail.pending}
+                  functionCallId={pendingEmail.pending.functionCallId}
+                  onConfirm={handleEmailConfirm}
+                  onCancel={handleEmailCancel}
+                />
+              </div>
+            )}
+          </div>
 
           <ChatInput
             input={input}
