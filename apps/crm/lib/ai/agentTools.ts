@@ -766,6 +766,21 @@ export const agentTools: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'getSupplierOrdersForProject',
+    parameters: {
+      type: Type.OBJECT,
+      description:
+        'Listet alle Lieferantenbestellungen eines Projekts (id, Bestellnummer, Lieferant, Status, ob versendet). Nutzen für "alle Bestellungen für Kunde X bestellen": zuerst findProjectsByCriteria(customerName) oder Projekt-ID, dann diese Funktion mit projectId, dann für jede gewünschte Bestellung sendSupplierOrderEmail(supplierOrderId) aufrufen.',
+      properties: {
+        projectId: {
+          type: Type.STRING,
+          description: 'Projekt-ID oder Kundenname (wie bei findProjectsByCriteria)',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
     name: 'confirmOrder',
     parameters: {
       type: Type.OBJECT,

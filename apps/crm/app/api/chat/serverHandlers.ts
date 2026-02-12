@@ -73,6 +73,7 @@ import {
 import {
   handleConfirmOrder,
   handleGetLeadTimes,
+  handleGetSupplierOrdersForProject,
   handleSetLeadTime,
 } from './handlers/orderHandlers'
 
@@ -372,6 +373,7 @@ const handlerRegistry: Record<string, ServerHandler> = {
   getCalendarView: handleGetCalendarView,
   sendEmail: handleSendEmail,
   sendSupplierOrderEmail: handleSendSupplierOrderEmail,
+  getSupplierOrdersForProject: handleGetSupplierOrdersForProject,
   confirmOrder: handleConfirmOrder,
   getLeadTimes: handleGetLeadTimes,
   setLeadTime: handleSetLeadTime,

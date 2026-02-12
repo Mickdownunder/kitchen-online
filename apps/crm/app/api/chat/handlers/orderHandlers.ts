@@ -3,6 +3,46 @@
  */
 
 import type { ServerHandler } from '../serverHandlers'
+import { findProject } from '../serverHandlers'
+
+export const handleGetSupplierOrdersForProject: ServerHandler = async (args, supabase) => {
+  const projectId = (args.projectId as string)?.trim()
+  if (!projectId) return { result: '❌ projectId fehlt (Projekt-ID oder Kundenname).' }
+
+  const project = await findProject(supabase, projectId)
+  if (!project) return { result: '❌ Projekt nicht gefunden.' }
+
+  const { data: orders, error } = await supabase
+    .from('supplier_orders')
+    .select(
+      `
+      id,
+      order_number,
+      status,
+      sent_at,
+      suppliers (name)
+    `
+    )
+    .eq('project_id', project.id)
+    .order('created_at', { ascending: true })
+
+  if (error) return { result: `❌ Fehler: ${error.message}` }
+  if (!orders?.length) {
+    return {
+      result: `✅ Projekt ${project.order_number || project.customer_name}: Keine Lieferantenbestellungen.`,
+    }
+  }
+
+  type Row = { id: string; order_number: string; status: string; sent_at: string | null; suppliers: { name: string } | null }
+  const lines = (orders as Row[]).map((o) => {
+    const supplierName = o.suppliers?.name ?? '–'
+    const sent = o.sent_at ? 'versendet' : 'noch nicht versendet'
+    return `id=${o.id} | ${o.order_number} | ${supplierName} | ${o.status} | ${sent}`
+  })
+  return {
+    result: `✅ Lieferantenbestellungen für Projekt ${project.order_number || project.customer_name}:\n${lines.join('\n')}\n\nFür den Versand: sendSupplierOrderEmail(supplierOrderId) mit der gewünschten id aufrufen.`,
+  }
+}
 
 export const handleConfirmOrder: ServerHandler = async (args, supabase) => {
   const orderId = (args.supplierOrderId as string)?.trim()

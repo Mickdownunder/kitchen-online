@@ -21,7 +21,7 @@ ${opts.appointmentsSummary}
 **Finanzen:** updateFinancialAmounts, updatePaymentStatus, createPartialPayment, updatePartialPayment, createFinalInvoice, updateInvoiceNumber, configurePaymentSchedule, sendReminder, getFinancialReport, automaticPaymentMatch
 **Artikel:** addItemToProject, updateItem, createArticle, updateArticle
 **Lieferantenstamm:** createSupplier, listSuppliers, getLeadTimes, setLeadTime (Lieferzeiten für Montageplanung)
-**Bestell-Tracking:** confirmOrder (AB erfassen), sendSupplierOrderEmail
+**Bestell-Tracking:** getSupplierOrdersForProject (Bestellungen pro Projekt auflisten), sendSupplierOrderEmail (Versand vorbereiten), confirmOrder (AB erfassen)
 **Stammdaten:** createCustomer, updateCustomer, createEmployee, updateEmployee, updateCompanySettings
 **Reklamationen:** createComplaint, updateComplaintStatus
 **Dokumente:** archiveDocument, sendEmail, analyzeKitchenPlan (Anleitung Küchenplan-Extraktion). E-Mail mit Lieferschein/Rechnung: sendEmail mit pdfType "deliveryNote" oder "invoice", projectId (aus Projekt-Kontext) und ggf. deliveryNoteId/invoiceId – projectId ist bei pdfType Pflicht.
