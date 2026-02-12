@@ -41,7 +41,7 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
   } | null>(null)
   const [streamingText, setStreamingText] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
-  const [pendingEmail, setPendingEmail] = useState<PendingEmailState | null>(null)
+  const [pendingEmailQueue, setPendingEmailQueue] = useState<PendingEmailState[]>([])
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const { refreshProjects } = useApp()
@@ -262,23 +262,26 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
                   break
 
                 case 'pendingEmail':
-                  // Human-in-the-loop: Show email confirmation
+                  // Human-in-the-loop: E-Mail-Bestätigung in Queue (mehrere nacheinander möglich)
                   if (data.email) {
                     hadPendingEmailThisTurn = true
-                    setPendingEmail({
-                      pending: {
-                        type: 'pendingEmail',
-                        functionName: data.email.functionName,
-                        to: data.email.to,
-                        subject: data.email.subject,
-                        bodyPreview: data.email.bodyPreview,
-                        api: data.email.api,
-                        payload: data.email.payload,
-                        functionCallId: '',
-                        projectId: data.email.projectId,
-                        reminderType: data.email.reminderType,
+                    setPendingEmailQueue(prev => [
+                      ...prev,
+                      {
+                        pending: {
+                          type: 'pendingEmail',
+                          functionName: data.email.functionName,
+                          to: data.email.to,
+                          subject: data.email.subject,
+                          bodyPreview: data.email.bodyPreview,
+                          api: data.email.api,
+                          payload: data.email.payload,
+                          functionCallId: '',
+                          projectId: data.email.projectId,
+                          reminderType: data.email.reminderType,
+                        },
                       },
-                    })
+                    ])
                   }
                   break
 
@@ -345,43 +348,46 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
     }
   }
 
-  const handleEmailConfirm = useCallback(async (extraPayload?: Record<string, unknown>) => {
-    if (!pendingEmail) return
+  const handleEmailConfirm = useCallback(
+    async (extraPayload?: Record<string, unknown>) => {
+      const first = pendingEmailQueue[0]
+      if (!first) return
 
-    const { pending } = pendingEmail
-    const body = extraPayload ? { ...pending.payload, ...extraPayload } : pending.payload
+      const { pending } = first
+      const body = extraPayload ? { ...pending.payload, ...extraPayload } : pending.payload
 
-    try {
-      const res = await fetch(pending.api, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+      try {
+        const res = await fetch(pending.api, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
 
-      const data = await res.json().catch(() => ({}))
-      const success = res.ok
-      const resultMsg = success
-        ? data.message || `✅ E-Mail erfolgreich an ${pending.to} versendet: "${pending.subject}"`
-        : `❌ ${data.error || 'Fehler beim Versenden'}`
+        const data = await res.json().catch(() => ({}))
+        const success = res.ok
+        const resultMsg = success
+          ? data.message || `✅ E-Mail erfolgreich an ${pending.to} versendet: "${pending.subject}"`
+          : `❌ ${data.error || 'Fehler beim Versenden'}`
 
-      setPendingEmail(null)
-      addMessage({ role: 'model', text: resultMsg })
+        setPendingEmailQueue(prev => prev.slice(1))
+        addMessage({ role: 'model', text: resultMsg })
 
-      if (success && pending.projectId) {
-        refreshProjects(true, true)
+        if (success && pending.projectId) {
+          refreshProjects(true, true)
+        }
+      } catch (err) {
+        setPendingEmailQueue(prev => prev.slice(1))
+        const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler beim Versenden'
+        addMessage({ role: 'model', text: `❌ ${errMsg}` })
       }
-    } catch (err) {
-      setPendingEmail(null)
-      const errMsg = err instanceof Error ? err.message : 'Unbekannter Fehler beim Versenden'
-      addMessage({ role: 'model', text: `❌ ${errMsg}` })
-    }
-  }, [pendingEmail, refreshProjects, addMessage])
+    },
+    [pendingEmailQueue, refreshProjects, addMessage]
+  )
 
   const handleEmailCancel = useCallback(() => {
-    if (!pendingEmail) return
-    setPendingEmail(null)
+    setPendingEmailQueue(prev => (prev.length === 0 ? prev : prev.slice(1)))
     addMessage({ role: 'model', text: 'E-Mail-Versand abgebrochen.' })
-  }, [pendingEmail, addMessage])
+  }, [addMessage])
 
   if (!isOpen) return null
 
@@ -476,13 +482,14 @@ const AIAgentSidebar: React.FC<AIAgentSidebarProps> = ({
               isSpeaking={isSpeaking}
             />
 
-            {pendingEmail && (
+            {pendingEmailQueue.length > 0 && (
               <div className="sticky bottom-0 z-10 shrink-0 border-t border-amber-500/20 bg-slate-900/95 px-8 py-4 backdrop-blur-sm">
                 <EmailConfirmationCard
-                  pending={pendingEmail.pending}
-                  functionCallId={pendingEmail.pending.functionCallId}
+                  pending={pendingEmailQueue[0].pending}
+                  functionCallId={pendingEmailQueue[0].pending.functionCallId}
                   onConfirm={handleEmailConfirm}
                   onCancel={handleEmailCancel}
+                  queueIndex={pendingEmailQueue.length > 1 ? { current: 1, total: pendingEmailQueue.length } : undefined}
                 />
               </div>
             )}

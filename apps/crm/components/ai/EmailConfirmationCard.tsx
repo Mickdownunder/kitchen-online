@@ -9,6 +9,8 @@ interface EmailConfirmationCardProps {
   functionCallId: string
   onConfirm: (extraPayload?: Record<string, unknown>) => Promise<string | void>
   onCancel: () => void
+  /** Wenn gesetzt: Hinweis "E-Mail 1 von 3" bei mehreren Bestätigungskarten */
+  queueIndex?: { current: number; total: number }
 }
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -32,6 +34,7 @@ export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
   functionCallId,
   onConfirm,
   onCancel,
+  queueIndex,
 }) => {
   void functionCallId
   const [isSending, setIsSending] = useState(false)
@@ -84,6 +87,11 @@ export const EmailConfirmationCard: React.FC<EmailConfirmationCardProps> = ({
               : pending.functionName === 'sendReminder'
                 ? 'Mahnung versenden'
                 : 'E-Mail versenden'}
+            {queueIndex && (
+              <span className="ml-2 text-slate-400">
+                ({queueIndex.current} von {queueIndex.total})
+              </span>
+            )}
           </p>
         </div>
       </div>
