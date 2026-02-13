@@ -32,6 +32,7 @@ export type ServiceErrorCode =
   | 'VALIDATION'
   | 'CONFLICT'
   | 'INTERNAL'
+  | 'MIGRATION_REQUIRED'
 
 /** Convenience constructors so services don't build the object by hand. */
 export function ok<T>(data: T): ServiceResult<T> {

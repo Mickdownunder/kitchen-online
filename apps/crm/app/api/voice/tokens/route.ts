@@ -66,6 +66,9 @@ export async function POST(request: NextRequest) {
       if (result.code === 'VALIDATION') {
         return apiErrors.validation({ component: 'api/voice/tokens', validationMessage: result.message })
       }
+      if (result.code === 'MIGRATION_REQUIRED') {
+        return apiErrors.migrationRequired({ component: 'api/voice/tokens' })
+      }
       return apiErrors.internal(new Error(result.message), { component: 'api/voice/tokens' })
     }
 

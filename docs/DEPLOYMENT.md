@@ -62,3 +62,11 @@ Vercel Cron (vercel.json):
 - Migrationen: `supabase db push` oder via Dashboard
 - Backups: Pro-Plan empfohlen (PITR)
 - RLS-Policies prüfen nach Migrationen
+
+### Voice (Siri/Handy-Diktat)
+
+Damit Firmenstammdaten mit Voice-Option und Token-Erstellung funktionieren, muss die Voice-Migration ausgeführt sein:
+
+- **Datei:** `packages/db/supabase/migrations/20260213130000_voice_capture_tasks.sql`
+- Enthält: Spalten `voice_capture_enabled`, `voice_auto_execute_enabled` in `company_settings`, Tabellen `voice_api_tokens`, `voice_inbox_entries`, `tasks` (falls noch nicht vorhanden).
+- Ohne diese Migration: Speichern der Firmendaten und Erstellen von Voice-Tokens schlagen mit Hinweis auf fehlende Datenbank-Aktualisierung fehl.

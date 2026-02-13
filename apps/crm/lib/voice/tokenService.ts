@@ -84,6 +84,17 @@ export async function createVoiceApiToken(input: {
     .single()
 
   if (error) {
+    const msg = (error as { message?: string }).message ?? ''
+    if (
+      /relation "voice_api_tokens".*does not exist/i.test(msg) ||
+      /voice_api_tokens/i.test(msg) && /does not exist/i.test(msg)
+    ) {
+      return fail(
+        'MIGRATION_REQUIRED',
+        'Voice-Funktion benötigt eine Datenbank-Aktualisierung. Bitte die Migration 20260213130000_voice_capture_tasks.sql ausführen.',
+        error,
+      )
+    }
     return fail('INTERNAL', error.message || 'Voice-Token konnte nicht erstellt werden.', error)
   }
 

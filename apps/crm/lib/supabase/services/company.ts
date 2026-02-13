@@ -261,6 +261,15 @@ export async function saveCompanySettings(
     .single()
 
   if (error) {
+    const msg = (error as { message?: string }).message ?? ''
+    if (
+      /column.*(voice_capture_enabled|voice_auto_execute_enabled).*does not exist/i.test(msg) ||
+      /relation "company_settings".*does not exist/i.test(msg)
+    ) {
+      throw new Error(
+        'Voice-Funktion benötigt eine Datenbank-Aktualisierung. Bitte die Migration 20260213130000_voice_capture_tasks.sql (Voice Capture) auf der Datenbank ausführen.',
+      )
+    }
     throw toServiceError(error, 'Fehler beim Speichern der Firmeneinstellungen.')
   }
 

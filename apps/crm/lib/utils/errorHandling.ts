@@ -24,6 +24,8 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
   RATE_LIMITED: 'Zu viele Anfragen. Bitte warten.',
   SERVICE_UNAVAILABLE: 'Dienst vorübergehend nicht verfügbar',
   BAD_REQUEST: 'Ungültige Anfrage',
+  MIGRATION_REQUIRED:
+    'Voice-Funktion: Datenbank-Aktualisierung fehlt. Bitte Migration 20260213130000 (Voice Capture) auf der Datenbank ausführen.',
 }
 
 interface ApiErrorOptions {
@@ -89,6 +91,9 @@ export const apiErrors = {
 
   internal: (error: Error, ctx?: Record<string, unknown>) =>
     apiError({ status: 500, code: 'INTERNAL_ERROR', logContext: ctx, originalError: error }),
+
+  migrationRequired: (ctx?: Record<string, unknown>) =>
+    apiError({ status: 503, code: 'MIGRATION_REQUIRED', logContext: ctx }),
 
   rateLimit: (resetTime?: number) =>
     NextResponse.json(
