@@ -56,6 +56,67 @@ function normalizeIsoDate(value: string): string | null {
   return `${deMatch[3]}-${month}-${day}`
 }
 
+/** Resolve relative date expressions (morgen, Montag, nächste Woche, etc.) to ISO date strings. */
+function resolveRelativeDate(text: string): string | null {
+  const lower = text.toLowerCase()
+  const now = new Date()
+
+  // heute
+  if (/\bheute\b/.test(lower)) {
+    return toIso(now)
+  }
+
+  // morgen
+  if (/\bmorgen\b/.test(lower) && !/\bguten\s*morgen\b/.test(lower)) {
+    return toIso(addDays(now, 1))
+  }
+
+  // übermorgen
+  if (/\bübermorgen\b/.test(lower)) {
+    return toIso(addDays(now, 2))
+  }
+
+  // nächste Woche (= next Monday)
+  if (/\bnächste\s*woche\b/.test(lower)) {
+    const monday = nextWeekday(now, 1)
+    return toIso(monday)
+  }
+
+  // Day names: Montag=1 … Sonntag=7
+  const dayNames: Record<string, number> = {
+    montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4,
+    freitag: 5, samstag: 6, sonntag: 0,
+  }
+  for (const [name, weekday] of Object.entries(dayNames)) {
+    const re = new RegExp(`\\b(?:am\\s+)?(?:nächsten?\\s+)?${name}\\b`)
+    if (re.test(lower)) {
+      return toIso(nextWeekday(now, weekday))
+    }
+  }
+
+  return null
+}
+
+function addDays(d: Date, n: number): Date {
+  const result = new Date(d)
+  result.setDate(result.getDate() + n)
+  return result
+}
+
+function nextWeekday(from: Date, weekday: number): Date {
+  const current = from.getDay()
+  let diff = weekday - current
+  if (diff <= 0) diff += 7
+  return addDays(from, diff)
+}
+
+function toIso(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function buildHeuristicIntent(text: string): VoiceIntent {
   const normalized = text.trim()
   const lower = normalized.toLowerCase()
@@ -64,7 +125,9 @@ function buildHeuristicIntent(text: string): VoiceIntent {
   const deDateMatch = normalized.match(/(\d{1,2}\.\d{1,2}\.\d{4})/)
   const timeMatch = normalized.match(/(?:um\s+)?(\d{1,2}:\d{2})/i)
 
-  const date = normalizeIsoDate(isoDateMatch?.[1] || deDateMatch?.[1] || '')
+  // Try explicit date formats first, then relative expressions
+  const date = normalizeIsoDate(isoDateMatch?.[1] || deDateMatch?.[1] || '') || resolveRelativeDate(lower)
+
   const looksLikeAppointment =
     lower.includes('termin') || lower.includes('besprechung') || lower.includes('meeting')
 
@@ -88,8 +151,31 @@ function buildHeuristicIntent(text: string): VoiceIntent {
     }
   }
 
+  // Auch ohne explizites "termin"-Keyword: wenn ein Datum + Uhrzeit + Name vorhanden
+  if (date && timeMatch && normalized.match(/(?:mit|bei)\s+\w/)) {
+    const customerNameMatch = normalized.match(/(?:mit|bei)\s+([A-Za-z0-9äöüÄÖÜß .\-]+)/)
+    return {
+      version: 'v1',
+      action: 'create_appointment',
+      summary: 'Termin aus Voice-Text',
+      confidence: 0.78,
+      confidenceLevel: toConfidenceLevel(0.78),
+      appointment: {
+        customerName: customerNameMatch?.[1]?.trim() || 'Kunde (unbekannt)',
+        date,
+        time: timeMatch[1].padStart(5, '0'),
+        type: 'Consultation',
+        notes: normalized,
+      },
+    }
+  }
+
+  // Task: "Aufgabe bis Freitag: Angebot schicken"
+  const dueDate = date || null
   const cleanedTitle = normalized
     .replace(/^(erstelle|lege|mach|notiere|bitte)\s+(eine\s+)?(aufgabe|todo)\s*/i, '')
+    .replace(/\b(bis|am)\s+(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|morgen|übermorgen|heute|nächste\s*woche)\b/gi, '')
+    .replace(/\b(bis|am)\s+\d{1,2}\.\d{1,2}\.\d{4}\b/g, '')
     .trim()
 
   const confidence = lower.includes('aufgabe') || lower.includes('todo') ? 0.88 : 0.65
@@ -104,6 +190,7 @@ function buildHeuristicIntent(text: string): VoiceIntent {
       title: cleanedTitle || normalized,
       description: normalized,
       priority: lower.includes('dringend') ? 'urgent' : 'normal',
+      dueAt: dueDate || undefined,
     },
   }
 }
@@ -220,6 +307,21 @@ Input:
   }
 }
 
+/** Schnelle Heuristik-only-Verarbeitung (kein KI-Aufruf, <10ms). Für Siri/Capture. */
+export function parseVoiceIntentHeuristic(text: string): VoiceIntentParseResult {
+  const normalizedText = text.trim()
+  if (!normalizedText) {
+    return { ok: false, message: 'Voice-Text ist leer.' }
+  }
+  const heuristic = buildHeuristicIntent(normalizedText)
+  return {
+    ok: true,
+    intent: normalizeValidatedIntent(heuristic),
+    raw: { source: 'heuristic', text: normalizedText },
+  }
+}
+
+/** Volle Verarbeitung: erst Gemini, Fallback auf Heuristik. Langsam (~10s). */
 export async function parseVoiceIntent(input: {
   text: string
   locale?: string

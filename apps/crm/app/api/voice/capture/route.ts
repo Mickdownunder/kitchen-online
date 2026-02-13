@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Json } from '@/types/database.types'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCompanyIdForUser, getCompanySettingsById } from '@/lib/supabase/services/company'
 import { rateLimit } from '@/lib/middleware/rateLimit'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import { logger } from '@/lib/utils/logger'
-import { createOrGetVoiceInboxEntry } from '@/lib/voice/inboxService'
+import { createOrGetVoiceInboxEntry, updateVoiceInboxEntry } from '@/lib/voice/inboxService'
 import { authenticateVoiceBearerToken, authenticateVoiceToken } from '@/lib/voice/tokenAuth'
+import { parseVoiceIntentHeuristic } from '@/lib/voice/intentParser'
+import { executeVoiceIntent } from '@/lib/voice/executeVoiceIntent'
 import { parseVoiceCaptureRequest } from './request'
 
 export const runtime = 'nodejs'
@@ -123,15 +126,117 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Sofort antworten — KI-Verarbeitung passiert async über /api/voice/inbox/[id]/process
-    // Siri Shortcuts hat ein kurzes Timeout; die 10s+ KI-Verarbeitung würde abgebrochen.
+    // Schnelle Heuristik-Verarbeitung (kein KI-Aufruf, <100ms)
+    const parseResult = parseVoiceIntentHeuristic(parsedRequest.data.text)
+    if (!parseResult.ok) {
+      await updateVoiceInboxEntry(supabase, companyId, entry.id, {
+        status: 'needs_confirmation',
+        error_message: parseResult.message,
+        needs_confirmation_reason: 'intent_parse_failed',
+      })
+      const durationMs = Date.now() - startTime
+      apiLogger.end(startTime, 200)
+      return siriResponse({
+        ok: true,
+        entryId: entry.id,
+        status: 'needs_confirmation',
+        message: 'Erfasst – bitte im Voice-Inbox bestätigen.',
+        durationMs,
+      })
+    }
+
+    const parsedIntent = parseResult.intent
+    await updateVoiceInboxEntry(supabase, companyId, entry.id, {
+      status: 'parsed',
+      intent_version: parsedIntent.version,
+      intent_payload: parsedIntent as unknown as Json,
+      confidence: parsedIntent.confidence,
+      execution_action: parsedIntent.action,
+      error_message: null,
+    })
+
+    // Auto-Execute wenn Confidence hoch genug
+    const executionResult = await executeVoiceIntent({
+      client: supabase,
+      companyId,
+      userId: tokenContext.userId,
+      intent: parsedIntent,
+      autoExecuteEnabled: Boolean(companySettings.voiceAutoExecuteEnabled),
+    })
+
+    const executionAttempts = (entry.executionAttempts || 0) + 1
+    const nowIso = new Date().toISOString()
+
+    if (executionResult.status === 'executed') {
+      await updateVoiceInboxEntry(supabase, companyId, entry.id, {
+        status: 'executed',
+        confidence: executionResult.confidence,
+        execution_action: executionResult.action,
+        execution_result: {
+          ...(executionResult.details || {}),
+          taskId: executionResult.taskId,
+          appointmentId: executionResult.appointmentId,
+          projectId: executionResult.projectId,
+          message: executionResult.message,
+        } as Json,
+        needs_confirmation_reason: null,
+        error_message: null,
+        execution_attempts: executionAttempts,
+        last_executed_at: nowIso,
+        executed_task_id: executionResult.taskId || null,
+        executed_appointment_id: executionResult.appointmentId || null,
+      })
+
+      const durationMs = Date.now() - startTime
+      apiLogger.end(startTime, 200)
+      return siriResponse({
+        ok: true,
+        entryId: entry.id,
+        status: 'executed',
+        message: executionResult.message,
+        taskId: executionResult.taskId,
+        appointmentId: executionResult.appointmentId,
+        durationMs,
+      })
+    }
+
+    if (executionResult.status === 'needs_confirmation') {
+      await updateVoiceInboxEntry(supabase, companyId, entry.id, {
+        status: 'needs_confirmation',
+        confidence: executionResult.confidence,
+        execution_action: executionResult.action,
+        execution_result: (executionResult.details || {}) as Json,
+        needs_confirmation_reason: executionResult.needsConfirmationReason || 'manual_confirmation_required',
+        error_message: null,
+      })
+      const durationMs = Date.now() - startTime
+      apiLogger.end(startTime, 200)
+      return siriResponse({
+        ok: true,
+        entryId: entry.id,
+        status: 'needs_confirmation',
+        message: executionResult.message,
+        durationMs,
+      })
+    }
+
+    // Failed
+    await updateVoiceInboxEntry(supabase, companyId, entry.id, {
+      status: 'failed',
+      confidence: executionResult.confidence,
+      execution_action: executionResult.action,
+      execution_result: (executionResult.details || {}) as Json,
+      error_message: executionResult.message,
+      execution_attempts: executionAttempts,
+      last_executed_at: nowIso,
+    })
     const durationMs = Date.now() - startTime
     apiLogger.end(startTime, 200)
     return siriResponse({
       ok: true,
       entryId: entry.id,
-      status: 'captured',
-      message: 'Erfasst! Verarbeitung läuft im Hintergrund.',
+      status: 'failed',
+      message: executionResult.message,
       durationMs,
     })
   } catch (error) {
