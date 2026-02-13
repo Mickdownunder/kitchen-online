@@ -43,14 +43,16 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServiceClient()
 
-    // Token aus Header ODER Body akzeptieren (Siri Shortcuts kann keine langen Header senden)
+    // Token aus URL-Parameter, Body oder Header akzeptieren (Siri Shortcuts Kompatibilität)
     const body = await request.json().catch(() => ({}))
+    const urlToken = request.nextUrl.searchParams.get('token')
     const bodyToken = typeof body === 'object' && body !== null && typeof (body as Record<string, unknown>).token === 'string'
       ? (body as Record<string, unknown>).token as string
       : null
+    const resolvedToken = urlToken || bodyToken
 
-    const tokenResult = bodyToken
-      ? await authenticateVoiceToken(supabase, bodyToken)
+    const tokenResult = resolvedToken
+      ? await authenticateVoiceToken(supabase, resolvedToken)
       : await authenticateVoiceBearerToken(supabase, request.headers)
     if (!tokenResult.ok) {
       apiLogger.error(new Error(tokenResult.message), 401)
