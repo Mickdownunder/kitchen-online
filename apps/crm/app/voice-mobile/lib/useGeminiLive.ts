@@ -216,24 +216,42 @@ export function useGeminiLive(voiceToken: string | null) {
               playAudioChunk(audioData)
             }
 
-            // Function calls — execute non-blocking, send result back
+            // Function calls — execute and send result back to Gemini
             const toolCall = (message as unknown as {
               toolCall?: { functionCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> }
             }).toolCall
             if (toolCall?.functionCalls) {
               for (const fc of toolCall.functionCalls) {
-                // Fire-and-forget: execute CRM action, send result back to Gemini
                 ;(async () => {
-                  const result = await executeFunctionCall(fc.id, fc.name, fc.args || {})
-                  if (sessionPromiseRef.current) {
-                    const session = await sessionPromiseRef.current
-                    await session.sendToolResponse({
-                      functionResponses: [{
-                        id: fc.id,
-                        name: fc.name,
-                        response: { result: result.result },
-                      }],
-                    })
+                  let resultText: string
+                  try {
+                    // Timeout: if function call takes >15s, return error to Gemini
+                    const timeoutPromise = new Promise<{ result: string }>((_, reject) =>
+                      setTimeout(() => reject(new Error('Timeout')), 15000),
+                    )
+                    const result = await Promise.race([
+                      executeFunctionCall(fc.id, fc.name, fc.args || {}),
+                      timeoutPromise,
+                    ])
+                    resultText = result.result
+                  } catch (e) {
+                    console.error('Voice function call failed:', fc.name, e)
+                    resultText = `Fehler bei ${fc.name}: ${e instanceof Error ? e.message : 'Unbekannt'}`
+                  }
+                  // Always send response back so Gemini can continue speaking
+                  try {
+                    if (sessionPromiseRef.current && isConnectedRef.current) {
+                      const session = await sessionPromiseRef.current
+                      await session.sendToolResponse({
+                        functionResponses: [{
+                          id: fc.id,
+                          name: fc.name,
+                          response: { result: resultText },
+                        }],
+                      })
+                    }
+                  } catch (e) {
+                    console.error('sendToolResponse failed:', fc.name, e)
                   }
                 })()
               }
