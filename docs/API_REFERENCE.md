@@ -6,7 +6,7 @@
 |-----|---------|--------------|
 | Mitarbeiter | Cookie (Supabase Session) | Alle CRM-Routen unter `/api/*` (außer customer, booking, cron, voice) |
 | Kunde | Bearer Token (JWT) | `Authorization: Bearer <token>` für `/api/customer/*` |
-| Voice (Siri/Shortcut) | Bearer Token (persönlicher Token) | `Authorization: Bearer <personal_voice_token>` für `/api/voice/capture` |
+| Voice (Siri/Shortcut) | Bearer Token (persönlicher Token) | `Authorization: Bearer <personal_voice_token>` für `/api/voice/capture`, `/api/voice/session`, `/api/voice/function` |
 | Cron | Header | `Authorization: Bearer <CRON_SECRET>` für `/api/cron/*` |
 | Webhook | Optional | `CALCOM_WEBHOOK_SECRET` für Signatur |
 
@@ -71,8 +71,12 @@ Basis: `Authorization: Bearer <personal_voice_token>`. Token werden in den Einst
 | `/api/voice/inbox/[id]/discard` | POST | Eintrag verwerfen. |
 | `/api/voice/tokens` | GET, POST | Voice-Tokens auflisten / erstellen (Cookie-Session). |
 | `/api/voice/tokens/[id]/revoke` | POST | Token widerrufen. |
+| `/api/voice/session` | POST | Gemini Live Session-Config abrufen (API-Key, System-Prompt mit CRM-Kontext, Tool-Deklarationen). Auth: Voice-Token (URL-Param `token`, Body, oder Bearer-Header). Client nutzt Antwort für direkte WebSocket-Verbindung zu Gemini Live API. |
+| `/api/voice/function` | POST | CRM-Funktion ausführen (Body: `functionName`, `args`). Auth: Voice-Token. Proxy für Gemini Live Tool-Calls – Client ruft diesen Endpoint wenn Gemini einen Function-Call anfordert, sendet Ergebnis zurück an WebSocket. |
 
-Erlaubte Aktionen (v1): `create_task`, `create_appointment`, `add_project_note`. Bei hoher Confidence und aktiviertem Auto-Execute wird direkt ausgeführt; sonst `needs_confirmation` (Bestätigung in der Voice-Inbox).
+Erlaubte Aktionen (v1 – Schnellerfassung): `create_task`, `create_appointment`, `add_project_note`. Bei hoher Confidence und aktiviertem Auto-Execute wird direkt ausgeführt; sonst `needs_confirmation` (Bestätigung in der Voice-Inbox).
+
+KI-Assistent (v2 – Gemini Live): Voller Zugriff auf alle CRM-Tools via Sprachgespräch. Die `/voice-mobile`-Seite verbindet sich per WebSocket direkt mit Gemini Live API (Audio-Streaming). Function-Calls werden über `/api/voice/function` an den Server delegiert.
 
 ## Customer-API (Kundenportal)
 
