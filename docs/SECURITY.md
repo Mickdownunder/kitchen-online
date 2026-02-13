@@ -33,8 +33,17 @@
 - Customer-Tabellen: `customer_id` Filter
 - `get_current_company_id` RPC: EXECUTE für authenticated (falls Client liest)
 
+## Voice-Token (Siri / Shortcuts)
+
+- **Auth:** Dedizierter persönlicher Token pro User, kein Cookie, kein Service-Role-Key im Shortcut.
+- **Speicherung:** Nur Hash (z. B. SHA-256 + optionaler Pepper aus `VOICE_TOKEN_PEPPER`) in `voice_api_tokens`; das Token-Secret wird nur einmal bei Erstellung angezeigt.
+- **Company-Auflösung:** `getCompanyIdForUser(userId, serviceClient)` nach Token-Lookup, nicht `get_current_company_id()` (Session).
+- **Rate-Limit:** Pro Token/User; Burst-Schutz für `/api/voice/capture`.
+- **Widerruf:** Token in Einstellungen widerrufbar; Ablaufdatum pro Token.
+
 ## Env-Variablen
 
 - Keine Secrets in Code oder Repo
 - `CRON_SECRET` für Cron-Endpunkte (Vercel setzt automatisch)
 - `CALCOM_WEBHOOK_SECRET` optional für Webhook-Signatur
+- `VOICE_TOKEN_PEPPER` optional für stärkeres Hashing der Voice-Tokens (empfohlen in Produktion)

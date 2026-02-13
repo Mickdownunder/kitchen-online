@@ -648,17 +648,20 @@ export function OrderEditorModal({
                     Montage reservieren
                   </button>
                 )}
-              {row?.kind === 'supplier' && row.externalOrderItems > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowMarkConfirm(true)}
-                  disabled={markBusy || saveBusy}
-                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {markBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Bereits bestellt
-                </button>
-              )}
+              {row?.kind === 'supplier' &&
+                row.externalOrderItems > 0 &&
+                row.queue !== 'montagebereit' &&
+                row.queue !== 'erledigt' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMarkConfirm(true)}
+                    disabled={markBusy || saveBusy}
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {markBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    Bereits bestellt
+                  </button>
+                )}
               <button
                 type="button"
                 onClick={onClose}

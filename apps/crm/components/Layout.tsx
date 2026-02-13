@@ -20,6 +20,8 @@ import {
   BarChart3,
   FileCheck,
   MessageSquare,
+  ListTodo,
+  Mic,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { signOut, getCompanySettings } from '@/lib/supabase/services'
@@ -150,6 +152,12 @@ const CrmLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       permission: 'menu_projects' as const,
     },
     {
+      id: '/tasks',
+      label: 'Tasks',
+      icon: ListTodo,
+      permission: 'edit_projects' as const,
+    },
+    {
       id: '/invoices',
       label: 'Rechnungen',
       icon: ReceiptText,
@@ -178,6 +186,12 @@ const CrmLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       id: '/accounting',
       label: 'Buchhaltung',
       icon: FileCheck,
+      permission: 'menu_accounting' as const,
+    },
+    {
+      id: '/voice-inbox',
+      label: 'Voice Inbox',
+      icon: Mic,
       permission: 'menu_accounting' as const,
     },
     {

@@ -157,6 +157,8 @@ kitchen-online/
 | `/deliveries` | Lieferungen | Lieferscheine, Upload, Analyse |
 | `/orders` | Bestellungen | Lieferanten-Workflow mit Queues, Bestell-Editor, AB/Lieferschein/Wareneingang |
 | `/calendar` | Kalender | Termine (Planung, Aufmaß, Lieferung, Montage), Drag & Drop |
+| `/tasks` | Tasks | Aufgabenliste (Heute, Überfällig, Offen, Erledigt), inkl. Voice-Erfassung |
+| `/voice-inbox` | Voice Inbox | Voice-Capture-Einträge (captured, needs_confirmation, executed, failed), Bestätigen/Retry/Verwerfen |
 | `/tickets` | Tickets | Support-Tickets, Nachrichten |
 | `/complaints` | Reklamationen | Kanban, Status-Workflow |
 | `/articles` | Artikel | Artikelkatalog |
@@ -168,6 +170,7 @@ kitchen-online/
 ### Zusatzfeatures
 
 - **AI-Assistent:** Chat mit Projekt-Kontext, Aktionen (E-Mail, Dokumente, Status, …)
+- **Voice Capture (Siri / Shortcuts):** Aufgaben, Termine und Projektnotizen per Sprache erfassen; persönlicher Bearer-Token in Einstellungen (Voice-Tab); Voice-Inbox zur Bestätigung/Retry; Feature-Flags pro Firma (`voice_capture_enabled`, `voice_auto_execute_enabled`).
 - **PDF-Generierung:** Rechnung, Lieferschein, Auftrag, Mahnung
 - **Adress-Autocomplete:** Geocoding-API (optional)
 - **Offline-Indikator:** Hinweis bei fehlender Netzverbindung

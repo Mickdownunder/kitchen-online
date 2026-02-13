@@ -1,5 +1,11 @@
 import type { CustomerProject, InvoiceItem } from '@/types'
+import type { InvoiceItemProcurementType } from '@/types'
 import { roundTo2Decimals } from '@/lib/utils/priceCalculations'
+
+const READY_PROCUREMENT_TYPES: InvoiceItemProcurementType[] = ['internal_stock', 'reservation_only']
+function isNonOrderProcurement(value?: InvoiceItemProcurementType): boolean {
+  return value != null && READY_PROCUREMENT_TYPES.includes(value)
+}
 
 export type ItemDeliveryStatus = NonNullable<InvoiceItem['deliveryStatus']>
 export type MaterialRiskLevel = 'critical' | 'warning' | 'ok'
@@ -228,10 +234,18 @@ export function getProjectMaterialSnapshot(
     (parsedInstallationDate.getTime() - today.getTime()) / DAY_IN_MS,
   )
 
-  const itemSnapshots = (project.items || []).map(getItemMaterialSnapshot)
+  const items = project.items || []
+  const itemSnapshots = items.map(getItemMaterialSnapshot)
   const totalItems = itemSnapshots.length
-  const fullyOrderedItems = itemSnapshots.filter((item) => item.isFullyOrdered).length
-  const fullyDeliveredItems = itemSnapshots.filter((item) => item.isFullyDelivered).length
+  // Reservierungs- und Lagerpositionen zählen als „bereit“, sie werden nicht bestellt/wareneingang
+  const fullyOrderedItems = itemSnapshots.filter((snap, i) => {
+    const item = items[i]
+    return snap.isFullyOrdered || isNonOrderProcurement(item?.procurementType)
+  }).length
+  const fullyDeliveredItems = itemSnapshots.filter((snap, i) => {
+    const item = items[i]
+    return snap.isFullyDelivered || isNonOrderProcurement(item?.procurementType)
+  }).length
   const missingItems = itemSnapshots.filter((item) => item.status === 'missing').length
   const openOrderItems = totalItems - fullyOrderedItems
   const openDeliveryItems = totalItems - fullyDeliveredItems

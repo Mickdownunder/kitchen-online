@@ -16,5 +16,6 @@ export * from './projects'
 export * from './supplierInvoices'
 export * from './supplierOrders'
 export * from './suppliers'
+export * from './tasks'
 // Note: audit.ts exports are NOT re-exported here because they use server-only imports
 // Import directly: import { logAuditEvent } from '@/lib/supabase/services/audit'

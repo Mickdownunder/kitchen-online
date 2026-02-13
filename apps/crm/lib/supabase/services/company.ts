@@ -222,6 +222,8 @@ export async function saveCompanySettings(
     email: settings.email,
     inbound_email_ab: inboundEmailAb,
     inbound_email_invoices: inboundEmailInvoices,
+    voice_capture_enabled: settings.voiceCaptureEnabled ?? false,
+    voice_auto_execute_enabled: settings.voiceAutoExecuteEnabled ?? false,
     // Legacy single inbox field kept for backward compatibility.
     inbound_email: inboundEmailLegacy,
     website: settings.website,
@@ -297,6 +299,8 @@ function mapCompanySettingsFromDB(db: Record<string, unknown>): CompanySettings 
     email: db.email,
     inboundEmailAb: inboundEmailAb ?? undefined,
     inboundEmailInvoices: inboundEmailInvoices ?? undefined,
+    voiceCaptureEnabled: Boolean(db.voice_capture_enabled),
+    voiceAutoExecuteEnabled: Boolean(db.voice_auto_execute_enabled),
     website: db.website,
     uid: db.uid,
     companyRegisterNumber: db.company_register_number,

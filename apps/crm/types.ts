@@ -54,6 +54,8 @@ export interface CompanySettings {
   email: string
   inboundEmailAb?: string
   inboundEmailInvoices?: string
+  voiceCaptureEnabled?: boolean
+  voiceAutoExecuteEnabled?: boolean
   website?: string
 
   // Legal / Tax
@@ -571,6 +573,119 @@ export interface PlanningAppointment {
     | 'Delivery'
     | 'Other'
   assignedUserId?: string // User assigned to this appointment
+}
+
+export type TaskStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
+export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type TaskSource = 'manual' | 'voice' | 'system'
+
+export interface Task {
+  id: string
+  companyId: string
+  userId: string
+  assignedUserId?: string
+  completedByUserId?: string
+  projectId?: string
+  title: string
+  description?: string
+  status: TaskStatus
+  priority: TaskPriority
+  source: TaskSource
+  dueAt?: string
+  completedAt?: string
+  metadata?: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export type VoiceInboxStatus =
+  | 'captured'
+  | 'parsed'
+  | 'needs_confirmation'
+  | 'executed'
+  | 'failed'
+  | 'discarded'
+
+export type VoiceIntentAction = 'create_task' | 'create_appointment' | 'add_project_note'
+export type VoiceIntentConfidenceLevel = 'high' | 'medium' | 'low'
+
+export interface VoiceIntentPayload {
+  version: 'v1'
+  action: VoiceIntentAction
+  confidence: number
+  confidenceLevel: VoiceIntentConfidenceLevel
+  summary: string
+  task?: {
+    title: string
+    description?: string
+    priority?: TaskPriority
+    dueAt?: string
+    projectHint?: string
+    customerHint?: string
+  }
+  appointment?: {
+    customerName: string
+    date: string
+    time?: string
+    type: PlanningAppointment['type']
+    notes?: string
+    phone?: string
+    projectHint?: string
+  }
+  projectNote?: {
+    projectHint: string
+    note: string
+  }
+}
+
+export interface VoiceInboxEntry {
+  id: string
+  companyId: string
+  userId: string
+  tokenId?: string
+  source: string
+  locale?: string
+  idempotencyKey: string
+  inputText: string
+  contextHints?: Record<string, unknown>
+  status: VoiceInboxStatus
+  intentVersion: string
+  intentPayload?: VoiceIntentPayload
+  confidence?: number
+  executionAction?: string
+  executionResult?: Record<string, unknown>
+  errorMessage?: string
+  needsConfirmationReason?: string
+  executionAttempts: number
+  lastExecutedAt?: string
+  executedTaskId?: string
+  executedAppointmentId?: string
+  confirmedByUserId?: string
+  confirmedAt?: string
+  discardedByUserId?: string
+  discardedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VoiceApiToken {
+  id: string
+  companyId: string
+  userId: string
+  label: string
+  tokenPrefix: string
+  scopes: string[]
+  lastUsedAt?: string
+  expiresAt: string
+  revokedAt?: string
+  revokedByUserId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreatedVoiceApiToken {
+  token: VoiceApiToken
+  secret: string
 }
 
 // Professional Project Structure

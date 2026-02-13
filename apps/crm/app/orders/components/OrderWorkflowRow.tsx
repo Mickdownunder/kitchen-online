@@ -207,15 +207,19 @@ export function OrderWorkflowRow({
       <td className="px-4 py-4 align-top">
         <p className="text-xs font-semibold text-slate-700">{row.nextAction}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {canEditPositions && (
+          {(canEditPositions || isReadyOrDone) && (
             <button
               type="button"
               onClick={() => onOpenEditor(row)}
               disabled={isBusy}
-              aria-label={`Positionen bearbeiten für Auftrag ${row.projectOrderNumber}`}
+              aria-label={
+                isReadyOrDone
+                  ? `Positionen anzeigen / Beschaffung ändern für Auftrag ${row.projectOrderNumber}`
+                  : `Positionen bearbeiten für Auftrag ${row.projectOrderNumber}`
+              }
               className={`${btnBase} ${btnNeutral}`}
             >
-              <Pencil className="h-3.5 w-3.5" /> Positionen
+              <Pencil className="h-3.5 w-3.5" /> {isReadyOrDone ? 'Positionen anzeigen' : 'Positionen'}
             </button>
           )}
 

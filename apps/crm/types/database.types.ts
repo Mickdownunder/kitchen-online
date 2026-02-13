@@ -940,6 +940,8 @@ export type Database = {
           inbound_email: string | null
           inbound_email_ab: string | null
           inbound_email_invoices: string | null
+          voice_auto_execute_enabled: boolean
+          voice_capture_enabled: boolean
           fax: string | null
           house_number: string | null
           id: string
@@ -980,6 +982,8 @@ export type Database = {
           inbound_email?: string | null
           inbound_email_ab?: string | null
           inbound_email_invoices?: string | null
+          voice_auto_execute_enabled?: boolean
+          voice_capture_enabled?: boolean
           fax?: string | null
           house_number?: string | null
           id?: string
@@ -1020,6 +1024,8 @@ export type Database = {
           inbound_email?: string | null
           inbound_email_ab?: string | null
           inbound_email_invoices?: string | null
+          voice_auto_execute_enabled?: boolean
+          voice_capture_enabled?: boolean
           fax?: string | null
           house_number?: string | null
           id?: string
@@ -2845,6 +2851,99 @@ export type Database = {
           },
         ]
       }
+      tasks: {
+        Row: {
+          assigned_user_id: string | null
+          company_id: string
+          completed_at: string | null
+          completed_by_user_id: string | null
+          created_at: string
+          description: string | null
+          due_at: string | null
+          id: string
+          metadata: Json
+          priority: string
+          project_id: string | null
+          source: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          company_id: string
+          completed_at?: string | null
+          completed_by_user_id?: string | null
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          priority?: string
+          project_id?: string | null
+          source?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          company_id?: string
+          completed_at?: string | null
+          completed_by_user_id?: string | null
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          priority?: string
+          project_id?: string | null
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_user_id_fkey"
+            columns: ["assigned_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_completed_by_user_id_fkey"
+            columns: ["completed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_messages: {
         Row: {
           author_id: string | null
@@ -3025,6 +3124,216 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_api_tokens: {
+        Row: {
+          company_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          label: string
+          last_used_at: string | null
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          scopes: string[]
+          token_hash: string
+          token_prefix: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          label: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          scopes?: string[]
+          token_hash: string
+          token_prefix: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          label?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          scopes?: string[]
+          token_hash?: string
+          token_prefix?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_api_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_api_tokens_revoked_by_user_id_fkey"
+            columns: ["revoked_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_api_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_inbox_entries: {
+        Row: {
+          company_id: string
+          confidence: number | null
+          confirmed_at: string | null
+          confirmed_by_user_id: string | null
+          context_hints: Json
+          created_at: string
+          discarded_at: string | null
+          discarded_by_user_id: string | null
+          error_message: string | null
+          executed_appointment_id: string | null
+          executed_task_id: string | null
+          execution_action: string | null
+          execution_attempts: number
+          execution_result: Json
+          id: string
+          idempotency_key: string
+          input_text: string
+          intent_payload: Json
+          intent_version: string
+          last_executed_at: string | null
+          locale: string | null
+          needs_confirmation_reason: string | null
+          source: string
+          status: string
+          token_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          confidence?: number | null
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
+          context_hints?: Json
+          created_at?: string
+          discarded_at?: string | null
+          discarded_by_user_id?: string | null
+          error_message?: string | null
+          executed_appointment_id?: string | null
+          executed_task_id?: string | null
+          execution_action?: string | null
+          execution_attempts?: number
+          execution_result?: Json
+          id?: string
+          idempotency_key: string
+          input_text: string
+          intent_payload?: Json
+          intent_version?: string
+          last_executed_at?: string | null
+          locale?: string | null
+          needs_confirmation_reason?: string | null
+          source?: string
+          status?: string
+          token_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          confidence?: number | null
+          confirmed_at?: string | null
+          confirmed_by_user_id?: string | null
+          context_hints?: Json
+          created_at?: string
+          discarded_at?: string | null
+          discarded_by_user_id?: string | null
+          error_message?: string | null
+          executed_appointment_id?: string | null
+          executed_task_id?: string | null
+          execution_action?: string | null
+          execution_attempts?: number
+          execution_result?: Json
+          id?: string
+          idempotency_key?: string
+          input_text?: string
+          intent_payload?: Json
+          intent_version?: string
+          last_executed_at?: string | null
+          locale?: string | null
+          needs_confirmation_reason?: string | null
+          source?: string
+          status?: string
+          token_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_inbox_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_inbox_entries_confirmed_by_user_id_fkey"
+            columns: ["confirmed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_inbox_entries_discarded_by_user_id_fkey"
+            columns: ["discarded_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_inbox_entries_executed_appointment_id_fkey"
+            columns: ["executed_appointment_id"]
+            isOneToOne: false
+            referencedRelation: "planning_appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_inbox_entries_executed_task_id_fkey"
+            columns: ["executed_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_inbox_entries_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "voice_api_tokens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_inbox_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3176,6 +3485,10 @@ export type Database = {
         | "FirstMeeting"
         | "Measurement"
         | "Installation"
+        | "Service"
+        | "ReMeasurement"
+        | "Delivery"
+        | "Other"
       article_category:
         | "Kitchen"
         | "Appliance"
@@ -3356,6 +3669,10 @@ export const Constants = {
         "FirstMeeting",
         "Measurement",
         "Installation",
+        "Service",
+        "ReMeasurement",
+        "Delivery",
+        "Other",
       ],
       article_category: [
         "Kitchen",

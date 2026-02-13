@@ -3,6 +3,10 @@ import { PlanningAppointment } from '@/types'
 import { getCurrentUser } from './auth'
 import { getCurrentCompanyId } from './permissions'
 import { logger } from '@/lib/utils/logger'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
+
+type DbClient = SupabaseClient<Database>
 
 /**
  * Get all appointments for the current user's company
@@ -128,64 +132,11 @@ export async function createAppointment(
       throw new Error('No company found. Please ensure you are assigned to a company.')
     }
 
-    logger.debug('createAppointment: Creating appointment', {
-      component: 'appointments',
+    return await createAppointmentForCompany(supabase as unknown as DbClient, {
+      userId: user.id,
       companyId,
-      customerName: appointment.customerName,
-      date: appointment.date,
-      type: appointment.type,
+      appointment,
     })
-
-    const { data, error } = await supabase
-      .from('planning_appointments')
-      .insert({
-        user_id: user.id,
-        company_id: companyId,
-        customer_id: appointment.customerId || null,
-        customer_name: appointment.customerName,
-        phone: appointment.phone || null,
-        date: appointment.date,
-        time: appointment.time || null,
-        type: appointment.type,
-        notes: appointment.notes || null,
-        assigned_user_id: appointment.assignedUserId || null,
-        project_id: null, // Can be linked later if needed
-      })
-      .select()
-      .single()
-
-    if (error) {
-      const errObj = error as Error & { code?: string; details?: string; hint?: string }
-      const errorCode = errObj.code
-      // ONLY check for specific PostgreSQL error code 42P01 (relation does not exist)
-      if (errorCode === '42P01') {
-        const errorMsg =
-          'Table planning_appointments does not exist. Please run the SQL migration: supabase/migrations/create_planning_appointments.sql'
-        logger.error('createAppointment: Table missing', {
-          component: 'appointments',
-          hint: errorMsg,
-        })
-        throw new Error(errorMsg)
-      }
-
-      logger.error(
-        'createAppointment error',
-        {
-          component: 'appointments',
-          errorCode,
-          errorDetails: errObj.details,
-          errorHint: errObj.hint,
-        },
-        error as Error
-      )
-      throw error
-    }
-
-    logger.debug('createAppointment: Successfully created', {
-      component: 'appointments',
-      appointmentId: data.id,
-    })
-    return mapAppointmentFromDB(data)
   } catch (error: unknown) {
     const err = error as { code?: string }
     logger.error(
@@ -195,6 +146,73 @@ export async function createAppointment(
     )
     throw error
   }
+}
+
+export async function createAppointmentForCompany(
+  client: DbClient,
+  input: {
+    userId: string
+    companyId: string
+    appointment: Omit<PlanningAppointment, 'id' | 'createdAt' | 'updatedAt'>
+  },
+): Promise<PlanningAppointment> {
+  logger.debug('createAppointment: Creating appointment', {
+    component: 'appointments',
+    companyId: input.companyId,
+    customerName: input.appointment.customerName,
+    date: input.appointment.date,
+    type: input.appointment.type,
+  })
+
+  const { data, error } = await client
+    .from('planning_appointments')
+    .insert({
+      user_id: input.userId,
+      company_id: input.companyId,
+      customer_id: input.appointment.customerId || null,
+      customer_name: input.appointment.customerName,
+      phone: input.appointment.phone || null,
+      date: input.appointment.date,
+      time: input.appointment.time || null,
+      type: input.appointment.type,
+      notes: input.appointment.notes || null,
+      assigned_user_id: input.appointment.assignedUserId || null,
+      project_id: null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    const errObj = error as Error & { code?: string; details?: string; hint?: string }
+    const errorCode = errObj.code
+    if (errorCode === '42P01') {
+      const errorMsg =
+        'Table planning_appointments does not exist. Please run the SQL migration: supabase/migrations/create_planning_appointments.sql'
+      logger.error('createAppointment: Table missing', {
+        component: 'appointments',
+        hint: errorMsg,
+      })
+      throw new Error(errorMsg)
+    }
+
+    logger.error(
+      'createAppointment error',
+      {
+        component: 'appointments',
+        errorCode,
+        errorDetails: errObj.details,
+        errorHint: errObj.hint,
+      },
+      error as Error,
+    )
+    throw error
+  }
+
+  logger.debug('createAppointment: Successfully created', {
+    component: 'appointments',
+    appointmentId: data.id,
+  })
+  return mapAppointmentFromDB(data)
 }
 
 /**

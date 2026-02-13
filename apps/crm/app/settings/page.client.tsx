@@ -11,6 +11,7 @@ import {
   Scale,
   ClipboardList,
   Package,
+  Mic,
 } from 'lucide-react'
 import AIAgentButton from '@/components/AIAgentButton'
 import { useAuth } from '@/hooks/useAuth'
@@ -23,12 +24,23 @@ import { AGBTab } from './components/AGBTab'
 import { AuftragTab } from './components/AuftragTab'
 import { UsersTab } from './components/UsersTab'
 import AuditLogTab from './components/AuditLogTab'
+import { VoiceTab } from './components/VoiceTab'
 import { useCompanySettingsData } from '@/hooks/useCompanySettingsData'
 import { useUserManagement } from '@/hooks/useUserManagement'
 import { useToast } from '@/components/providers/ToastProvider'
 import { logger } from '@/lib/utils/logger'
 
-type TabType = 'company' | 'bank' | 'suppliers' | 'employees' | 'invoice' | 'agb' | 'auftrag' | 'users' | 'audit'
+type TabType =
+  | 'company'
+  | 'voice'
+  | 'bank'
+  | 'suppliers'
+  | 'employees'
+  | 'invoice'
+  | 'agb'
+  | 'auftrag'
+  | 'users'
+  | 'audit'
 
 type RoleKey = 'geschaeftsfuehrer' | 'administration' | 'buchhaltung' | 'verkaeufer' | 'monteur'
 
@@ -208,6 +220,7 @@ export default function SettingsPageClient() {
 
   const tabs = [
     { id: 'company' as TabType, label: 'Firmendaten', icon: Building2 },
+    { id: 'voice' as TabType, label: 'Voice / Siri', icon: Mic },
     { id: 'bank' as TabType, label: 'Bankverbindungen', icon: CreditCard },
     { id: 'suppliers' as TabType, label: 'Lieferanten', icon: Package },
     { id: 'employees' as TabType, label: 'Mitarbeiter', icon: Users },
@@ -280,6 +293,15 @@ export default function SettingsPageClient() {
             saving={saving}
             onSaveBank={handleSaveBank}
             onDeleteBank={handleDeleteBank}
+          />
+        )}
+
+        {activeTab === 'voice' && (
+          <VoiceTab
+            companySettings={companySettings}
+            setCompanySettings={setCompanySettings}
+            saving={saving}
+            onSaveCompany={handleSaveCompany}
           />
         )}
 

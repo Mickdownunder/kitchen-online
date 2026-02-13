@@ -4,8 +4,9 @@
 
 | Typ | Methode | Beschreibung |
 |-----|---------|--------------|
-| Mitarbeiter | Cookie (Supabase Session) | Alle CRM-Routen unter `/api/*` (außer customer, booking, cron) |
+| Mitarbeiter | Cookie (Supabase Session) | Alle CRM-Routen unter `/api/*` (außer customer, booking, cron, voice) |
 | Kunde | Bearer Token (JWT) | `Authorization: Bearer <token>` für `/api/customer/*` |
+| Voice (Siri/Shortcut) | Bearer Token (persönlicher Token) | `Authorization: Bearer <personal_voice_token>` für `/api/voice/capture` |
 | Cron | Header | `Authorization: Bearer <CRON_SECRET>` für `/api/cron/*` |
 | Webhook | Optional | `CALCOM_WEBHOOK_SECRET` für Signatur |
 
@@ -56,6 +57,22 @@
 | `/api/geocode` | GET | Adress-Autocomplete |
 | `/api/analyze-document` | POST | Dokument (PDF) analysieren (Prompt + Base64) |
 | `/api/analyze-kitchen-plan` | POST | Küchenplan-PDF (DAN, Blanco, Bosch) → strukturierte Artikel-Liste (Base64) |
+
+## Voice-API (Siri / Shortcuts)
+
+Basis: `Authorization: Bearer <personal_voice_token>`. Token werden in den Einstellungen (Voice-Tab) erzeugt; das Secret wird nur einmal angezeigt. Pro Firma müssen die Feature-Flags `voice_capture_enabled` (und optional `voice_auto_execute_enabled`) aktiv sein.
+
+| Route | Methode | Beschreibung |
+|-------|---------|--------------|
+| `/api/voice/capture` | POST | Voice-Text erfassen (Body: `text`, `idempotencyKey`; optional: `source`, `locale`, `contextHints`). Antwort: `status` (stored \| executed \| needs_confirmation \| failed), `message`, `entryId`; bei Ausführung ggf. `taskId`, `appointmentId`. Idempotenz über `(company_id, idempotency_key)`. Rate-Limit pro Token. |
+| `/api/voice/inbox` | GET | Voice-Inbox-Einträge (Filter: status, limit). Cookie-Session (Mitarbeiter). |
+| `/api/voice/inbox/[id]/confirm` | POST | needs_confirmation-Eintrag bestätigen und ausführen. |
+| `/api/voice/inbox/[id]/retry` | POST | Fehlgeschlagenen Eintrag erneut ausführen. |
+| `/api/voice/inbox/[id]/discard` | POST | Eintrag verwerfen. |
+| `/api/voice/tokens` | GET, POST | Voice-Tokens auflisten / erstellen (Cookie-Session). |
+| `/api/voice/tokens/[id]/revoke` | POST | Token widerrufen. |
+
+Erlaubte Aktionen (v1): `create_task`, `create_appointment`, `add_project_note`. Bei hoher Confidence und aktiviertem Auto-Execute wird direkt ausgeführt; sonst `needs_confirmation` (Bestätigung in der Voice-Inbox).
 
 ## Customer-API (Kundenportal)
 

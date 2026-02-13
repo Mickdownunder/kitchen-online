@@ -3,6 +3,7 @@ import { ProjectStatus } from '@/types'
 import {
   applyItemMaterialUpdate,
   getItemMaterialSnapshot,
+  getProjectMaterialSnapshot,
   getUpcomingInstallationMaterialSnapshots,
   resolveItemDeliveryStatus,
 } from '@/lib/utils/materialTracking'
@@ -198,6 +199,50 @@ describe('getUpcomingInstallationMaterialSnapshots', () => {
     expect(snapshots[1].riskLevel).toBe('warning')
     expect(snapshots[2].projectId).toBe('ready')
     expect(snapshots[2].riskLevel).toBe('ok')
+  })
+
+  it('treats reservation_only and internal_stock items as ready for dashboard (no "Artikel fehlen")', () => {
+    const project = createProject({
+      id: 'reservation-project',
+      customerName: 'Dr. Strobl',
+      orderNumber: 'A2026-1116',
+      installationDate: '2026-02-23',
+      items: [
+        createItem({
+          id: 'ext-1',
+          quantity: 1,
+          quantityOrdered: 1,
+          quantityDelivered: 1,
+          deliveryStatus: 'delivered',
+          procurementType: 'external_order',
+        }),
+        createItem({
+          id: 'res-1',
+          quantity: 1,
+          quantityOrdered: 0,
+          quantityDelivered: 0,
+          deliveryStatus: 'not_ordered',
+          procurementType: 'reservation_only',
+        }),
+        createItem({
+          id: 'stock-1',
+          quantity: 1,
+          quantityOrdered: 0,
+          quantityDelivered: 0,
+          deliveryStatus: 'not_ordered',
+          procurementType: 'internal_stock',
+        }),
+      ],
+    })
+
+    const snapshot = getProjectMaterialSnapshot(project, now)
+    expect(snapshot).not.toBeNull()
+    expect(snapshot!.totalItems).toBe(3)
+    expect(snapshot!.fullyOrderedItems).toBe(3)
+    expect(snapshot!.fullyDeliveredItems).toBe(3)
+    expect(snapshot!.openOrderItems).toBe(0)
+    expect(snapshot!.openDeliveryItems).toBe(0)
+    expect(snapshot!.riskLevel).toBe('ok')
   })
 })
 

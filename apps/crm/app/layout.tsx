@@ -42,9 +42,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     pathname === '/signup' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password'
+  const isVoiceMobileRoute = pathname === '/voice-mobile'
 
-  // Portal + auth routes get minimal layout
-  if (isPortalRoute || isAuthRoute) {
+  // Portal + auth + voice-mobile (Handy-Diktat ohne Sidebar) get minimal layout
+  if (isPortalRoute || isAuthRoute || isVoiceMobileRoute) {
     return (
       <html lang="de" className={fontClass}>
         <body className="bg-slate-50 text-slate-900">

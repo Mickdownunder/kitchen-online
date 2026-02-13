@@ -20,6 +20,7 @@ import { getCurrentCompanyId } from '@/lib/supabase/services/permissions'
 import {
   getAppointments,
   createAppointment,
+  createAppointmentForCompany,
   updateAppointment,
   deleteAppointment,
 } from '@/lib/supabase/services/appointments'
@@ -126,6 +127,33 @@ describe('createAppointment', () => {
     })
 
     expect(result.id).toBe('apt-new')
+  })
+})
+
+describe('createAppointmentForCompany (regression)', () => {
+  it('creates appointment with injected client for server flows', async () => {
+    const client = {
+      from: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({
+        data: { ...APT_ROW, id: 'apt-service', customer_name: 'Service Kunde' },
+        error: null,
+      }),
+    }
+
+    const result = await createAppointmentForCompany(client as never, {
+      userId: 'user-1',
+      companyId: 'comp-1',
+      appointment: {
+        customerName: 'Service Kunde',
+        date: '2026-02-20',
+        type: 'Consultation',
+      },
+    })
+
+    expect(result.id).toBe('apt-service')
+    expect(result.customerName).toBe('Service Kunde')
   })
 })
 

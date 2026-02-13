@@ -56,6 +56,8 @@ export function useCompanySettingsData(): UseCompanySettingsDataResult {
     email: '',
     inboundEmailAb: '',
     inboundEmailInvoices: '',
+    voiceCaptureEnabled: false,
+    voiceAutoExecuteEnabled: false,
     uid: '',
     defaultPaymentTerms: 14,
     defaultTaxRate: 20,
