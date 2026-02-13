@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useGeminiLive, type ConnectionState } from './lib/useGeminiLive'
+import { useVoiceChat, type VoiceChatState } from './lib/useVoiceChat'
 
 const TOKEN_KEY = 'baleah_voice_token'
 const HISTORY_KEY = 'baleah_voice_history'
@@ -53,12 +53,12 @@ function timeAgo(isoString: string): string {
   return `vor ${Math.floor(hours / 24)} Tag(en)`
 }
 
-function connectionLabel(state: ConnectionState): string {
+function stateLabel(state: VoiceChatState): string {
   switch (state) {
-    case 'connecting': return 'Verbinde ...'
-    case 'connected': return 'Verbunden'
-    case 'error': return 'Fehler'
-    default: return 'Getrennt'
+    case 'listening': return 'H\u00F6re zu ...'
+    case 'thinking': return 'Denke nach ...'
+    case 'speaking': return 'June spricht ...'
+    default: return 'Tippe um zu starten'
   }
 }
 
@@ -84,16 +84,19 @@ export default function VoiceMobileClient() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const resultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // KI Assistant (Gemini Live)
+  // KI Assistant (Server-Side Gemini 3 Flash + STT/TTS)
   const {
-    connect,
-    disconnect,
-    connectionState,
-    inputVolume,
-    outputVolume,
-    isPlaying,
-    error: liveError,
-  } = useGeminiLive(savedToken)
+    state: voiceState,
+    messages: chatMessages,
+    error: voiceError,
+    autoListen,
+    setAutoListen,
+    currentTranscript,
+    startListening,
+    stopListening,
+    stop: stopVoice,
+    clearMessages,
+  } = useVoiceChat(savedToken)
 
   // -----------------------------------------------------------------------
   // Init
@@ -140,20 +143,20 @@ export default function VoiceMobileClient() {
   }, [token])
 
   const clearToken = useCallback(() => {
-    if (connectionState === 'connected') disconnect()
+    stopVoice()
     localStorage.removeItem(TOKEN_KEY)
     setSavedToken(null)
     setTokenState('')
     setShowTokenSetup(true)
-  }, [connectionState, disconnect])
+  }, [stopVoice])
 
   const switchMode = useCallback((m: AppMode) => {
-    if (connectionState === 'connected') disconnect()
+    stopVoice()
     setMode(m)
     localStorage.setItem(MODE_KEY, m)
     setError('')
     setLastResult(null)
-  }, [connectionState, disconnect])
+  }, [stopVoice])
 
   const showResult = useCallback((status: string, message: string) => {
     setLastResult({ status, message })
@@ -253,19 +256,21 @@ export default function VoiceMobileClient() {
   // KI Assistant handlers
   // -----------------------------------------------------------------------
 
-  const handleAssistantToggle = useCallback(() => {
-    if (connectionState === 'connected') {
-      disconnect()
-    } else if (connectionState !== 'connecting') {
-      connect()
+  const handleMicToggle = useCallback(() => {
+    if (voiceState === 'listening') {
+      stopListening()
+    } else if (voiceState === 'idle') {
+      startListening()
+    } else if (voiceState === 'speaking') {
+      stopVoice()
     }
-  }, [connectionState, connect, disconnect])
+  }, [voiceState, startListening, stopListening, stopVoice])
 
-  // -----------------------------------------------------------------------
-  // Volume bar helper
-  // -----------------------------------------------------------------------
-
-  const volumeBarWidth = (vol: number) => `${Math.round(Math.max(vol, 0.05) * 100)}%`
+  // Auto-scroll chat
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
 
   // -----------------------------------------------------------------------
   // Render
@@ -362,126 +367,152 @@ export default function VoiceMobileClient() {
       {/* KI ASSISTANT MODE                                             */}
       {/* ============================================================= */}
       {mode === 'assistant' && savedToken && !showTokenSetup && (
-        <div className="flex flex-1 flex-col items-center justify-center px-5">
+        <div className="flex flex-1 flex-col px-5">
 
           {/* Error display */}
-          {(liveError || error) && (
-            <div className="mb-6 w-full rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-center backdrop-blur-md">
-              <p className="text-sm text-rose-300">{liveError || error}</p>
+          {(voiceError || error) && (
+            <div className="mb-3 mt-2 w-full rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3 text-center backdrop-blur-md">
+              <p className="text-sm text-rose-300">{voiceError || error}</p>
             </div>
           )}
 
-          {/* Connection status badge */}
-          <div className={`mb-6 rounded-full px-4 py-1.5 text-xs font-medium ${
-            connectionState === 'connected'
-              ? 'bg-emerald-500/20 text-emerald-300'
-              : connectionState === 'connecting'
-                ? 'bg-amber-500/20 text-amber-300'
-                : connectionState === 'error'
-                  ? 'bg-rose-500/20 text-rose-300'
-                  : 'bg-white/10 text-slate-400'
-          }`}>
-            {connectionLabel(connectionState)}
+          {/* Auto-listen toggle + clear */}
+          <div className="mb-2 mt-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setAutoListen(!autoListen)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                autoListen
+                  ? 'bg-violet-500/20 text-violet-300'
+                  : 'bg-white/10 text-slate-500'
+              }`}
+            >
+              Auto-Zuh&ouml;ren {autoListen ? 'An' : 'Aus'}
+            </button>
+            {chatMessages.length > 0 && (
+              <button
+                type="button"
+                onClick={clearMessages}
+                className="text-xs text-slate-500 transition-colors active:text-slate-300"
+              >
+                Chat l&ouml;schen
+              </button>
+            )}
           </div>
 
-          {/* Volume visualizer */}
-          {connectionState === 'connected' && (
-            <div className="mb-8 w-full max-w-xs space-y-2">
-              {/* Input volume bar */}
-              <div className="flex items-center gap-3">
-                <span className="w-6 text-center text-xs text-slate-500">Du</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-violet-400 to-indigo-400 transition-all duration-100"
-                    style={{ width: volumeBarWidth(inputVolume) }}
-                  />
+          {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+            {chatMessages.length === 0 && voiceState === 'idle' && (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <p className="text-sm text-slate-500">
+                  Sprich direkt mit June.
+                </p>
+                <p className="mt-1 text-xs text-slate-600">
+                  Termine, Finanzen, Projekte &mdash; alles per Stimme.
+                </p>
+              </div>
+            )}
+            {chatMessages.map((msg, i) => (
+              <div
+                key={`${msg.timestamp}-${i}`}
+                className={`mb-2 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-violet-500/20 text-violet-100'
+                      : 'bg-white/10 text-slate-200'
+                  }`}
+                >
+                  {msg.content}
                 </div>
               </div>
-              {/* Output volume bar */}
-              <div className="flex items-center gap-3">
-                <span className="w-6 text-center text-xs text-slate-500">KI</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-100"
-                    style={{ width: volumeBarWidth(outputVolume) }}
-                  />
+            ))}
+            {/* Interim transcript */}
+            {currentTranscript && (
+              <div className="mb-2 flex justify-end">
+                <div className="max-w-[85%] rounded-2xl bg-violet-500/10 px-4 py-2.5 text-sm italic text-violet-300/70">
+                  {currentTranscript}
                 </div>
               </div>
+            )}
+            {/* Thinking indicator */}
+            {voiceState === 'thinking' && (
+              <div className="mb-2 flex justify-start">
+                <div className="rounded-2xl bg-white/10 px-4 py-2.5 text-sm text-slate-400">
+                  <span className="inline-flex gap-1">
+                    <span className="animate-bounce" style={{ animationDelay: '0ms' }}>&bull;</span>
+                    <span className="animate-bounce" style={{ animationDelay: '150ms' }}>&bull;</span>
+                    <span className="animate-bounce" style={{ animationDelay: '300ms' }}>&bull;</span>
+                  </span>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Bottom bar: mic button + state label */}
+          <div className="flex flex-col items-center pb-4 pt-4">
+            {/* State badge */}
+            <div className={`mb-4 rounded-full px-4 py-1.5 text-xs font-medium ${
+              voiceState === 'listening'
+                ? 'bg-rose-500/20 text-rose-300 animate-pulse'
+                : voiceState === 'thinking'
+                  ? 'bg-amber-500/20 text-amber-300 animate-pulse'
+                  : voiceState === 'speaking'
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-white/10 text-slate-400'
+            }`}>
+              {stateLabel(voiceState)}
             </div>
-          )}
 
-          {/* Big connect/disconnect button */}
-          <button
-            type="button"
-            onClick={handleAssistantToggle}
-            disabled={connectionState === 'connecting'}
-            className={`relative flex h-32 w-32 items-center justify-center rounded-full shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-60 ${
-              connectionState === 'connected'
-                ? 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-emerald-500/30'
-                : connectionState === 'connecting'
-                  ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30'
-                  : 'bg-gradient-to-br from-violet-500 to-indigo-600 shadow-violet-500/30'
-            }`}
-          >
-            {/* Pulse rings when connected */}
-            {connectionState === 'connected' && (
-              <>
-                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-15" />
-                <span
-                  className="absolute -inset-2 rounded-full border-2 border-emerald-400/30 transition-transform duration-200"
-                  style={{ transform: `scale(${1 + outputVolume * 0.15})` }}
-                />
-              </>
-            )}
-            {connectionState === 'connecting' && (
-              <span className="absolute inset-0 animate-pulse rounded-full bg-amber-400 opacity-15" />
-            )}
+            {/* Mic button */}
+            <button
+              type="button"
+              onClick={handleMicToggle}
+              disabled={voiceState === 'thinking'}
+              className={`relative flex h-20 w-20 items-center justify-center rounded-full shadow-2xl transition-all duration-300 active:scale-95 disabled:opacity-60 ${
+                voiceState === 'listening'
+                  ? 'bg-gradient-to-br from-rose-400 to-red-500 shadow-rose-500/30'
+                  : voiceState === 'speaking'
+                    ? 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-emerald-500/30'
+                    : voiceState === 'thinking'
+                      ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30'
+                      : 'bg-gradient-to-br from-violet-500 to-indigo-600 shadow-violet-500/30'
+              }`}
+            >
+              {voiceState === 'listening' && (
+                <>
+                  <span className="absolute inset-0 animate-ping rounded-full bg-rose-400 opacity-15" />
+                  <span className="absolute -inset-2 animate-pulse rounded-full border-2 border-rose-400/30" />
+                </>
+              )}
+              {voiceState === 'thinking' && (
+                <span className="absolute inset-0 animate-pulse rounded-full bg-amber-400 opacity-15" />
+              )}
+              {voiceState === 'speaking' && (
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-10" />
+              )}
 
-            {/* Icon */}
-            {connectionState === 'connected' ? (
-              /* Phone hang-up icon */
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="relative z-10 h-14 w-14 text-white">
-                <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
-                <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
-            ) : connectionState === 'connecting' ? (
-              /* Spinner */
-              <svg className="relative z-10 h-14 w-14 animate-spin text-white" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : (
-              /* Microphone icon */
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="relative z-10 h-14 w-14 text-white">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
-            )}
-          </button>
-
-          {/* Status label */}
-          <p className={`mt-6 text-center text-sm font-medium ${
-            connectionState === 'connected'
-              ? 'text-emerald-300'
-              : connectionState === 'connecting'
-                ? 'text-amber-300 animate-pulse'
-                : 'text-slate-400'
-          }`}>
-            {connectionState === 'connected'
-              ? isPlaying ? 'June spricht ...' : 'Sage etwas ...'
-              : connectionState === 'connecting'
-                ? 'Verbinde mit June ...'
-                : 'Tippe um zu starten'}
-          </p>
-
-          {/* Hint text */}
-          {connectionState === 'disconnected' && (
-            <p className="mt-4 max-w-xs text-center text-xs leading-relaxed text-slate-500">
-              Sprich direkt mit deiner KI-Assistentin June.
-              Sie kann Termine erstellen, Finanzen abfragen, Notizen hinzufügen und mehr.
-            </p>
-          )}
+              {voiceState === 'thinking' ? (
+                <svg className="relative z-10 h-10 w-10 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : voiceState === 'speaking' ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="relative z-10 h-10 w-10 text-white">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="relative z-10 h-10 w-10 text-white">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
