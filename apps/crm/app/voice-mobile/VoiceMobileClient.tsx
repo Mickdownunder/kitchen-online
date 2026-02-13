@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const TOKEN_KEY = 'baleah_voice_token'
 const API_PATH = '/api/voice/capture'
@@ -10,13 +10,20 @@ export default function VoiceMobileClient() {
   const [savedToken, setSavedToken] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('')
   const [listening, setListening] = useState(false)
+  const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>('')
+  const [manualText, setManualText] = useState('')
+  const [hasSpeechApi, setHasSpeechApi] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const stored = localStorage.getItem(TOKEN_KEY)
     setSavedToken(stored)
     if (stored) setTokenState(stored)
+    // Detect Speech API support
+    const win = window as unknown as Record<string, unknown>
+    setHasSpeechApi(Boolean(win.webkitSpeechRecognition || win.SpeechRecognition))
   }, [])
 
   const saveToken = useCallback(() => {
@@ -28,7 +35,7 @@ export default function VoiceMobileClient() {
     localStorage.setItem(TOKEN_KEY, t)
     setSavedToken(t)
     setError('')
-    setStatus('Token gespeichert. Du kannst jetzt diktieren.')
+    setStatus('Token gespeichert.')
   }, [token])
 
   const clearToken = useCallback(() => {
@@ -44,9 +51,15 @@ export default function VoiceMobileClient() {
         setError('Kein Token. Bitte oben Token eintragen und speichern.')
         return
       }
+      const trimmed = text.trim()
+      if (!trimmed) {
+        setError('Bitte Text eingeben oder diktieren.')
+        return
+      }
       const idempotencyKey = `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       setStatus('Sende …')
       setError('')
+      setSending(true)
 
       try {
         const res = await fetch(API_PATH, {
@@ -56,7 +69,7 @@ export default function VoiceMobileClient() {
             Authorization: `Bearer ${savedToken.trim()}`,
           },
           body: JSON.stringify({
-            text: text.trim(),
+            text: trimmed,
             idempotencyKey,
             source: 'mobile_app',
           }),
@@ -74,22 +87,28 @@ export default function VoiceMobileClient() {
           return
         }
         setStatus(data.message || 'Erfasst.')
+        setManualText('')
         setError('')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Netzwerkfehler')
         setStatus('')
+      } finally {
+        setSending(false)
       }
     },
-    [savedToken]
+    [savedToken],
   )
 
   const startDictation = useCallback(() => {
     setError('')
     const win = typeof window !== 'undefined' ? window : null
-    const Recognition = win && ((win as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition ?? (win as unknown as { SpeechRecognition?: unknown }).SpeechRecognition)
+    const Recognition =
+      win &&
+      ((win as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition ??
+        (win as unknown as { SpeechRecognition?: unknown }).SpeechRecognition)
 
     if (!Recognition) {
-      setError('Diktierfunktion wird in diesem Browser nicht unterstützt. Bitte Safari auf dem iPhone verwenden.')
+      setError('Spracherkennung nicht verfügbar. Nutze das Textfeld oder die iPhone-Tastatur-Diktierfunktion.')
       return
     }
 
@@ -122,15 +141,20 @@ export default function VoiceMobileClient() {
     rec.start()
   }, [sendCapture])
 
+  const handleManualSend = useCallback(() => {
+    void sendCapture(manualText)
+  }, [sendCapture, manualText])
+
   return (
     <div className="min-h-screen bg-slate-100 p-6">
       <div className="mx-auto max-w-md space-y-6">
-        <h1 className="text-xl font-semibold text-slate-800">Baleah Voice (Handy)</h1>
+        <h1 className="text-xl font-semibold text-slate-800">Baleah Voice</h1>
 
+        {/* Token setup */}
         {!savedToken ? (
           <div className="rounded-xl bg-white p-4 shadow">
             <p className="mb-2 text-sm text-slate-600">
-              Token einmal eintragen (aus dem CRM: Einstellungen → Voice → Token erstellen → Secret kopieren).
+              Token einmal eintragen (CRM: Einstellungen &rarr; Voice &rarr; Token erstellen &rarr; Secret kopieren).
             </p>
             <textarea
               className="mb-2 w-full rounded-lg border border-slate-300 p-3 text-sm"
@@ -156,17 +180,46 @@ export default function VoiceMobileClient() {
           </div>
         )}
 
+        {/* Dictation button (only if Speech API available) */}
+        {hasSpeechApi && (
+          <div className="rounded-xl bg-white p-4 shadow">
+            <button
+              type="button"
+              onClick={startDictation}
+              disabled={!savedToken || listening || sending}
+              className="w-full rounded-lg bg-slate-800 py-4 font-medium text-white disabled:opacity-50"
+            >
+              {listening ? 'Höre zu …' : 'Diktieren'}
+            </button>
+          </div>
+        )}
+
+        {/* Manual text input — always visible as fallback */}
         <div className="rounded-xl bg-white p-4 shadow">
+          <p className="mb-2 text-sm text-slate-500">
+            {hasSpeechApi
+              ? 'Oder Text eingeben / per Tastatur-Mikrofon diktieren:'
+              : 'Text eingeben oder per Tastatur-Mikrofon diktieren:'}
+          </p>
+          <textarea
+            ref={textareaRef}
+            className="mb-3 w-full rounded-lg border border-slate-300 p-3 text-base leading-relaxed"
+            placeholder="z.B. Aufgabe: Angebot an Müller schicken bis Freitag"
+            rows={3}
+            value={manualText}
+            onChange={(e) => setManualText(e.target.value)}
+          />
           <button
             type="button"
-            onClick={startDictation}
-            disabled={!savedToken || listening}
-            className="w-full rounded-lg bg-slate-800 py-4 font-medium text-white disabled:opacity-50"
+            onClick={handleManualSend}
+            disabled={!savedToken || sending || !manualText.trim()}
+            className="w-full rounded-lg bg-amber-500 py-3 font-medium text-white disabled:opacity-50"
           >
-            {listening ? 'Höre zu …' : 'Diktieren'}
+            {sending ? 'Sende …' : 'Absenden'}
           </button>
         </div>
 
+        {/* Status / Error */}
         {(status || error) && (
           <div
             className={`rounded-xl p-4 ${error ? 'bg-rose-50 text-rose-800' : 'bg-emerald-50 text-emerald-800'}`}

@@ -57,35 +57,30 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 
 ALTER TABLE public.tasks OWNER TO postgres;
 
-ALTER TABLE ONLY public.tasks
-  ADD CONSTRAINT tasks_company_id_fkey
-  FOREIGN KEY (company_id)
-  REFERENCES public.company_settings(id)
-  ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.tasks
-  ADD CONSTRAINT tasks_user_id_fkey
-  FOREIGN KEY (user_id)
-  REFERENCES auth.users(id)
-  ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.tasks
-  ADD CONSTRAINT tasks_assigned_user_id_fkey
-  FOREIGN KEY (assigned_user_id)
-  REFERENCES auth.users(id)
-  ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.tasks
-  ADD CONSTRAINT tasks_completed_by_user_id_fkey
-  FOREIGN KEY (completed_by_user_id)
-  REFERENCES auth.users(id)
-  ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.tasks
-  ADD CONSTRAINT tasks_project_id_fkey
-  FOREIGN KEY (project_id)
-  REFERENCES public.projects(id)
-  ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_company_id_fkey') THEN
+    ALTER TABLE ONLY public.tasks ADD CONSTRAINT tasks_company_id_fkey
+      FOREIGN KEY (company_id) REFERENCES public.company_settings(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_user_id_fkey') THEN
+    ALTER TABLE ONLY public.tasks ADD CONSTRAINT tasks_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_assigned_user_id_fkey') THEN
+    ALTER TABLE ONLY public.tasks ADD CONSTRAINT tasks_assigned_user_id_fkey
+      FOREIGN KEY (assigned_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_completed_by_user_id_fkey') THEN
+    ALTER TABLE ONLY public.tasks ADD CONSTRAINT tasks_completed_by_user_id_fkey
+      FOREIGN KEY (completed_by_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_project_id_fkey') THEN
+    ALTER TABLE ONLY public.tasks ADD CONSTRAINT tasks_project_id_fkey
+      FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE SET NULL;
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_tasks_company_status_due
   ON public.tasks USING btree (company_id, status, due_at);
@@ -119,23 +114,22 @@ CREATE TABLE IF NOT EXISTS public.voice_api_tokens (
 
 ALTER TABLE public.voice_api_tokens OWNER TO postgres;
 
-ALTER TABLE ONLY public.voice_api_tokens
-  ADD CONSTRAINT voice_api_tokens_company_id_fkey
-  FOREIGN KEY (company_id)
-  REFERENCES public.company_settings(id)
-  ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.voice_api_tokens
-  ADD CONSTRAINT voice_api_tokens_user_id_fkey
-  FOREIGN KEY (user_id)
-  REFERENCES auth.users(id)
-  ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.voice_api_tokens
-  ADD CONSTRAINT voice_api_tokens_revoked_by_user_id_fkey
-  FOREIGN KEY (revoked_by_user_id)
-  REFERENCES auth.users(id)
-  ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_api_tokens_company_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_api_tokens ADD CONSTRAINT voice_api_tokens_company_id_fkey
+      FOREIGN KEY (company_id) REFERENCES public.company_settings(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_api_tokens_user_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_api_tokens ADD CONSTRAINT voice_api_tokens_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_api_tokens_revoked_by_user_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_api_tokens ADD CONSTRAINT voice_api_tokens_revoked_by_user_id_fkey
+      FOREIGN KEY (revoked_by_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_voice_api_tokens_company_active
   ON public.voice_api_tokens USING btree (company_id, revoked_at, expires_at);
@@ -197,47 +191,38 @@ CREATE TABLE IF NOT EXISTS public.voice_inbox_entries (
 
 ALTER TABLE public.voice_inbox_entries OWNER TO postgres;
 
-ALTER TABLE ONLY public.voice_inbox_entries
-  ADD CONSTRAINT voice_inbox_entries_company_id_fkey
-  FOREIGN KEY (company_id)
-  REFERENCES public.company_settings(id)
-  ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.voice_inbox_entries
-  ADD CONSTRAINT voice_inbox_entries_user_id_fkey
-  FOREIGN KEY (user_id)
-  REFERENCES auth.users(id)
-  ON DELETE CASCADE;
-
-ALTER TABLE ONLY public.voice_inbox_entries
-  ADD CONSTRAINT voice_inbox_entries_token_id_fkey
-  FOREIGN KEY (token_id)
-  REFERENCES public.voice_api_tokens(id)
-  ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.voice_inbox_entries
-  ADD CONSTRAINT voice_inbox_entries_executed_task_id_fkey
-  FOREIGN KEY (executed_task_id)
-  REFERENCES public.tasks(id)
-  ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.voice_inbox_entries
-  ADD CONSTRAINT voice_inbox_entries_executed_appointment_id_fkey
-  FOREIGN KEY (executed_appointment_id)
-  REFERENCES public.planning_appointments(id)
-  ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.voice_inbox_entries
-  ADD CONSTRAINT voice_inbox_entries_confirmed_by_user_id_fkey
-  FOREIGN KEY (confirmed_by_user_id)
-  REFERENCES auth.users(id)
-  ON DELETE SET NULL;
-
-ALTER TABLE ONLY public.voice_inbox_entries
-  ADD CONSTRAINT voice_inbox_entries_discarded_by_user_id_fkey
-  FOREIGN KEY (discarded_by_user_id)
-  REFERENCES auth.users(id)
-  ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_inbox_entries_company_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_inbox_entries ADD CONSTRAINT voice_inbox_entries_company_id_fkey
+      FOREIGN KEY (company_id) REFERENCES public.company_settings(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_inbox_entries_user_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_inbox_entries ADD CONSTRAINT voice_inbox_entries_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_inbox_entries_token_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_inbox_entries ADD CONSTRAINT voice_inbox_entries_token_id_fkey
+      FOREIGN KEY (token_id) REFERENCES public.voice_api_tokens(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_inbox_entries_executed_task_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_inbox_entries ADD CONSTRAINT voice_inbox_entries_executed_task_id_fkey
+      FOREIGN KEY (executed_task_id) REFERENCES public.tasks(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_inbox_entries_executed_appointment_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_inbox_entries ADD CONSTRAINT voice_inbox_entries_executed_appointment_id_fkey
+      FOREIGN KEY (executed_appointment_id) REFERENCES public.planning_appointments(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_inbox_entries_confirmed_by_user_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_inbox_entries ADD CONSTRAINT voice_inbox_entries_confirmed_by_user_id_fkey
+      FOREIGN KEY (confirmed_by_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_inbox_entries_discarded_by_user_id_fkey') THEN
+    ALTER TABLE ONLY public.voice_inbox_entries ADD CONSTRAINT voice_inbox_entries_discarded_by_user_id_fkey
+      FOREIGN KEY (discarded_by_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_voice_inbox_entries_company_status_created
   ON public.voice_inbox_entries USING btree (company_id, status, created_at DESC);
