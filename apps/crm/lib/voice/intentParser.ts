@@ -132,8 +132,14 @@ function buildHeuristicIntent(text: string): VoiceIntent {
     lower.includes('termin') || lower.includes('besprechung') || lower.includes('meeting')
 
   if (looksLikeAppointment && date) {
-    const confidence = lower.includes('mit ') && Boolean(timeMatch) ? 0.9 : 0.72
     const customerNameMatch = normalized.match(/(?:mit|bei)\s+([A-Za-z0-9äöüÄÖÜß .\-]+)/)
+    const hasCustomer = Boolean(customerNameMatch?.[1]?.trim())
+    const hasTime = Boolean(timeMatch)
+
+    // Confidence: Termin + Datum reicht für high. Mehr Details = höher.
+    let confidence = 0.86 // Termin + Datum = genug für Auto-Execute
+    if (hasTime) confidence = 0.90
+    if (hasCustomer && hasTime) confidence = 0.95
 
     return {
       version: 'v1',
@@ -158,8 +164,8 @@ function buildHeuristicIntent(text: string): VoiceIntent {
       version: 'v1',
       action: 'create_appointment',
       summary: 'Termin aus Voice-Text',
-      confidence: 0.78,
-      confidenceLevel: toConfidenceLevel(0.78),
+      confidence: 0.88,
+      confidenceLevel: toConfidenceLevel(0.88),
       appointment: {
         customerName: customerNameMatch?.[1]?.trim() || 'Kunde (unbekannt)',
         date,
@@ -178,7 +184,9 @@ function buildHeuristicIntent(text: string): VoiceIntent {
     .replace(/\b(bis|am)\s+\d{1,2}\.\d{1,2}\.\d{4}\b/g, '')
     .trim()
 
-  const confidence = lower.includes('aufgabe') || lower.includes('todo') ? 0.88 : 0.65
+  // "Aufgabe" oder "Todo" explizit genannt → high confidence
+  const hasTaskKeyword = lower.includes('aufgabe') || lower.includes('todo') || lower.includes('erinnerung')
+  const confidence = hasTaskKeyword ? 0.92 : 0.70
 
   return {
     version: 'v1',
