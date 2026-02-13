@@ -111,26 +111,42 @@ export function useGeminiLive(voiceToken: string | null) {
       setError(null)
       cleanup()
 
+      // #region agent log
+      console.log('[DBG] connect-start', { token: voiceToken?.slice(0, 8) })
+      // #endregion
+
       // 1. Get session config from server (system prompt + tools + API key)
       const sessionRes = await fetch(`/api/voice/session?token=${encodeURIComponent(voiceToken)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
+      // #region agent log
+      console.log('[DBG] session-response', { ok: sessionRes.ok, status: sessionRes.status })
+      // #endregion
       if (!sessionRes.ok) {
         const errData = await sessionRes.json().catch(() => ({})) as { error?: string }
         throw new Error(errData.error || `Session-Fehler ${sessionRes.status}`)
       }
       const sessionConfig = (await sessionRes.json()) as SessionConfig
+      // #region agent log
+      console.log('[DBG] session-parsed', { hasApiKey: !!sessionConfig.apiKey, toolCount: sessionConfig.config?.tools?.length, sysInstrLen: sessionConfig.config?.systemInstruction?.length })
+      // #endregion
 
       // 2. Initialize audio output
       await initializeAudio()
+      // #region agent log
+      console.log('[DBG] audio-init done')
+      // #endregion
 
       // 3. Setup audio input (AudioWorklet)
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       inputAudioContextRef.current = new AC()
       const inputRate = inputAudioContextRef.current.sampleRate
       await inputAudioContextRef.current.audioWorklet.addModule(`/audio-processor.js?t=${Date.now()}`)
+      // #region agent log
+      console.log('[DBG] worklet-loaded', { inputRate })
+      // #endregion
 
       // 4. Build function declarations from server config
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,6 +157,9 @@ export function useGeminiLive(voiceToken: string | null) {
       })) as FunctionDeclaration[]
 
       // 5. Connect to Gemini Live
+      // #region agent log
+      console.log('[DBG] gemini-connect-start', { model: LIVE_MODEL, toolCount: functionDeclarations.length })
+      // #endregion
       const ai = new GoogleGenAI({ apiKey: sessionConfig.apiKey })
       const sessionPromise = ai.live.connect({
         model: LIVE_MODEL,
@@ -151,6 +170,9 @@ export function useGeminiLive(voiceToken: string | null) {
         } as Parameters<typeof ai.live.connect>[0]['config'],
         callbacks: {
           onopen: async () => {
+            // #region agent log
+            console.log('[DBG] gemini-onopen fired')
+            // #endregion
             isConnectedRef.current = true
             try {
               if (inputAudioContextRef.current?.state === 'suspended') {
@@ -241,24 +263,33 @@ export function useGeminiLive(voiceToken: string | null) {
           },
 
           onclose: () => {
+            // #region agent log
+            console.log('[DBG] gemini-onclose fired')
+            // #endregion
             cleanup()
             setConnectionState('disconnected')
             isConnectingRef.current = false
           },
           onerror: (e: unknown) => {
+            // #region agent log
+            console.error('[DBG] gemini-onerror', { error: String(e), msg: e instanceof Error ? e.message : 'unknown' })
+            // #endregion
             console.error('Gemini Live error:', e)
             cleanup()
             setConnectionState('error')
-            setError('Verbindungsfehler. Bitte erneut versuchen.')
+            setError(`[onerror] ${e instanceof Error ? e.message : String(e)}`)
             isConnectingRef.current = false
           },
         },
       })
       sessionPromiseRef.current = sessionPromise
     } catch (e) {
+      // #region agent log
+      console.error('[DBG] connect-catch', { error: String(e), msg: e instanceof Error ? e.message : 'unknown', stack: e instanceof Error ? e.stack?.slice(0, 300) : 'none' })
+      // #endregion
       cleanup()
       setConnectionState('error')
-      setError(e instanceof Error ? e.message : 'Verbindung fehlgeschlagen')
+      setError(`[catch] ${e instanceof Error ? e.message : String(e)}`)
       isConnectingRef.current = false
     }
   }, [connectionState, voiceToken, cleanup, initializeAudio, playAudioChunk, executeFunctionCall])
