@@ -46,6 +46,7 @@ export function toListInvoice(invoice: DBInvoice, project: CustomerProject): Lis
 export function useInvoiceFilters(opts: UseInvoiceFiltersOptions): UseInvoiceFiltersResult {
   const filteredInvoices = useMemo(() => {
     const q = opts.searchTerm.trim().toLowerCase()
+    const hasSearch = q.length > 0
     return opts.invoices.filter(inv => {
       // Search filter
       const customerName = inv.project?.customerName?.toLowerCase() || ''
@@ -63,6 +64,9 @@ export function useInvoiceFilters(opts: UseInvoiceFiltersOptions): UseInvoiceFil
       // Status filter
       if (opts.filterStatus === 'paid' && !inv.isPaid) return false
       if (opts.filterStatus === 'sent' && inv.isPaid) return false
+
+      // Bei aktiver Suche: Jahr/Monat ignorieren – Treffer aus allen Jahren anzeigen
+      if (hasSearch) return true
 
       // Year/Month filter
       const dateStr = inv.invoiceDate || inv.date

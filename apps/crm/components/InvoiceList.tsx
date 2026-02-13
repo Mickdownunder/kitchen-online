@@ -75,7 +75,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
     itemsPerPage,
     totalPages,
     paginatedInvoices,
-    currentMonthInvoices,
+    displayInvoices,
     stats,
     loadInvoices,
     handleMarkAsPaid,
@@ -324,7 +324,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ projects, onProjectUpdate }) 
           /* Einzelner Monat ausgewählt - Tabelle mit Pagination */
           <InvoiceTableSimple
             invoices={paginatedInvoices}
-            allInvoices={currentMonthInvoices}
+            allInvoices={displayInvoices}
             selectedMonth={selectedMonth as number}
             selectedYear={selectedYear as number}
             currentPage={currentPage}

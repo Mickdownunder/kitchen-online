@@ -75,6 +75,7 @@ interface UseInvoiceListDataResult {
   totalPages: number
   paginatedInvoices: ListInvoice[]
   currentMonthInvoices: ListInvoice[]
+  displayInvoices: ListInvoice[]
   stats: InvoiceListStats
   loadInvoices: (silent?: boolean) => Promise<void>
   handleMarkAsPaid: (invoice: ListInvoice) => Promise<void>
@@ -230,6 +231,16 @@ export function useInvoiceListData({
     selectedMonth,
   })
 
+  // Für Monats-Tab-Zählung: nur nach Jahr filtern (nicht nach Monat), damit alle 12 Monate die richtige Anzahl anzeigen
+  const { filteredInvoices: invoicesForMonthCounts } = useInvoiceFilters({
+    invoices,
+    searchTerm,
+    filterType,
+    filterStatus,
+    selectedYear,
+    selectedMonth: 'all',
+  })
+
   const handleInvoiceSort = useCallback((field: InvoiceListSortField): void => {
     setSortDirection((direction) => {
       if (sortField === field) {
@@ -277,7 +288,7 @@ export function useInvoiceListData({
       return months
     }
 
-    sortedInvoices.forEach((invoice) => {
+    invoicesForMonthCounts.forEach((invoice) => {
       const dateSource = invoice.invoiceDate || invoice.date
       const date = dateSource ? new Date(dateSource) : new Date()
       if (date.getFullYear() === selectedYear) {
@@ -287,14 +298,14 @@ export function useInvoiceListData({
     })
 
     return months
-  }, [selectedYear, sortedInvoices])
+  }, [selectedYear, invoicesForMonthCounts])
 
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedMonth, selectedYear])
+  }, [selectedMonth, selectedYear, searchTerm])
 
   const currentMonthInvoices = useMemo(() => {
     if (selectedYear === 'all' || selectedMonth === 'all') {
@@ -303,12 +314,18 @@ export function useInvoiceListData({
     return invoicesByMonth.get(selectedMonth as number) || []
   }, [invoicesByMonth, selectedMonth, selectedYear, sortedInvoices])
 
-  const totalPages = Math.ceil(currentMonthInvoices.length / itemsPerPage)
+  // Bei aktiver Suche: Suchtreffer aus allen Jahren anzeigen; sonst Monatsliste
+  const displayInvoices = useMemo(() => {
+    if (searchTerm.trim().length > 0) return sortedInvoices
+    return currentMonthInvoices
+  }, [searchTerm, sortedInvoices, currentMonthInvoices])
+
+  const totalPages = Math.ceil(displayInvoices.length / itemsPerPage)
 
   const paginatedInvoices = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
-    return currentMonthInvoices.slice(start, start + itemsPerPage)
-  }, [currentMonthInvoices, currentPage])
+    return displayInvoices.slice(start, start + itemsPerPage)
+  }, [displayInvoices, currentPage])
 
   const stats = useMemo((): InvoiceListStats => {
     const total = filteredInvoices.reduce((accumulator, invoice) => accumulator + invoice.amount, 0)
@@ -397,6 +414,7 @@ export function useInvoiceListData({
     totalPages,
     paginatedInvoices,
     currentMonthInvoices,
+    displayInvoices,
     stats,
     loadInvoices,
     handleMarkAsPaid,

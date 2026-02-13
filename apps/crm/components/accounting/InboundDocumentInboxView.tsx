@@ -181,12 +181,15 @@ export default function InboundDocumentInboxView({ projects }: InboundDocumentIn
     rejectItem,
   } = useInboundDocumentInbox()
 
-  const [draft, setDraft] = useState<InboundDraft | null>(null)
+  // Reset draft when selectedItem changes; use queueMicrotask to avoid synchronous setState in effect
+  const [draft, setDraft] = useState<InboundDraft | null>(() => createDraft(selectedItem))
   const [message, setMessage] = useState<UiMessage | null>(null)
 
   useEffect(() => {
-    setDraft(createDraft(selectedItem))
-    setMessage(null)
+    queueMicrotask(() => {
+      setDraft(createDraft(selectedItem))
+      setMessage(null)
+    })
   }, [selectedItem])
 
   const projectOptions = useMemo(

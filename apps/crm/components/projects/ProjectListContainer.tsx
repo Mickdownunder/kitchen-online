@@ -200,10 +200,10 @@ export const ProjectListContainer: React.FC<ProjectListProps> = ({
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20
 
-  // Reset pagination when month changes
+  // Reset pagination when month/year or search changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedMonth, selectedYear])
+  }, [selectedMonth, selectedYear, searchTerm])
 
   // Projekte für den aktuellen Monat mit Pagination
   const currentMonthProjects = useMemo(() => {
@@ -212,11 +212,17 @@ export const ProjectListContainer: React.FC<ProjectListProps> = ({
     return projectsByMonth.get(selectedMonth as number) || []
   }, [projectsByMonth, selectedMonth, selectedYear, sortedProjects])
 
-  const totalPages = Math.ceil(currentMonthProjects.length / itemsPerPage)
+  // Bei aktiver Suche: Suchtreffer aus allen Jahren anzeigen; sonst Monatsliste
+  const displayProjects = useMemo(() => {
+    if (searchTerm.trim().length > 0) return sortedProjects
+    return currentMonthProjects
+  }, [searchTerm, sortedProjects, currentMonthProjects])
+
+  const totalPages = Math.ceil(displayProjects.length / itemsPerPage)
   const paginatedProjects = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
-    return currentMonthProjects.slice(start, start + itemsPerPage)
-  }, [currentMonthProjects, currentPage, itemsPerPage])
+    return displayProjects.slice(start, start + itemsPerPage)
+  }, [displayProjects, currentPage, itemsPerPage])
 
   // Legacy grouped projects for "all" mode
   const { groupedProjects, expandedGroups, toggleGroup } = useGroupedProjects(sortedProjects)
@@ -499,18 +505,18 @@ export const ProjectListContainer: React.FC<ProjectListProps> = ({
       {activeTab === 'orders' && (
       <ProjectListTable>
         {(selectedYear !== 'all' && selectedMonth !== 'all') ? (
-          /* Einzelner Monat ausgewählt - Einfache Tabelle mit Pagination */
-          currentMonthProjects.length > 0 ? (
+          /* Einzelner Monat ausgewählt (oder Suche aktiv) - Tabelle mit Pagination */
+          displayProjects.length > 0 ? (
             <div>
-              {/* Header mit Monatszusammenfassung */}
+              {/* Header mit Monatszusammenfassung / Suchtreffer */}
               <div className="border-b border-slate-200 bg-slate-50/80 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-900">
-                      {new Date(2000, (selectedMonth as number) - 1).toLocaleDateString('de-DE', { month: 'long' })} {selectedYear}
+                      {searchTerm.trim() ? 'Suchtreffer' : `${new Date(2000, (selectedMonth as number) - 1).toLocaleDateString('de-DE', { month: 'long' })} ${selectedYear}`}
                     </h3>
                     <p className="text-sm text-slate-500">
-                      {currentMonthProjects.length} Auftrag{currentMonthProjects.length !== 1 ? 'e' : ''} • {formatCurrency(currentMonthProjects.reduce((sum, p) => sum + p.totalAmount, 0))} €
+                      {displayProjects.length} Auftrag{displayProjects.length !== 1 ? 'e' : ''} • {formatCurrency(displayProjects.reduce((sum, p) => sum + p.totalAmount, 0))} €
                     </p>
                   </div>
                   {totalPages > 1 && (
@@ -629,7 +635,7 @@ export const ProjectListContainer: React.FC<ProjectListProps> = ({
               {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t-2 border-slate-200 bg-slate-50/80 px-6 py-4">
                   <div className="text-sm text-slate-600">
-                    Zeige {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, currentMonthProjects.length)} von {currentMonthProjects.length}
+                    Zeige {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, displayProjects.length)} von {displayProjects.length}
                   </div>
                   <div className="flex items-center gap-2">
                     <button

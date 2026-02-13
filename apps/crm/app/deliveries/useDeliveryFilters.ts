@@ -186,11 +186,15 @@ export function useDeliveryFilters() {
 
   const filteredSupplier = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const hasSearch = q.length > 0
     return supplierDeliveryNotes
       .filter(n => {
         const d = new Date(n.deliveryDate)
-        if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
-        if (selectedMonth !== 'all' && d.getMonth() + 1 !== selectedMonth) return false
+        // Bei aktiver Suche: Jahr/Monat ignorieren – Treffer aus allen Jahren anzeigen
+        if (!hasSearch) {
+          if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
+          if (selectedMonth !== 'all' && d.getMonth() + 1 !== selectedMonth) return false
+        }
         if (statusFilter !== 'all' && n.status !== statusFilter) return false
         if (!q) return true
         return (
@@ -206,9 +210,10 @@ export function useDeliveryFilters() {
 
   const filteredSupplierForCounts = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const hasSearch = q.length > 0
     return supplierDeliveryNotes.filter(n => {
       const d = new Date(n.deliveryDate)
-      if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
+      if (!hasSearch && selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
       if (statusFilter !== 'all' && n.status !== statusFilter) return false
       if (!q) return true
       return (
@@ -221,11 +226,15 @@ export function useDeliveryFilters() {
 
   const filteredCustomer = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const hasSearch = q.length > 0
     return customerDeliveryNotes
       .filter(n => {
         const d = new Date(n.deliveryDate)
-        if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
-        if (selectedMonth !== 'all' && d.getMonth() + 1 !== selectedMonth) return false
+        // Bei aktiver Suche: Jahr/Monat ignorieren – Treffer aus allen Jahren anzeigen
+        if (!hasSearch) {
+          if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
+          if (selectedMonth !== 'all' && d.getMonth() + 1 !== selectedMonth) return false
+        }
         if (statusFilter !== 'all' && n.status !== statusFilter) return false
         if (!q) return true
         const project = projectsIndex.get(n.projectId)
@@ -243,9 +252,10 @@ export function useDeliveryFilters() {
 
   const filteredCustomerForCounts = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const hasSearch = q.length > 0
     return customerDeliveryNotes.filter(n => {
       const d = new Date(n.deliveryDate)
-      if (selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
+      if (!hasSearch && selectedYear !== 'all' && d.getFullYear() !== selectedYear) return false
       if (statusFilter !== 'all' && n.status !== statusFilter) return false
       if (!q) return true
       const project = projectsIndex.get(n.projectId)

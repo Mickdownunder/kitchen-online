@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Loader2, Mail, Paperclip, Send, X } from 'lucide-react'
 import type { OrderWorkflowRow } from '../types'
 import { ModalShell } from './ModalShell'
@@ -41,19 +41,11 @@ export function SendOrderConfirm({
   onClose,
   onConfirm,
 }: SendOrderConfirmProps) {
+  // Parent passes key={row?.key} so state resets on row change without effect
   const [recipient, setRecipient] = useState(() => (row?.supplierOrderEmail || '').trim())
   const [confirmed, setConfirmed] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (row) {
-      setRecipient((row.supplierOrderEmail || '').trim())
-      setConfirmed(false)
-      setSelectedFile(null)
-      setError(null)
-    }
-  }, [row?.key])
 
   const canSubmit = useMemo(() => {
     return confirmed && recipient.trim().length > 0 && EMAIL_PATTERN.test(recipient.trim())

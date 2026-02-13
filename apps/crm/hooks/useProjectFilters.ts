@@ -20,6 +20,7 @@ interface UseProjectFiltersResult {
 export function useProjectFilters(opts: UseProjectFiltersOptions): UseProjectFiltersResult {
   const filteredProjects = useMemo(() => {
     const q = opts.searchTerm.trim().toLowerCase()
+    const hasSearch = q.length > 0
     return opts.projects.filter(p => {
       const matchesSearch =
         p.customerName.toLowerCase().includes(q) || p.orderNumber.toLowerCase().includes(q)
@@ -35,6 +36,9 @@ export function useProjectFilters(opts: UseProjectFiltersOptions): UseProjectFil
         const isRisk = snapshot.riskLevel === 'critical' || snapshot.riskLevel === 'warning'
         return inWindow && isRisk
       }
+
+      // Bei aktiver Suche: Jahr/Monat ignorieren – Treffer aus allen Jahren anzeigen
+      if (hasSearch) return true
 
       const projectDate = p.orderDate || p.measurementDate || p.offerDate || p.createdAt
       if (projectDate) {
