@@ -6,6 +6,8 @@ export const VoiceCaptureRequestSchema = z.object({
   source: z.enum(['siri_shortcut', 'mobile_app', 'web', 'system']).optional(),
   locale: z.string().min(2).max(20).optional(),
   contextHints: z.record(z.unknown()).optional(),
-}).strict()
+  /** Optional: Token im Body statt im Authorization-Header (für Siri Shortcuts). */
+  token: z.string().min(10).max(200).optional(),
+})
 
 export type VoiceCaptureRequest = z.infer<typeof VoiceCaptureRequestSchema>

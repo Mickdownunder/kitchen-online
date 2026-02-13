@@ -6,7 +6,7 @@ import { rateLimit } from '@/lib/middleware/rateLimit'
 import { apiErrors } from '@/lib/utils/errorHandling'
 import { logger } from '@/lib/utils/logger'
 import { createOrGetVoiceInboxEntry, updateVoiceInboxEntry } from '@/lib/voice/inboxService'
-import { authenticateVoiceBearerToken } from '@/lib/voice/tokenAuth'
+import { authenticateVoiceBearerToken, authenticateVoiceToken } from '@/lib/voice/tokenAuth'
 import { parseVoiceIntent } from '@/lib/voice/intentParser'
 import { executeVoiceIntent } from '@/lib/voice/executeVoiceIntent'
 import { parseVoiceCaptureRequest } from './request'
@@ -43,7 +43,15 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServiceClient()
 
-    const tokenResult = await authenticateVoiceBearerToken(supabase, request.headers)
+    // Token aus Header ODER Body akzeptieren (Siri Shortcuts kann keine langen Header senden)
+    const body = await request.json().catch(() => ({}))
+    const bodyToken = typeof body === 'object' && body !== null && typeof (body as Record<string, unknown>).token === 'string'
+      ? (body as Record<string, unknown>).token as string
+      : null
+
+    const tokenResult = bodyToken
+      ? await authenticateVoiceToken(supabase, bodyToken)
+      : await authenticateVoiceBearerToken(supabase, request.headers)
     if (!tokenResult.ok) {
       apiLogger.error(new Error(tokenResult.message), 401)
       return apiErrors.unauthorized({ component: 'api/voice/capture' })
@@ -74,7 +82,6 @@ export async function POST(request: NextRequest) {
       return apiErrors.forbidden({ component: 'api/voice/capture', reason: 'voice_capture_disabled' })
     }
 
-    const body = await request.json().catch(() => ({}))
     const parsedRequest = parseVoiceCaptureRequest(body)
     if (!parsedRequest.ok) {
       apiLogger.error(new Error(parsedRequest.message), 400)
