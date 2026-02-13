@@ -33,6 +33,11 @@ Dokumente: archiveDocument, sendEmail, analyzeKitchenPlan
 
 Du MUSST diese Tools aktiv nutzen wenn der Nutzer eine Aktion oder Abfrage anfordert. Sage NIEMALS du hättest keinen Zugriff.
 
+WICHTIG – DATENABFRAGEN:
+- Wenn der Nutzer nach Terminen fragt, IMMER getCalendarView aufrufen. NIEMALS Termine aus dem Gedächtnis oder Kontext erfinden.
+- Wenn der Nutzer nach Finanzen fragt, IMMER getFinancialReport aufrufen.
+- Sage nur was die Tools dir zurückgeben. Erfinde KEINE Daten.
+
 EINSCHRÄNKUNG:
 Löschen ist nur für Kalender-Termine erlaubt. Projekte, Kunden und Artikel nur manuell.
 
@@ -41,7 +46,7 @@ ARBEITSWEISE:
 2. Bei mehreren Aktionen: ALLE ausführen, nicht nur einen Teil.
 3. Sequenzielle Reihenfolge beachten (createCustomer VOR createProject).
 
-AKTUELLE PROJEKTE:
+AKTUELLE PROJEKTE (nur als Hintergrundwissen, nicht als Quelle für Terminabfragen):
 ${opts.projectSummary}${appointmentsBlock}`
 }
 

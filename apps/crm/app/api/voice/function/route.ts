@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCompanyIdForUser } from '@/lib/supabase/services/company'
 import { apiErrors } from '@/lib/utils/errorHandling'
@@ -10,6 +11,31 @@ import { executeServerFunctionCall } from '@/app/api/chat/serverHandlers'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
+
+/**
+ * Wraps a service-role Supabase client so that `rpc('get_current_company_id')`
+ * returns the known companyId instead of relying on auth.uid() (which is null
+ * for service-role clients). This lets existing chat handlers work unchanged
+ * when called from the voice endpoint.
+ */
+function withCompanyContext(client: SupabaseClient, companyId: string): SupabaseClient {
+  const originalRpc = client.rpc.bind(client)
+  const proxy = new Proxy(client, {
+    get(target, prop) {
+      if (prop === 'rpc') {
+        return (fnName: string, ...rest: unknown[]) => {
+          if (fnName === 'get_current_company_id') {
+            // Return a thenable that mimics the Supabase response shape
+            return { data: companyId, error: null, count: null, status: 200, statusText: 'OK' }
+          }
+          return originalRpc(fnName, ...rest)
+        }
+      }
+      return Reflect.get(target, prop)
+    },
+  })
+  return proxy
+}
 
 /**
  * POST /api/voice/function
@@ -84,11 +110,15 @@ export async function POST(request: NextRequest) {
       userId: tokenContext.userId,
     })
 
+    // Wrap supabase client so handlers can resolve company_id via
+    // rpc('get_current_company_id') without a user session.
+    const supabaseWithCompany = withCompanyContext(supabase, companyId)
+
     // Execute the CRM function using existing handler registry
     const result = await executeServerFunctionCall(
       functionName,
       args,
-      supabase,
+      supabaseWithCompany,
       tokenContext.userId,
     )
 
