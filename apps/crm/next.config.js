@@ -82,6 +82,14 @@ const nextConfig = {
   },
   // Verhindert Indexierung durch Suchmaschinen (inkl. PDFs, Bilder, etc.)
   headers: async () => [
+    // Voice-Mobile: Mikrofon für Diktat erlauben
+    {
+      source: '/voice-mobile',
+      headers: [
+        ...securityHeaders.filter(h => h.key !== 'Permissions-Policy'),
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
+      ],
+    },
     {
       source: '/:path*',
       headers: securityHeaders,
