@@ -25,7 +25,7 @@ interface SessionConfig {
 // Constants
 // ---------------------------------------------------------------------------
 
-const LIVE_MODEL = 'gemini-2.5-flash-preview-native-audio-dialog'
+const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025'
 
 // ---------------------------------------------------------------------------
 // Hook
