@@ -254,7 +254,10 @@ export const handleGetCalendarView: ServerHandler = async (args, supabase) => {
     endDate = d.toISOString().slice(0, 10)
   }
 
-  const query = supabase
+  const lines: string[] = []
+
+  // 1. Planning appointments (Beratung, Erstgespräch, etc.)
+  const { data: rows, error } = await supabase
     .from('planning_appointments')
     .select('id, customer_name, date, time, type, notes')
     .eq('company_id', companyId)
@@ -263,20 +266,47 @@ export const handleGetCalendarView: ServerHandler = async (args, supabase) => {
     .order('date', { ascending: true })
     .order('time', { ascending: true })
 
-  const { data: rows, error } = await query
-
   if (error) return { result: `❌ Fehler: ${error.message}` }
-  if (!rows?.length) {
+
+  for (const r of (rows || []) as { id: string; customer_name: string; date: string; time: string | null; type: string; notes: string | null }[]) {
+    const time = r.time ? ` ${r.time}` : ''
+    const notes = r.notes ? ` - ${r.notes.slice(0, 60)}` : ''
+    lines.push(`id=${r.id} | ${r.date}${time} | ${r.type} | ${r.customer_name}${notes}`)
+  }
+
+  // 2. Project-based dates: Montage, Aufmaß, Lieferung
+  // These are stored on the projects table, not in planning_appointments
+  const { data: projectRows } = await supabase
+    .from('projects')
+    .select('id, customer_name, order_number, installation_date, installation_time, measurement_date, measurement_time, delivery_date, delivery_time')
+    .eq('company_id', companyId)
+
+  for (const p of (projectRows || []) as { id: string; customer_name: string; order_number: string; installation_date: string | null; installation_time: string | null; measurement_date: string | null; measurement_time: string | null; delivery_date: string | null; delivery_time: string | null }[]) {
+    if (p.installation_date && p.installation_date >= startDate && p.installation_date <= endDate) {
+      const time = p.installation_time ? ` ${p.installation_time}` : ''
+      lines.push(`projekt=${p.id} | ${p.installation_date}${time} | Montage | ${p.customer_name} (${p.order_number})`)
+    }
+    if (p.measurement_date && p.measurement_date >= startDate && p.measurement_date <= endDate) {
+      const time = p.measurement_time ? ` ${p.measurement_time}` : ''
+      lines.push(`projekt=${p.id} | ${p.measurement_date}${time} | Aufmaß | ${p.customer_name} (${p.order_number})`)
+    }
+    if (p.delivery_date && p.delivery_date >= startDate && p.delivery_date <= endDate) {
+      const time = p.delivery_time ? ` ${p.delivery_time}` : ''
+      lines.push(`projekt=${p.id} | ${p.delivery_date}${time} | Lieferung | ${p.customer_name} (${p.order_number})`)
+    }
+  }
+
+  if (!lines.length) {
     return { result: `Keine Termine für ${isWeek ? `${startDate} bis ${endDate}` : startDate}.` }
   }
 
-  const lines = rows.map(
-    (r: { id: string; customer_name: string; date: string; time: string | null; type: string; notes: string | null }) => {
-      const time = r.time ? ` ${r.time}` : ''
-      const notes = r.notes ? ` - ${r.notes.slice(0, 60)}` : ''
-      return `id=${r.id} | ${r.date}${time} | ${r.type} | ${r.customer_name}${notes}`
-    },
-  )
+  // Sort by date+time
+  lines.sort((a, b) => {
+    const dateA = a.split('|')[1]?.trim() || ''
+    const dateB = b.split('|')[1]?.trim() || ''
+    return dateA.localeCompare(dateB)
+  })
+
   return { result: lines.join('\n') }
 }
 

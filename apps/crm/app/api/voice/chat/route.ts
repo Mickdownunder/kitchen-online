@@ -16,6 +16,7 @@ import { agentTools } from '@/lib/ai/agentTools'
 import { buildSystemInstruction } from '@/lib/ai/systemInstruction'
 import { executeServerFunctionCall } from '@/app/api/chat/serverHandlers'
 import { mapProjectFromDB } from '@/lib/supabase/services/projects/mappers'
+import type { ProjectRow } from '@/lib/supabase/services/projects/types'
 import { loadInvoicesForProjectSummary } from '@/app/api/chat/summaryContext'
 import { buildProjectSummary } from '@/lib/ai/projectSummary'
 
@@ -155,25 +156,78 @@ async function executeFunctionCalls(
 // ---------------------------------------------------------------------------
 
 async function loadVoiceContext(supabase: SupabaseClient, companyId: string) {
-  // Load projects with items
-  const { data: projectRows } = await supabase
+  // Load projects — try with invoice_items join, fall back to plain select
+  // (service_role may lack table-level GRANT on invoice_items)
+  let projectRows: Record<string, unknown>[] | null = null
+  let projectError: unknown = null
+
+  const fullQuery = await supabase
     .from('projects')
     .select('*, invoice_items (*)')
     .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .limit(100)
 
-  const projects = (projectRows || []).map(mapProjectFromDB)
-  const invoices = await loadInvoicesForProjectSummary(supabase, projects)
+  if (fullQuery.error) {
+    logger.warn('Voice context: full project query failed, falling back to simple query', {
+      component: 'api/voice/chat',
+      error: fullQuery.error.message,
+    })
+    const simpleQuery = await supabase
+      .from('projects')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    projectRows = simpleQuery.data
+    projectError = simpleQuery.error
+  } else {
+    projectRows = fullQuery.data
+  }
+
+  if (projectError) {
+    logger.error('Voice context: project loading failed', {
+      component: 'api/voice/chat',
+      error: String(projectError),
+    })
+  }
+
+  const projects = (projectRows || []).map((row) => mapProjectFromDB(row as unknown as ProjectRow))
+
+  // Load invoices separately (more robust than relying on join)
+  let invoices: Awaited<ReturnType<typeof loadInvoicesForProjectSummary>> = []
+  try {
+    invoices = await loadInvoicesForProjectSummary(supabase, projects)
+  } catch (e) {
+    logger.warn('Voice context: invoice loading failed', {
+      component: 'api/voice/chat',
+      error: e instanceof Error ? e.message : String(e),
+    })
+  }
+
   const projectSummary = buildProjectSummary(projects, invoices)
 
-  // Load appointments
-  const { data: appointments } = await supabase
+  logger.info('Voice context loaded', {
+    component: 'api/voice/chat',
+    projectCount: projects.length,
+    invoiceCount: invoices.length,
+    summaryLength: projectSummary.length,
+  })
+
+  // Load planning appointments
+  const { data: appointments, error: apptError } = await supabase
     .from('planning_appointments')
     .select('id, customer_name, date, time, type, notes')
     .eq('company_id', companyId)
     .order('date', { ascending: true })
     .order('time', { ascending: true })
+
+  if (apptError) {
+    logger.warn('Voice context: appointment loading failed', {
+      component: 'api/voice/chat',
+      error: apptError.message,
+    })
+  }
 
   const appointmentLines = (appointments || []).map(
     (a: Record<string, unknown>) => {
@@ -182,7 +236,37 @@ async function loadVoiceContext(supabase: SupabaseClient, companyId: string) {
       return `id=${a.id} | ${a.date}${time} | ${a.type} | ${a.customer_name}${notes}`
     },
   )
+
+  // Also include project-based dates (Montage, Aufmaß, Lieferung) as appointment lines
+  for (const p of projects) {
+    if (p.installationDate) {
+      const time = p.installationTime ? ` ${p.installationTime}` : ''
+      appointmentLines.push(`projekt=${p.id} | ${p.installationDate}${time} | Montage | ${p.customerName} (${p.orderNumber})`)
+    }
+    if (p.measurementDate) {
+      const time = p.measurementTime ? ` ${p.measurementTime}` : ''
+      appointmentLines.push(`projekt=${p.id} | ${p.measurementDate}${time} | Aufmaß | ${p.customerName} (${p.orderNumber})`)
+    }
+    if (p.deliveryDate) {
+      const time = p.deliveryTime ? ` ${p.deliveryTime}` : ''
+      appointmentLines.push(`projekt=${p.id} | ${p.deliveryDate}${time} | Lieferung | ${p.customerName} (${p.orderNumber})`)
+    }
+  }
+
+  // Sort by date
+  appointmentLines.sort((a, b) => {
+    const dateA = a.split('|')[1]?.trim() || ''
+    const dateB = b.split('|')[1]?.trim() || ''
+    return dateA.localeCompare(dateB)
+  })
+
   const appointmentsSummary = appointmentLines.join('\n')
+
+  logger.info('Voice context appointments', {
+    component: 'api/voice/chat',
+    planningCount: (appointments || []).length,
+    totalAppointmentLines: appointmentLines.length,
+  })
 
   return { projectSummary, appointmentsSummary }
 }
